@@ -1,7 +1,7 @@
 // Service worker: permite instalar la app y abrirla aunque falle la cobertura.
 // Siempre intenta la red primero (para tener lo último) y si no hay, usa la copia guardada.
-const CACHE = 'kubel-oficina-v2.0.0';
-const BASICOS = ['./', 'index.html', 'manifest.webmanifest', 'iconos/icono-192.png', '../comun/config.js', '../comun/cargar-supabase.js'];
+const CACHE = 'kubel-oficina-v2.1.0';
+const BASICOS = ['./', 'index.html', 'manifest.webmanifest', 'iconos/icono-192.png', '../comun/config.js', '../comun/cargar-supabase.js', '../comun/avisos.js'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(BASICOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && k.startsWith('kubel-oficina')).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
@@ -19,4 +19,28 @@ self.addEventListener('fetch', (e) => {
       return res;
     }).catch(() => caches.match(req).then((r) => r || caches.match('index.html')))
   );
+});
+
+// ---------- Notificaciones push ----------
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data.json(); } catch { d = { title: 'KUBEL', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'KUBEL', {
+    body: d.body || '', tag: d.tag, renotify: !!d.tag,
+    icon: 'iconos/icono-192.png', badge: 'iconos/badge-96.png',
+    data: { url: d.url || self.registration.scope },
+  }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || self.registration.scope;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+    for (const c of cs) {
+      if (c.url.startsWith(self.registration.scope)) {
+        c.postMessage({ tipo: 'notificacion', url });
+        return c.focus();
+      }
+    }
+    return self.clients.openWindow(url);
+  }));
 });

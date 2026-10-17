@@ -1,0 +1,9 @@
+-- FASE 2.1 (18/10/2026) — ya aplicado en el proyecto kubel.
+-- Resumen (las claves reales están solo en la base de datos, tabla privado.ajustes, NO aquí):
+--  * extensiones pg_net y pg_cron
+--  * esquema privado + tabla privado.ajustes (vapid_public, vapid_private, notif_secreto, backup_key)
+--  * tabla public.push_suscripciones + RLS + RPC registrar_suscripcion / borrar_suscripcion
+--  * función privado.avisar() + disparadores asignaciones_avisar_alta, asignaciones_avisar_cambio, informes_avisar
+--  * función public.ping() + cron 'kubel-mantener-activo' (07:00 UTC diario)
+--  * función public.clave_copias() (solo oficina) para abrir copias desde la web
+-- Funciones Edge: notificar (verify_jwt = false, valida cabecera x-kubel-secreto), copia (verify_jwt = true).

@@ -13,6 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="KUBEL Oficina">
 <script src="../comun/config.js"></script>
 <script src="../comun/cargar-supabase.js"></script>
+<script src="../comun/avisos.js"></script>
 <style>
   :root{
     --fondo:#F3F1EC; --tarjeta:#fff; --texto:#1E2328; --suave:#5F6770; --borde:#E2DED6;
@@ -189,7 +190,7 @@
       <a href="#informes" data-v="informes">Informes<span id="b-inf" class="badge oculto"></span></a>
       <a href="#operarios" data-v="operarios">Operarios</a>
     </nav>
-    <div class="usuario"><span id="vivo" class="vivo off" title="Actualización en directo"></span><span id="yo"></span><button class="mini" onclick="salir()">Salir</button></div>
+    <div class="usuario"><span id="vivo" class="vivo off" title="Actualización en directo"></span><button class="mini" id="btn-avisos" onclick="alternarAvisos()" title="Avisos en este dispositivo">🔕</button><span id="yo"></span><button class="mini" onclick="salir()">Salir</button></div>
   </header>
   <main id="contenido"></main>
 </div>
@@ -287,6 +288,7 @@ async function alCambiarSesion(sesion) {
   await cargarCatalogos();
   arrancarTiempoReal();
   contarSinRevisar();
+  KubelAvisos.sincronizar(sb).then(pintarBotonAvisos);
   irA(location.hash.slice(1) || 'hoy');
 }
 
@@ -297,7 +299,25 @@ async function entrar(ev) {
   $('#lg-btn').disabled = false;
   if (error) $('#lg-error').textContent = /Invalid login/i.test(error.message) ? 'Correo o contraseña incorrectos.' : mensaje(error);
 }
-function salir() { if (confirm('¿Cerrar sesión?')) sb.auth.signOut(); }
+async function salir() {
+  if (!confirm('¿Cerrar sesión? Este dispositivo dejará de recibir avisos.')) return;
+  await KubelAvisos.desactivar(sb);
+  sb.auth.signOut();
+}
+async function pintarBotonAvisos() {
+  const b = $('#btn-avisos'); if (!b) return;
+  if (!KubelAvisos.soportado()) { b.classList.add('oculto'); return; }
+  const on = await KubelAvisos.activos();
+  b.textContent = on ? '🔔' : '🔕';
+  b.title = on ? 'Avisos activados en este dispositivo (pulsa para desactivar)' : 'Activar avisos en este dispositivo';
+}
+async function alternarAvisos() {
+  try {
+    if (await KubelAvisos.activos()) { await KubelAvisos.desactivar(sb); aviso('Avisos desactivados en este dispositivo'); }
+    else { await KubelAvisos.activar(sb); aviso('🔔 Avisos activados: te llegarán los informes y las visitas no realizadas'); }
+  } catch (e) { alert(mensaje(e)); }
+  pintarBotonAvisos();
+}
 
 async function cargarCatalogos() {
   const [o, c] = await Promise.all([
@@ -844,7 +864,19 @@ async function vistaOperarios() {
         <td style="text-align:center"><input type="checkbox" id="op-a-${p.id}" ${p.activo ? 'checked' : ''} ${p.id === yo.id ? 'disabled' : ''} style="width:auto"></td>
         <td style="white-space:nowrap"><button class="mini" onclick="guardarOperario('${p.id}')">Guardar</button>
             <button class="mini sec" onclick="modalClave('${p.id}')">Contraseña</button></td>
-      </tr>`).join('')}</tbody></table></div>`;
+      </tr>`).join('')}</tbody></table></div>
+    <div class="tarjeta" style="margin-top:20px">
+      <h3 style="margin:0 0 6px">Copias de seguridad</h3>
+      <p style="color:var(--suave);margin:0 0 12px">Cada lunes se guarda automáticamente una copia cifrada de todos los datos (sin las fotos) durante 90 días en
+        <a href="https://github.com/aitorortega00-dot/aitorortega00-dot.github.io/actions/workflows/copia.yml" target="_blank" rel="noopener">GitHub → Copia de seguridad</a>.
+        Aquí puedes descargar una ahora o abrir una guardada.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="copiaAhora()" id="btn-copia">Descargar copia ahora</button>
+        <button class="sec" onclick="$('#f-copia').click()">Abrir copia guardada…</button>
+        <input type="file" id="f-copia" accept=".json,.zip,application/json" class="oculto" onchange="abrirCopia(this)">
+      </div>
+      <div id="copia-res" style="margin-top:10px;color:var(--suave)"></div>
+    </div>`;
   const enlace = new URL('../operario/', location.href).href;
   $('#enlace-op').textContent = enlace;
   try {
@@ -852,6 +884,44 @@ async function vistaOperarios() {
     cache.todosPerfiles.forEach((p) => { const td = $('#op-e-' + p.id); if (td) td.textContent = r.correos[p.id] || '—'; });
   } catch (e) { cache.todosPerfiles.forEach((p) => { const td = $('#op-e-' + p.id); if (td) td.textContent = '—'; }); }
 }
+// ---------- Copias de seguridad ----------
+const b64aBytes = (b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
+async function descifrarCopia(c) {
+  if (c?.formato !== 'kubel-copia-v1') throw new Error('Este archivo no es una copia de KUBEL.');
+  const { data: clave, error } = await sb.rpc('clave_copias');
+  if (error) throw error;
+  const key = await crypto.subtle.importKey('raw', b64aBytes(clave), 'AES-GCM', false, ['decrypt']);
+  const plano = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64aBytes(c.iv) }, key, b64aBytes(c.datos));
+  return JSON.parse(new TextDecoder().decode(plano));
+}
+function descargarJSON(obj, nombre) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));
+  a.download = nombre; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+const resumenCopia = (d) => Object.entries(d.datos).map(([t, f]) => `${t}: ${f.length}`).join(' · ');
+async function copiaAhora() {
+  $('#btn-copia').disabled = true; $('#copia-res').textContent = 'Preparando copia…';
+  try {
+    const { data, error } = await sb.functions.invoke('copia', { body: {} });
+    if (error) throw error;
+    const d = await descifrarCopia(data);
+    descargarJSON(d, `kubel-copia-${hoyISO()}.json`);
+    $('#copia-res').textContent = '✅ Copia descargada (' + resumenCopia(d) + ')';
+  } catch (e) { $('#copia-res').textContent = 'Error: ' + mensaje(e); }
+  $('#btn-copia').disabled = false;
+}
+async function abrirCopia(inp) {
+  const f = inp.files?.[0]; inp.value = ''; if (!f) return;
+  $('#copia-res').textContent = 'Abriendo…';
+  try {
+    if (/\.zip$/i.test(f.name)) throw new Error('GitHub la descarga comprimida: haz clic derecho en el .zip → "Extraer todo" y abre el .json de dentro.');
+    const d = await descifrarCopia(JSON.parse(await f.text()));
+    descargarJSON(d, f.name.replace(/\.json$/i, '') + '-abierta.json');
+    $('#copia-res').textContent = `✅ Copia del ${fHora(d.fecha)} abierta y descargada (${resumenCopia(d)})`;
+  } catch (e) { $('#copia-res').textContent = 'Error: ' + mensaje(e); }
+}
+
 function copiarEnlace() {
   navigator.clipboard?.writeText($('#enlace-op').textContent).then(() => aviso('Enlace copiado'), () => {});
 }

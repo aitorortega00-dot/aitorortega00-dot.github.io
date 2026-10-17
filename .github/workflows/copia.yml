@@ -1,0 +1,51 @@
+# Copia de seguridad semanal de los datos de KUBEL (cifrada) + mantener Supabase activo.
+# Las copias se guardan 90 días en la pestaña Actions → "Copia de seguridad" → Artifacts.
+# Para abrirlas: web de oficina → Operarios → Copias de seguridad.
+name: Copia de seguridad
+
+on:
+  schedule:
+    - cron: '30 2 * * 1'   # lunes 02:30 UTC
+    - cron: '15 6 * * *'   # todos los días: ping a Supabase
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+env:
+  SUPABASE_URL: https://hytmotuhdxbzpustnlzx.supabase.co
+  # Clave pública (anon): la misma que usan las webs
+  SUPABASE_ANON: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5dG1vdHVoZHhienB1c3RubHp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxNzcyODUsImV4cCI6MjEwNzc1MzI4NX0.Jo84VL4eQWhYwaUPlCCMp6PYDON4CqUdEx5GmaFoVVo
+
+jobs:
+  copia:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mantener Supabase activo
+        run: |
+          curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/ping" -H "apikey: $SUPABASE_ANON" -H "Authorization: Bearer $SUPABASE_ANON" -H "Content-Type: application/json" -d '{}'
+
+      - name: Descargar copia cifrada
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * 1'
+        run: |
+          F="kubel-copia-$(date -u +%Y-%m-%d).json"
+          curl -fsS --max-time 120 -X POST "$SUPABASE_URL/functions/v1/copia" -H "Authorization: Bearer $SUPABASE_ANON" -H "Content-Type: application/json" -d '{}' -o "$F"
+          python3 -c "import json,sys;d=json.load(open('$F'));assert d.get('formato')=='kubel-copia-v1', d;print('Filas:', d['filas'])"
+          echo "FICHERO=$F" >> "$GITHUB_ENV"
+
+      - name: Guardar copia (90 días)
+        if: env.FICHERO != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FICHERO }}
+          path: ${{ env.FICHERO }}
+          retention-days: 90
+
+      - name: Evitar que GitHub desactive las tareas programadas
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for w in copia.yml; do
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/$w/enable" || true
+          done

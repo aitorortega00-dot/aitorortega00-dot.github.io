@@ -15,6 +15,7 @@
 <meta name="format-detection" content="telephone=no">
 <script src="../comun/config.js"></script>
 <script src="../comun/cargar-supabase.js"></script>
+<script src="../comun/avisos.js"></script>
 <style>
   :root{
     --fondo:#F3F1EC; --tarjeta:#fff; --texto:#1E2328; --suave:#5F6770; --borde:#E2DED6;
@@ -228,6 +229,7 @@ async function alCambiarSesion(s) {
   if (!data.activo) { await informar('Cuenta desactivada', 'Habla con la oficina.'); return sb.auth.signOut(); }
   yo = data;
   arrancarTiempoReal();
+  KubelAvisos.sincronizar(sb).then(() => pintarBandas());
   history.replaceState({ p: 'dia' }, '');
   estado.pantalla = 'dia';
   pintar();
@@ -284,7 +286,7 @@ function descartarInstalacion() { try { localStorage.setItem('kubel-sin-aviso-in
 function bandaInstalarHTML(enLogin) {
   if (instalada || (!enLogin && instalacionDescartada())) return '';
   let txt = '';
-  if (esIOS) txt = 'Para tenerla como app: pulsa <b>Compartir</b> <span style="font-size:18px">⎋</span> y luego <b>“Añadir a pantalla de inicio”</b>.';
+  if (esIOS) txt = 'Para tenerla como app y recibir avisos: pulsa <b>Compartir</b> <span style="font-size:18px">⎋</span> y luego <b>“Añadir a pantalla de inicio”</b>.';
   else if (esAndroid) txt = `Para tenerla como app: <a href="${URL_APK}">descarga la APK</a>${promptInstalar ? ' o <a href="#" onclick="promptInstalar.prompt();return false">instálala desde Chrome</a>' : ''}.`;
   else return '';
   if (enLogin) return `<p class="suave" style="margin-top:18px;text-align:left">${txt}</p>`;
@@ -293,6 +295,7 @@ function bandaInstalarHTML(enLogin) {
 function pintarBandas() {
   const b = $('#bandas'); if (!b) return;
   b.innerHTML = (navigator.onLine ? '' : '<div class="banda offline">Sin conexión. Los datos pueden no estar al día.</div>') + bandaInstalarHTML(false);
+  bandaAvisos().then((h) => { if ($('#bandas') === b && h) b.insertAdjacentHTML('beforeend', h); });
 }
 window.addEventListener('online', () => { pintarBandas(); if (estado.pantalla === 'dia') cargarDia(); });
 window.addEventListener('offline', pintarBandas);
@@ -336,7 +339,29 @@ function pintarDia() {
 }
 function cambiarDia(n) { irAFecha(sumar(estado.fecha, n)); }
 function irAFecha(f) { estado.fecha = f; pintarDia(); }
-async function salir() { if (await preguntar('Cerrar sesión', '¿Seguro que quieres salir?', 'Salir', true)) sb.auth.signOut(); }
+async function salir() {
+  if (!(await preguntar('Cerrar sesión', '¿Seguro que quieres salir? Este móvil dejará de recibir tus avisos.', 'Salir', true))) return;
+  await KubelAvisos.desactivar(sb);
+  sb.auth.signOut();
+}
+
+// ---------- Avisos (notificaciones) ----------
+function avisosDescartados() { try { return localStorage.getItem('kubel-sin-aviso-notif') === '1'; } catch { return false; } }
+function descartarAvisos() { try { localStorage.setItem('kubel-sin-aviso-notif', '1'); } catch {} pintarBandas(); }
+async function bandaAvisos() {
+  if (avisosDescartados() || KubelAvisos.permiso() === 'denied') return '';
+  if (await KubelAvisos.activos()) return '';
+  if (KubelAvisos.necesitaInstalar()) return ''; // en iPhone primero hay que instalarla (ya sale el aviso de instalar)
+  if (!KubelAvisos.soportado()) return '';
+  return `<div class="banda instalar"><span>🔔 Activa los avisos para enterarte al momento de servicios nuevos o cambios.</span>
+    <a href="#" onclick="activarAvisos();return false" style="font-weight:700;white-space:nowrap">Activar</a>
+    <button onclick="descartarAvisos()" aria-label="Cerrar">✕</button></div>`;
+}
+async function activarAvisos() {
+  try { await KubelAvisos.activar(sb); aviso('Avisos activados ✅'); }
+  catch (e) { informar('No se pudieron activar los avisos', mensaje(e)); }
+  pintarBandas();
+}
 
 async function cargarDia(lunes) {
   const f = estado.fecha;
@@ -593,7 +618,15 @@ async function enviarInforme() {
   }
 }
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  // Al tocar una notificación con la app abierta: volver a "Mis servicios" y recargar
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.tipo === 'notificacion' && yo) {
+      if (estado.pantalla === 'dia') cargarDia(); else if (estado.pantalla === 'parte') history.back();
+    }
+  });
+}
 </script>
 </body>
 </html>
