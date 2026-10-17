@@ -1,0 +1,44 @@
+plugins {
+    id 'com.android.application'
+}
+
+def runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+
+android {
+    namespace 'es.kubel.operario'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'es.kubel.operario'
+        minSdk 21
+        targetSdk 34
+        versionCode runNumber
+        versionName "2.0.${runNumber}"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("KUBEL_KEYSTORE_PATH") ?: "kubel.keystore")
+            storeType "pkcs12"
+            storePassword System.getenv("KUBEL_KEYSTORE_PASS") ?: ""
+            keyAlias "kubel"
+            keyPassword System.getenv("KUBEL_KEYSTORE_PASS") ?: ""
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+}

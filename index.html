@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KUBEL</title>
+<meta name="theme-color" content="#1F4E5F">
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+  :root{--marca:#1F4E5F;--acento:#E07A1F;--suave:#5F6770;--borde:#E2DED6}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--marca);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1E2328;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+  .caja{width:100%;max-width:760px}
+  h1{color:#fff;text-align:center;letter-spacing:6px;font-size:40px;margin:0}
+  .sub{color:#C9DCE2;text-align:center;margin:4px 0 28px}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .t{background:#fff;border-radius:16px;padding:22px;display:flex;flex-direction:column}
+  .t h2{margin:0 0 4px;color:var(--marca)}
+  .t p{color:var(--suave);margin:0 0 16px;flex:1}
+  a.b{display:block;text-align:center;background:var(--marca);color:#fff;text-decoration:none;font-weight:600;border-radius:10px;padding:13px;margin-top:8px}
+  a.b.ac{background:var(--acento)}
+  a.b.sec{background:#fff;color:var(--marca);border:1.5px solid var(--marca)}
+  details{margin-top:12px;color:var(--suave);font-size:14px}
+  summary{cursor:pointer;color:var(--marca);font-weight:600}
+  ol{padding-left:20px;margin:8px 0 0}
+  @media (max-width:640px){.dos{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="caja">
+  <h1>KUBEL</h1>
+  <div class="sub">Gestión de servicios y reparaciones</div>
+  <div class="dos">
+    <div class="t">
+      <h2>Oficina</h2>
+      <p>Partes, planificación semanal, rutas de hoy, informes y fotos de los operarios.</p>
+      <a class="b" href="oficina/">Entrar a la oficina</a>
+    </div>
+    <div class="t">
+      <h2>Operarios</h2>
+      <p>Tus servicios del día, cómo llegar, llamar al cliente e informe con fotos.</p>
+      <a class="b ac" href="operario/">Abrir la app</a>
+      <a class="b sec" href="https://github.com/aitorortega00-dot/aitorortega00-dot.github.io/releases/latest/download/kubel-operario.apk">Descargar APK (Android)</a>
+      <details><summary>Instalar en iPhone</summary>
+        <ol><li>Abre <b>esta página en Safari</b> y pulsa “Abrir la app”.</li>
+          <li>Pulsa el botón <b>Compartir</b> (cuadrado con flecha).</li>
+          <li>Elige <b>“Añadir a pantalla de inicio”</b> → Añadir.</li></ol></details>
+      <details><summary>Instalar en Android</summary>
+        <ol><li>Pulsa <b>Descargar APK</b> y ábrela al terminar.</li>
+          <li>Si el móvil lo pide, permite “instalar apps de esta fuente”.</li>
+          <li>Abre <b>KUBEL</b> desde el menú de apps.</li></ol></details>
+    </div>
+  </div>
+</div>
+</body>
+</html>

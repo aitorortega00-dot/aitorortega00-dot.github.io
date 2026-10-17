@@ -1,0 +1,61 @@
+# Fabrica la APK de KUBEL Operario y la publica en "Releases".
+# Se lanza sola cuando cambia la carpeta android/, o a mano desde la pestaña Actions.
+name: APK Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/apk.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Comprobar la clave de firma
+        env:
+          KUBEL_KEYSTORE_PASS: ${{ secrets.KUBEL_KEYSTORE_PASS }}
+        run: |
+          if [ -z "$KUBEL_KEYSTORE_PASS" ]; then
+            echo "::error::Falta el secreto KUBEL_KEYSTORE_PASS (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          openssl enc -d -aes-256-cbc -pbkdf2 -in android/kubel.keystore.enc -out "$RUNNER_TEMP/kubel.keystore" -pass env:KUBEL_KEYSTORE_PASS
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Compilar APK firmada
+        env:
+          KUBEL_KEYSTORE_PASS: ${{ secrets.KUBEL_KEYSTORE_PASS }}
+        run: |
+          export KUBEL_KEYSTORE_PATH="$RUNNER_TEMP/kubel.keystore"
+          gradle -p android assembleRelease --no-daemon
+          cp android/app/build/outputs/apk/release/app-release.apk kubel-operario.apk
+          ls -la kubel-operario.apk
+
+      - name: Publicar en Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: KUBEL Operario (Android) · versión ${{ github.run_number }}
+          body: |
+            APK de la app de operarios. Descárgala en el móvil Android y ábrela para instalar.
+            Enlace fijo a la última versión: https://github.com/${{ github.repository }}/releases/latest/download/kubel-operario.apk
+          files: kubel-operario.apk
+          make_latest: true
+
+      - name: Borrar la clave temporal
+        if: always()
+        run: rm -f "$RUNNER_TEMP/kubel.keystore"

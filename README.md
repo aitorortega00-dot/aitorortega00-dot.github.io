@@ -1,0 +1,9 @@
+# KUBEL
+
+- **Oficina** → https://aitorortega00-dot.github.io/oficina/
+- **Operarios** → https://aitorortega00-dot.github.io/operario/
+- **APK Android** → https://github.com/aitorortega00-dot/aitorortega00-dot.github.io/releases/latest/download/kubel-operario.apk
+
+Web estática (HTML + JS) sobre Supabase. Cada cambio subido a `main` se publica solo en GitHub Pages.
+La APK (carpeta `android/`) es un envoltorio Trusted Web Activity de la web de operarios: los cambios de la web
+llegan a todos los móviles sin reinstalar. Se fabrica con la acción **APK Android** (necesita el secreto `KUBEL_KEYSTORE_PASS`).

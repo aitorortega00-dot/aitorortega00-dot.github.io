@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "es.kubel.operario",
+    "sha256_cert_fingerprints": ["40:CB:C9:50:72:ED:AC:BC:5A:E5:32:17:3F:72:04:E6:FF:42:AA:65:AC:E2:C1:37:D6:EF:D4:47:5D:0A:A8:32"]
+  }
+}]

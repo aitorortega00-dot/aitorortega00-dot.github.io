@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KUBEL Oficina</title>
+<meta name="theme-color" content="#1F4E5F">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="iconos/favicon.png">
+<link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="KUBEL Oficina">
+<script src="../comun/config.js"></script>
+<script src="../comun/cargar-supabase.js"></script>
+<style>
+  :root{
+    --fondo:#F3F1EC; --tarjeta:#fff; --texto:#1E2328; --suave:#5F6770; --borde:#E2DED6;
+    --marca:#1F4E5F; --marca-suave:#E3ECEF; --acento:#E07A1F; --peligro:#C0392B; --ok:#2E7D4F; --azul:#1B5A8C;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--fondo);color:var(--texto)}
+  a{color:var(--marca)}
+  button,input,select,textarea{font:inherit}
+  button{cursor:pointer;border-radius:8px;border:1.5px solid var(--marca);background:var(--marca);color:#fff;padding:7px 14px;font-weight:600}
+  button.sec{background:#fff;color:var(--marca)}
+  button.acento{background:var(--acento);border-color:var(--acento)}
+  button.peligro{background:#fff;color:var(--peligro);border-color:var(--peligro)}
+  button.mini{padding:3px 9px;font-size:12px}
+  button:disabled{opacity:.5;cursor:default}
+  input,select,textarea{border:1px solid var(--borde);border-radius:8px;padding:7px 10px;background:#FAFAF8;color:var(--texto);width:100%}
+  textarea{min-height:80px;resize:vertical}
+  label{display:block;font-weight:600;font-size:12px;color:var(--suave);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px}
+  .oculto{display:none!important}
+
+  header{background:var(--marca);color:#fff;display:flex;align-items:center;gap:20px;padding:0 20px;padding-top:env(safe-area-inset-top);min-height:56px;position:sticky;top:0;z-index:5}
+  header .logo{font-weight:800;letter-spacing:3px;font-size:18px;white-space:nowrap}
+  header .logo small{font-weight:600;letter-spacing:1px;font-size:11px;color:#C9DCE2;margin-left:6px}
+  header nav{display:flex;gap:4px;flex:1;overflow-x:auto;scrollbar-width:none}
+  header nav::-webkit-scrollbar{display:none}
+  header nav a{color:#C9DCE2;text-decoration:none;padding:8px 12px;border-radius:8px;font-weight:600;white-space:nowrap;position:relative}
+  header nav a.activo,header nav a:hover{background:rgba(255,255,255,.12);color:#fff}
+  .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--acento);color:#fff;font-size:11px;line-height:18px;text-align:center;margin-left:4px}
+  header .usuario{font-size:13px;color:#C9DCE2;white-space:nowrap;display:flex;align-items:center;gap:8px}
+  header .usuario button{background:transparent;border-color:#C9DCE2;color:#fff}
+  .vivo{width:8px;height:8px;border-radius:50%;background:#7FD19B;display:inline-block}
+  .vivo.off{background:#E8A598}
+
+  main{padding:20px;max-width:1500px;margin:0 auto}
+  .barra{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+  .barra h2{margin:0 12px 0 0;font-size:20px}
+  .barra .esp{flex:1}
+  .tarjeta{background:var(--tarjeta);border:1px solid var(--borde);border-radius:12px;padding:16px}
+
+  .centro{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--marca);padding:20px}
+  .caja{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:400px}
+  .caja h1{margin:0;color:var(--marca);letter-spacing:4px;text-align:center}
+  .caja p{color:var(--suave);text-align:center;margin:4px 0 12px}
+  .caja button{width:100%;margin-top:18px;padding:11px}
+  .error{color:var(--peligro);margin-top:10px;font-size:13px}
+  .nota{background:#FFF4E5;color:#8A4B00;border-radius:8px;padding:10px;font-size:13px}
+
+  /* Hoy */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+  .kpi{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:14px 16px;text-decoration:none;color:inherit;display:block}
+  .kpi:hover{border-color:var(--marca)}
+  .kpi .n{font-size:30px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+  .kpi .t{font-size:12px;color:var(--suave);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+  .kpi.alerta .n{color:var(--acento)}
+  .kpi.mal .n{color:var(--peligro)}
+  .hoy-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;align-items:start}
+  .op-hoy{margin-bottom:12px}
+  .op-hoy .cab{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .op-hoy .cab b{font-size:15px}
+  .op-hoy .cab .esp{flex:1}
+  .progreso{height:6px;background:#ECEAE4;border-radius:3px;overflow:hidden;margin-bottom:10px}
+  .progreso div{height:100%;background:var(--ok)}
+  .visita{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--borde);cursor:pointer}
+  .visita:hover{background:#FAF8F3}
+  .visita .h{width:44px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--suave)}
+  .visita .d{flex:1;min-width:0}
+  .visita .d div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .feed .item{padding:10px 0;border-top:1px solid var(--borde);cursor:pointer}
+  .feed .item:first-of-type{border-top:0}
+  .feed .item:hover{background:#FAF8F3}
+  .feed .item .txt{color:var(--suave);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+  /* Planificación */
+  .plan{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start}
+  .sin-plan{position:sticky;top:76px;max-height:calc(100vh - 96px);overflow:auto}
+  .sin-plan h3{margin:0 0 8px;font-size:14px}
+  .rejilla{overflow:auto;background:#fff;border:1px solid var(--borde);border-radius:12px}
+  .rejilla table{border-collapse:collapse;width:100%;min-width:900px;table-layout:fixed}
+  .rejilla th,.rejilla td{border-bottom:1px solid var(--borde);border-right:1px solid var(--borde);vertical-align:top;padding:6px}
+  .rejilla th{background:#FAFAF8;font-size:12px;text-transform:capitalize;color:var(--suave);position:sticky;top:0}
+  .rejilla th.hoy{background:var(--marca-suave);color:var(--marca)}
+  .rejilla td.op{font-weight:700;width:130px;background:#FAFAF8}
+  .rejilla td.celda{height:90px}
+  .rejilla td.celda.sobre{background:#FFF4E5}
+  .rejilla td.hoy{background:#F7FAFB}
+  .chip{background:var(--marca-suave);border-left:4px solid var(--marca);border-radius:6px;padding:4px 6px;margin-bottom:5px;font-size:12px;cursor:grab;line-height:1.3}
+  .chip b{display:block}
+  .chip .dir{color:var(--suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip.urgente{border-left-color:var(--peligro)}
+  .chip.hecho{opacity:.55;border-left-color:var(--ok)}
+  .chip.no_realizado{border-left-color:var(--peligro);background:#F8DEDA}
+  .chip.en_camino{border-left-color:var(--azul);background:#DCEBF7}
+  .anadir{display:block;width:100%;background:transparent;border:1px dashed var(--borde);color:var(--suave);padding:2px;font-weight:400;font-size:12px}
+  .anadir:hover{border-color:var(--marca);color:var(--marca)}
+  .leyenda{display:flex;gap:14px;font-size:12px;color:var(--suave);margin-top:10px;flex-wrap:wrap}
+  .leyenda span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;background:var(--c)}
+
+  table.lista{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--borde);border-radius:12px;overflow:hidden}
+  table.lista th,table.lista td{padding:9px 10px;border-bottom:1px solid var(--borde);text-align:left;vertical-align:top}
+  table.lista th{background:#FAFAF8;font-size:12px;color:var(--suave);text-transform:uppercase}
+  table.lista tr.clic:hover{background:#FAF8F3;cursor:pointer}
+  .et{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;background:#ECEAE4;color:#4A5058;white-space:nowrap}
+  .et.pendiente{background:#FDEBD8;color:#9A4E0B}
+  .et.asignado{background:var(--marca-suave);color:var(--marca)}
+  .et.en_curso,.et.en_camino{background:#DCEBF7;color:var(--azul)}
+  .et.terminado,.et.hecho,.et.revisado{background:#DDF0E3;color:var(--ok)}
+  .et.anulado,.et.no_realizado,.et.urg{background:#F8DEDA;color:#A33224}
+  .et.nuevo{background:var(--acento);color:#fff}
+
+  .informe{margin-bottom:12px}
+  .informe.sin-revisar{border-left:4px solid var(--acento)}
+  .informe .cab{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+  .informe .cab b{font-size:15px}
+  .informe .cab .esp{flex:1}
+  .informe .txt{white-space:pre-wrap}
+  .fotos{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .fotos a{position:relative;display:block}
+  .fotos img{width:110px;height:110px;object-fit:cover;border-radius:8px;border:1px solid var(--borde);background:var(--borde)}
+  .fotos span{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:1px 5px;border-radius:4px;text-transform:uppercase}
+
+  .velo{position:fixed;inset:0;background:rgba(20,25,30,.45);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:20}
+  .modal{background:#fff;border-radius:14px;width:100%;max-width:640px;padding:22px}
+  .modal.ancho{max-width:860px}
+  .modal h3{margin:0 0 6px}
+  .modal .acciones{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap}
+  .modal .acciones .esp{flex:1}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  .tres{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 12px}
+  .check{display:flex;gap:8px;align-items:center;margin-top:12px}
+  .check input{width:auto}
+  .aviso{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--texto);color:#fff;padding:10px 18px;border-radius:10px;z-index:30;font-weight:600;max-width:calc(100vw - 32px)}
+  .vacio{color:var(--suave);padding:20px;text-align:center}
+
+  .visor{position:fixed;inset:0;background:rgba(10,12,14,.92);z-index:40;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:16px}
+  .visor img{max-width:100%;max-height:calc(100vh - 110px);border-radius:6px}
+  .visor .barra-v{display:flex;gap:10px;align-items:center;color:#fff}
+  .visor button{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3)}
+
+  @media (max-width:1000px){.hoy-grid{grid-template-columns:1fr}}
+  @media (max-width:900px){
+    .plan{grid-template-columns:1fr}.sin-plan{position:static;max-height:none}
+    header{gap:10px;padding:0 10px;flex-wrap:wrap}
+    header nav{order:3;flex-basis:100%;padding-bottom:6px}
+    header .logo small{display:none}
+    main{padding:14px}
+    table.lista .opc{display:none}
+  }
+  @media (max-width:560px){.dos,.tres{grid-template-columns:1fr}.velo{padding:12px 8px}.modal{padding:16px}}
+</style>
+</head>
+<body>
+
+<div id="v-carga" class="centro"><div style="color:#fff;font-weight:700;letter-spacing:3px">KUBEL…</div></div>
+
+<div id="v-login" class="centro oculto">
+  <form class="caja" onsubmit="entrar(event)">
+    <h1>KUBEL</h1><p>Oficina</p>
+    <label>Correo</label><input id="lg-correo" type="email" autocomplete="username" required>
+    <label>Contraseña</label><input id="lg-clave" type="password" autocomplete="current-password" required>
+    <div id="lg-error" class="error"></div>
+    <button id="lg-btn">Entrar</button>
+    <p style="margin-top:14px;font-size:12px">¿Eres operario? <a href="../operario/">Ir a la app de operarios</a></p>
+  </form>
+</div>
+
+<div id="v-app" class="oculto">
+  <header>
+    <div class="logo">KUBEL<small>OFICINA</small></div>
+    <nav>
+      <a href="#hoy" data-v="hoy">Hoy</a>
+      <a href="#plan" data-v="plan">Planificación</a>
+      <a href="#partes" data-v="partes">Partes</a>
+      <a href="#informes" data-v="informes">Informes<span id="b-inf" class="badge oculto"></span></a>
+      <a href="#operarios" data-v="operarios">Operarios</a>
+    </nav>
+    <div class="usuario"><span id="vivo" class="vivo off" title="Actualización en directo"></span><span id="yo"></span><button class="mini" onclick="salir()">Salir</button></div>
+  </header>
+  <main id="contenido"></main>
+</div>
+
+<div id="modal"></div>
+<div id="visor"></div>
+<div id="aviso" class="aviso oculto"></div>
+
+<script>
+/* =====================================================================
+   KUBEL Oficina — v2
+   Web accesible desde cualquier sitio. Datos en Supabase.
+   ===================================================================== */
+
+// ---------- Utilidades ----------
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dos = (n) => String(n).padStart(2, '0');
+const aISO = (d) => `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+const deISO = (s) => { const [a, m, d] = s.split('-').map(Number); return new Date(a, m - 1, d); };
+const sumar = (iso, n) => { const d = deISO(iso); d.setDate(d.getDate() + n); return aISO(d); };
+const hoyISO = () => aISO(new Date());
+const DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const DIAS_L = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const fCorta = (iso) => { const d = deISO(iso); return `${DIAS[d.getDay()]} ${d.getDate()} ${MESES[d.getMonth()]}`; };
+const fLarga = (iso) => { const d = deISO(iso); return `${DIAS_L[d.getDay()]} ${d.getDate()} ${MESES[d.getMonth()]}`; };
+const hCorta = (h) => (h ? h.slice(0, 5) : '');
+const fHora = (ts) => { const d = new Date(ts); return `${dos(d.getDate())}/${dos(d.getMonth() + 1)}/${d.getFullYear()} ${dos(d.getHours())}:${dos(d.getMinutes())}`; };
+const hace = (ts) => {
+  const m = Math.round((Date.now() - new Date(ts)) / 60000);
+  if (m < 1) return 'ahora'; if (m < 60) return `hace ${m} min`;
+  const h = Math.round(m / 60); if (h < 24) return `hace ${h} h`;
+  return fHora(ts);
+};
+const euros = (n) => Number(n).toFixed(2).replace('.', ',') + ' €';
+const lunesDe = (iso) => { const d = deISO(iso); const dia = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dia); return aISO(d); };
+const ESTADOS_PARTE = ['pendiente', 'asignado', 'en_curso', 'terminado', 'cerrado', 'anulado'];
+const TXT_ESTADO = { pendiente: 'Pendiente', asignado: 'Asignado', en_curso: 'En curso', terminado: 'Terminado', cerrado: 'Cerrado', anulado: 'Anulado', en_camino: 'En camino', hecho: 'Hecho', no_realizado: 'No realizado' };
+const GREMIOS = ['Fontanería', 'Albañilería', 'Pintura', 'Electricidad'];
+const dirCompleta = (p) => [p?.direccion, p?.codigo_postal, p?.poblacion].filter(Boolean).join(', ');
+
+function aviso(txt) { const a = $('#aviso'); a.textContent = txt; a.classList.remove('oculto'); clearTimeout(aviso.t); aviso.t = setTimeout(() => a.classList.add('oculto'), 3200); }
+function mensaje(e) {
+  const m = e?.message || String(e);
+  if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Sin conexión con el servidor. Comprueba internet.';
+  if (/JWT expired/i.test(m)) return 'La sesión ha caducado. Vuelve a entrar.';
+  return m;
+}
+function fallo(e) { console.error(e); alert('Error: ' + mensaje(e)); }
+function cerrarModal() { $('#modal').innerHTML = ''; }
+function abrirModal(html, ancho) {
+  $('#modal').innerHTML = `<div class="velo" onclick="if(event.target===this)cerrarModal()"><div class="modal ${ancho ? 'ancho' : ''}">${html}</div></div>`;
+}
+function val(id) { return $('#' + id).value.trim(); }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if ($('#visor').innerHTML) cerrarVisor(); else cerrarModal(); } });
+
+// ---------- Conexión ----------
+let sb = null;
+let yo = null;
+let cache = { operarios: [], companias: [], todosPerfiles: [] };
+let vistaActual = 'hoy';
+
+function mostrar(id) { ['v-carga', 'v-login', 'v-app'].forEach((v) => $('#' + v).classList.toggle('oculto', v !== id)); }
+
+function alFallarSupabase() {
+  $('#v-carga').innerHTML = '<div class="caja"><h1>KUBEL</h1><p>No se pudo conectar. Comprueba internet y recarga la página.</p><button onclick="location.reload()">Recargar</button></div>';
+}
+function alCargarSupabase() {
+  if (sb) return;
+  const c = window.KUBEL_CONFIG;
+  sb = window.supabase.createClient(c.url, c.key);
+  sb.auth.onAuthStateChange((_ev, sesion) => { setTimeout(() => alCambiarSesion(sesion), 0); });
+}
+if (window.KUBEL_SB === 'listo') alCargarSupabase(); else if (window.KUBEL_SB === 'error') alFallarSupabase();
+document.addEventListener('supabase-listo', alCargarSupabase);
+document.addEventListener('supabase-error', alFallarSupabase);
+
+let sesionActual;
+async function alCambiarSesion(sesion) {
+  const id = sesion?.user?.id ?? null;
+  if (id === sesionActual) return;
+  sesionActual = id;
+  if (!id) { yo = null; pararTiempoReal(); return mostrar('v-login'); }
+  const { data, error } = await sb.from('perfiles').select('*').eq('id', id).single();
+  if (error || !data) { alert('No se encontró tu perfil.'); return sb.auth.signOut(); }
+  if (data.rol !== 'oficina' || !data.activo) {
+    alert('Esta cuenta es de operario. Te llevo a la app de operarios.');
+    location.href = '../operario/';
+    return;
+  }
+  yo = data;
+  $('#yo').textContent = yo.nombre;
+  mostrar('v-app');
+  await cargarCatalogos();
+  arrancarTiempoReal();
+  contarSinRevisar();
+  irA(location.hash.slice(1) || 'hoy');
+}
+
+async function entrar(ev) {
+  ev.preventDefault();
+  $('#lg-error').textContent = ''; $('#lg-btn').disabled = true;
+  const { error } = await sb.auth.signInWithPassword({ email: val('lg-correo').toLowerCase(), password: $('#lg-clave').value });
+  $('#lg-btn').disabled = false;
+  if (error) $('#lg-error').textContent = /Invalid login/i.test(error.message) ? 'Correo o contraseña incorrectos.' : mensaje(error);
+}
+function salir() { if (confirm('¿Cerrar sesión?')) sb.auth.signOut(); }
+
+async function cargarCatalogos() {
+  const [o, c] = await Promise.all([
+    sb.from('perfiles').select('*').order('nombre'),
+    sb.from('companias').select('*').order('nombre'),
+  ]);
+  cache.todosPerfiles = o.data || [];
+  cache.operarios = cache.todosPerfiles.filter((p) => p.rol === 'operario' && p.activo);
+  cache.companias = c.data || [];
+}
+const nombreDe = (id) => cache.todosPerfiles.find((p) => p.id === id)?.nombre || '—';
+
+// ---------- Tiempo real ----------
+let canal = null, recargaT = null;
+function arrancarTiempoReal() {
+  pararTiempoReal();
+  canal = sb.channel('oficina')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'asignaciones' }, (p) => alCambio('asignaciones', p))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'informes' }, (p) => alCambio('informes', p))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'partes' }, (p) => alCambio('partes', p))
+    .subscribe((estado) => $('#vivo').classList.toggle('off', estado !== 'SUBSCRIBED'));
+}
+function pararTiempoReal() { if (canal) { sb.removeChannel(canal); canal = null; } }
+function alCambio(tabla, p) {
+  if (tabla === 'informes' && p.eventType === 'INSERT') {
+    aviso(`📝 Nuevo informe de ${nombreDe(p.new.operario_id)}`);
+  } else if (tabla === 'asignaciones' && p.eventType === 'UPDATE' && p.old?.estado !== p.new?.estado && p.new?.estado) {
+    if (p.new.estado === 'en_camino') aviso(`🚐 ${nombreDe(p.new.operario_id)} va en camino`);
+    if (p.new.estado === 'no_realizado') aviso(`⚠️ ${nombreDe(p.new.operario_id)}: visita no realizada`);
+  }
+  if (tabla === 'informes') contarSinRevisar();
+  // No recargar si hay una ventana abierta (para no perder lo que se está escribiendo)
+  clearTimeout(recargaT);
+  recargaT = setTimeout(() => { if (!$('#modal').innerHTML) irA(vistaActual, true); }, 600);
+}
+async function contarSinRevisar() {
+  const { count } = await sb.from('informes').select('id', { count: 'exact', head: true }).eq('revisado', false);
+  const b = $('#b-inf'); b.textContent = count || ''; b.classList.toggle('oculto', !count);
+}
+
+// ---------- Navegación ----------
+window.addEventListener('hashchange', () => yo && irA(location.hash.slice(1)));
+function irA(v, silencioso) {
+  const vistas = { hoy: vistaHoy, plan: vistaPlan, partes: vistaPartes, informes: vistaInformes, operarios: vistaOperarios };
+  if (!vistas[v]) v = 'hoy';
+  vistaActual = v;
+  document.querySelectorAll('header nav a').forEach((a) => a.classList.toggle('activo', a.dataset.v === v));
+  if (silencioso && v === 'operarios') return; // no pisar lo que se está editando
+  vistas[v]();
+}
+
+// =====================================================================
+//  HOY
+// =====================================================================
+async function vistaHoy() {
+  const hoy = hoyISO();
+  if (!$('#hoy-raiz')) {
+    $('#contenido').innerHTML = `<div id="hoy-raiz">
+      <div class="barra"><h2 style="text-transform:capitalize">${fLarga(hoy)}</h2><span class="esp"></span>
+        <button class="sec" onclick="modalParte()">+ Nuevo parte</button><button onclick="location.hash='plan'">Planificar semana</button></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="hoy-grid">
+        <div><h3 style="margin:0 0 10px">Rutas de hoy</h3><div id="rutas-hoy">Cargando…</div></div>
+        <div class="tarjeta feed"><h3 style="margin:0 0 6px">Últimos informes</h3><div id="feed">Cargando…</div></div>
+      </div></div>`;
+  }
+  const [asig, sinAsignar, urg, sinRev, ultimos] = await Promise.all([
+    sb.from('asignaciones').select('id, fecha, hora, orden, tipo, estado, operario_id, parte:partes!asignaciones_parte_id_fkey(id, numero_servicio, direccion, poblacion, codigo_postal, gremio, urgente, compania:companias(nombre))')
+      .eq('fecha', hoy).order('orden').order('hora', { nullsFirst: false }),
+    sb.from('partes').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente'),
+    sb.from('partes').select('id', { count: 'exact', head: true }).eq('urgente', true).in('estado', ['pendiente', 'asignado', 'en_curso']),
+    sb.from('informes').select('id', { count: 'exact', head: true }).eq('revisado', false),
+    sb.from('informes').select('id, creado_en, texto, revisado, trabajo_terminado, necesita_repaso, operario_id, parte:partes!informes_parte_id_fkey(id, numero_servicio, direccion)')
+      .order('creado_en', { ascending: false }).limit(8),
+  ]);
+  if (asig.error) return fallo(asig.error);
+  const lista = asig.data || [];
+  const hechas = lista.filter((a) => a.estado === 'hecho').length;
+  const noReal = lista.filter((a) => a.estado === 'no_realizado').length;
+  $('#kpis').innerHTML = `
+    <a class="kpi ${sinAsignar.count ? 'alerta' : ''}" href="#plan"><div class="n">${sinAsignar.count ?? 0}</div><div class="t">Partes sin asignar</div></a>
+    <a class="kpi" href="#plan"><div class="n">${hechas}/${lista.length}</div><div class="t">Visitas hechas hoy</div></a>
+    <a class="kpi ${noReal ? 'mal' : ''}" href="#plan"><div class="n">${noReal}</div><div class="t">No realizadas hoy</div></a>
+    <a class="kpi ${urg.count ? 'mal' : ''}" href="#partes"><div class="n">${urg.count ?? 0}</div><div class="t">Urgentes abiertos</div></a>
+    <a class="kpi ${sinRev.count ? 'alerta' : ''}" href="#informes"><div class="n">${sinRev.count ?? 0}</div><div class="t">Informes sin revisar</div></a>`;
+
+  const porOp = {};
+  lista.forEach((a) => (porOp[a.operario_id] ??= []).push(a));
+  const ids = [...new Set([...cache.operarios.map((o) => o.id), ...Object.keys(porOp)])];
+  $('#rutas-hoy').innerHTML = ids.length ? ids.map((id) => {
+    const v = porOp[id] || [];
+    const h = v.filter((a) => a.estado === 'hecho' || a.estado === 'no_realizado').length;
+    const enCamino = v.find((a) => a.estado === 'en_camino');
+    return `<div class="tarjeta op-hoy">
+      <div class="cab"><b>${esc(nombreDe(id))}</b>${enCamino ? `<span class="et en_camino">En camino → ${esc(enCamino.parte?.numero_servicio)}</span>` : ''}
+        <span class="esp"></span><span style="color:var(--suave)">${h}/${v.length}</span>
+        ${v.length ? `<button class="mini sec" onclick='verRuta(${JSON.stringify(v.map((a) => dirCompleta(a.parte)))})'>Mapa</button>` : ''}</div>
+      ${v.length ? `<div class="progreso"><div style="width:${Math.round((100 * h) / v.length)}%"></div></div>` : ''}
+      ${v.map((a) => `<div class="visita" onclick="modalAsignacion('${a.id}')">
+          <div class="h">${hCorta(a.hora) || '—'}</div>
+          <div class="d"><div><b>${esc(a.parte?.numero_servicio)}</b> ${a.parte?.urgente ? '<span class="et urg">URG</span>' : ''} ${a.tipo === 'repaso' ? '<span class="et pendiente">Repaso</span>' : ''}</div>
+          <div style="color:var(--suave)">${esc(dirCompleta(a.parte))}</div></div>
+          <span class="et ${a.estado}">${TXT_ESTADO[a.estado]}</span></div>`).join('') || '<div style="color:var(--suave)">Sin visitas hoy.</div>'}
+    </div>`;
+  }).join('') : '<div class="tarjeta vacio">No hay operarios. Créalos en la pestaña Operarios.</div>';
+
+  const u = ultimos.data || [];
+  $('#feed').innerHTML = u.length ? u.map((i) => `
+    <div class="item" onclick="filtroInformes={parte:'${i.parte?.id}'};location.hash='informes'">
+      <div><b>${esc(i.parte?.numero_servicio)}</b> · ${esc(nombreDe(i.operario_id))} <span style="color:var(--suave)">· ${hace(i.creado_en)}</span>
+        ${i.revisado ? '' : '<span class="et nuevo">Nuevo</span>'} ${i.necesita_repaso ? '<span class="et pendiente">Repaso</span>' : ''}</div>
+      <div class="txt">${esc(i.texto)}</div></div>`).join('') : '<div class="vacio">Todavía no hay informes.</div>';
+}
+
+function verRuta(dirs) {
+  if (!dirs.length) return;
+  const l = dirs.slice(0, 10);
+  let url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(l[l.length - 1])}&travelmode=driving`;
+  if (l.length > 1) url += `&waypoints=${encodeURIComponent(l.slice(0, -1).join('|'))}`;
+  window.open(url, '_blank', 'noopener');
+}
+
+// =====================================================================
+//  PLANIFICACIÓN SEMANAL
+// =====================================================================
+let semana = lunesDe(hoyISO());
+let arrastrando = null;
+
+async function vistaPlan() {
+  const dias = [...Array(7)].map((_, i) => sumar(semana, i));
+  const hoy = hoyISO();
+  $('#contenido').innerHTML = `
+    <div class="barra">
+      <h2>Planificación</h2>
+      <button class="sec" onclick="semana=sumar(semana,-7);vistaPlan()">‹ Anterior</button>
+      <button class="sec" onclick="semana=lunesDe(hoyISO());vistaPlan()">Esta semana</button>
+      <button class="sec" onclick="semana=sumar(semana,7);vistaPlan()">Siguiente ›</button>
+      <span class="esp"></span>
+      <strong>${fCorta(dias[0])} – ${fCorta(dias[6])}</strong>
+    </div>
+    <div class="plan">
+      <div class="tarjeta sin-plan"><h3>Partes sin asignar</h3><div id="sin-plan">Cargando…</div>
+        <p style="font-size:12px;color:var(--suave);margin-bottom:0">Arrastra un parte a la casilla del operario y día, o pulsa el parte / el “+” de la casilla.</p></div>
+      <div>
+        <div class="rejilla"><table>
+          <thead><tr><th style="width:130px">Operario</th>${dias.map((d) => `<th class="${d === hoy ? 'hoy' : ''}">${fCorta(d)}</th>`).join('')}</tr></thead>
+          <tbody id="filas"><tr><td colspan="8" class="vacio">Cargando…</td></tr></tbody>
+        </table></div>
+        <div class="leyenda">
+          <span style="--c:var(--marca)">Pendiente</span><span style="--c:var(--azul)">En camino</span>
+          <span style="--c:var(--ok)">Hecho</span><span style="--c:var(--peligro)">Urgente / No realizado</span>
+        </div>
+      </div>
+    </div>`;
+
+  const [asig, sinPlan] = await Promise.all([
+    sb.from('asignaciones')
+      .select('id, fecha, hora, orden, tipo, estado, notas, operario_id, parte:partes!asignaciones_parte_id_fkey(id, numero_servicio, direccion, poblacion, gremio, urgente)')
+      .gte('fecha', dias[0]).lte('fecha', dias[6])
+      .order('orden').order('hora', { nullsFirst: false }),
+    sb.from('partes').select('id, numero_servicio, direccion, poblacion, gremio, urgente, compania:companias(nombre)')
+      .eq('estado', 'pendiente').order('urgente', { ascending: false }).order('creado_en'),
+  ]);
+  if (asig.error) return fallo(asig.error);
+
+  $('#sin-plan').innerHTML = (sinPlan.data || []).map((p) => `
+    <div class="chip ${p.urgente ? 'urgente' : ''}" draggable="true"
+         ondragstart="arrastrando={tipo:'parte',id:'${p.id}'}" onclick="modalAsignar({parteId:'${p.id}'})">
+      <b>${esc(p.numero_servicio)} ${p.urgente ? '· URGENTE' : ''}</b>
+      <div class="dir">${esc(p.direccion)}${p.poblacion ? ', ' + esc(p.poblacion) : ''}</div>
+      <div class="dir">${esc([p.compania?.nombre, p.gremio].filter(Boolean).join(' · '))}</div>
+    </div>`).join('') || '<div class="vacio">No hay partes pendientes 🎉</div>';
+
+  if (!cache.operarios.length) {
+    $('#filas').innerHTML = `<tr><td colspan="8" class="vacio">No hay operarios todavía. Créalos en la pestaña Operarios.</td></tr>`;
+    return;
+  }
+  const porCelda = {};
+  (asig.data || []).forEach((a) => { (porCelda[a.operario_id + '|' + a.fecha] ??= []).push(a); });
+  $('#filas').innerHTML = cache.operarios.map((op) => `
+    <tr><td class="op">${esc(op.nombre)}</td>
+    ${dias.map((d) => {
+      const lista = porCelda[op.id + '|' + d] || [];
+      return `<td class="celda ${d === hoy ? 'hoy' : ''}" data-op="${op.id}" data-f="${d}"
+                 ondragover="event.preventDefault();this.classList.add('sobre')"
+                 ondragleave="this.classList.remove('sobre')"
+                 ondrop="soltar(event,this)">
+        ${lista.map((a) => `
+          <div class="chip ${a.estado} ${a.parte?.urgente ? 'urgente' : ''}" draggable="true"
+               ondragstart="arrastrando={tipo:'asig',id:'${a.id}'}" onclick="modalAsignacion('${a.id}')"
+               title="${esc(a.parte?.direccion)}">
+            <b>${hCorta(a.hora) ? hCorta(a.hora) + ' · ' : ''}${esc(a.parte?.numero_servicio)}${a.tipo === 'repaso' ? ' · R' : ''}</b>
+            <div class="dir">${esc(a.parte?.direccion)}</div>
+          </div>`).join('')}
+        <button class="anadir" onclick="modalAsignar({operarioId:'${op.id}',fecha:'${d}'})">+</button>
+      </td>`;
+    }).join('')}</tr>`).join('');
+}
+
+async function soltar(ev, td) {
+  ev.preventDefault(); td.classList.remove('sobre');
+  if (!arrastrando) return;
+  const operario_id = td.dataset.op, fecha = td.dataset.f;
+  const orden = td.querySelectorAll('.chip').length + 1;
+  const a = arrastrando; arrastrando = null;
+  const r = a.tipo === 'parte'
+    ? await sb.from('asignaciones').insert({ parte_id: a.id, operario_id, fecha, orden })
+    : await sb.from('asignaciones').update({ operario_id, fecha, orden }).eq('id', a.id);
+  if (r.error) return fallo(r.error);
+  aviso(a.tipo === 'parte' ? 'Parte asignado' : 'Visita movida');
+  vistaPlan();
+}
+
+async function modalAsignar({ parteId = '', operarioId = '', fecha = '' } = {}) {
+  const { data: partes } = await sb.from('partes').select('id, numero_servicio, direccion, estado')
+    .in('estado', ['pendiente', 'asignado', 'en_curso', 'terminado']).order('numero_servicio');
+  if (!cache.operarios.length) return alert('Primero crea al menos un operario (pestaña Operarios).');
+  abrirModal(`
+    <h3>Asignar visita</h3>
+    <label>Parte</label>
+    <select id="as-parte">${(partes || []).map((p) => `<option value="${p.id}" ${p.id === parteId ? 'selected' : ''}>${esc(p.numero_servicio)} — ${esc(p.direccion)} (${TXT_ESTADO[p.estado]})</option>`).join('')}</select>
+    <div class="dos">
+      <div><label>Operario</label><select id="as-op">${cache.operarios.map((o) => `<option value="${o.id}" ${o.id === operarioId ? 'selected' : ''}>${esc(o.nombre)}</option>`).join('')}</select></div>
+      <div><label>Día</label><input id="as-fecha" type="date" value="${fecha || hoyISO()}"></div>
+    </div>
+    <div class="tres">
+      <div><label>Hora (opcional)</label><input id="as-hora" type="time"></div>
+      <div><label>Orden en la ruta</label><input id="as-orden" type="number" min="0" value="1"></div>
+      <div><label>Tipo</label><select id="as-tipo"><option value="visita">Visita</option><option value="repaso">Repaso</option></select></div>
+    </div>
+    <label>Notas para el operario</label><textarea id="as-notas" placeholder="Llevar escalera, llaves en portería…"></textarea>
+    <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button onclick="guardarAsignar()">Asignar</button></div>`);
+  if (!partes?.length) $('#as-parte').outerHTML = '<div class="nota">No hay partes abiertos. Crea uno en la pestaña Partes.</div>';
+}
+async function guardarAsignar() {
+  if (!$('#as-parte')) return;
+  const fila = {
+    parte_id: val('as-parte'), operario_id: val('as-op'), fecha: val('as-fecha'),
+    hora: val('as-hora') || null, orden: Number(val('as-orden') || 0), tipo: val('as-tipo'), notas: val('as-notas') || null,
+  };
+  if (!fila.operario_id || !fila.fecha) return alert('Elige operario y día.');
+  const { error } = await sb.from('asignaciones').insert(fila);
+  if (error) return fallo(error);
+  cerrarModal(); aviso('Visita asignada'); irA(vistaActual);
+}
+
+async function modalAsignacion(id) {
+  const { data: a, error } = await sb.from('asignaciones')
+    .select('*, parte:partes!asignaciones_parte_id_fkey(id, numero_servicio, direccion, poblacion, asegurado, telefono, descripcion)').eq('id', id).single();
+  if (error) return fallo(error);
+  const ops = cache.operarios.some((o) => o.id === a.operario_id) ? cache.operarios : [...cache.operarios, { id: a.operario_id, nombre: nombreDe(a.operario_id) + ' (inactivo)' }];
+  abrirModal(`
+    <h3>${esc(a.parte.numero_servicio)} <span class="et ${a.estado}">${TXT_ESTADO[a.estado]}</span></h3>
+    <div style="color:var(--suave)">${esc(a.parte.direccion)}${a.parte.poblacion ? ', ' + esc(a.parte.poblacion) : ''} · ${esc(a.parte.asegurado || '')} ${esc(a.parte.telefono || '')}</div>
+    <div class="dos">
+      <div><label>Operario</label><select id="ae-op">${ops.map((o) => `<option value="${o.id}" ${o.id === a.operario_id ? 'selected' : ''}>${esc(o.nombre)}</option>`).join('')}</select></div>
+      <div><label>Día</label><input id="ae-fecha" type="date" value="${a.fecha}"></div>
+    </div>
+    <div class="tres">
+      <div><label>Hora</label><input id="ae-hora" type="time" value="${hCorta(a.hora)}"></div>
+      <div><label>Orden</label><input id="ae-orden" type="number" min="0" value="${a.orden}"></div>
+      <div><label>Tipo</label><select id="ae-tipo"><option value="visita" ${a.tipo === 'visita' ? 'selected' : ''}>Visita</option><option value="repaso" ${a.tipo === 'repaso' ? 'selected' : ''}>Repaso</option></select></div>
+    </div>
+    <label>Estado de la visita</label>
+    <select id="ae-estado">${['pendiente', 'en_camino', 'hecho', 'no_realizado'].map((e) => `<option value="${e}" ${e === a.estado ? 'selected' : ''}>${TXT_ESTADO[e]}</option>`).join('')}</select>
+    <label>Notas para el operario</label><textarea id="ae-notas">${esc(a.notas || '')}</textarea>
+    <div class="acciones">
+      <button class="peligro" onclick="quitarAsignacion('${a.id}')">Quitar de la planificación</button>
+      <span class="esp"></span>
+      <button class="sec" onclick="cerrarModal();modalParte('${a.parte.id}')">Ver parte</button>
+      <button onclick="guardarAsignacion('${a.id}')">Guardar</button>
+    </div>`);
+}
+async function guardarAsignacion(id) {
+  const { error } = await sb.from('asignaciones').update({
+    operario_id: val('ae-op'), fecha: val('ae-fecha'), hora: val('ae-hora') || null,
+    orden: Number(val('ae-orden') || 0), tipo: val('ae-tipo'), estado: val('ae-estado'), notas: val('ae-notas') || null,
+  }).eq('id', id);
+  if (error) return fallo(error);
+  cerrarModal(); aviso('Guardado'); irA(vistaActual);
+}
+async function quitarAsignacion(id) {
+  if (!confirm('¿Quitar esta visita de la planificación? (El parte no se borra)')) return;
+  const { data: a } = await sb.from('asignaciones').select('parte_id').eq('id', id).single();
+  // Si la visita tiene informes, borrarla los borraría también: no se permite.
+  const { count: nInf } = await sb.from('informes').select('id', { count: 'exact', head: true }).eq('asignacion_id', id);
+  if (nInf) return alert('Esta visita ya tiene informes del operario y no se puede quitar (se perderían). Cambia su estado o su fecha en su lugar.');
+  const { error } = await sb.from('asignaciones').delete().eq('id', id);
+  if (error) return fallo(error);
+  const { count } = await sb.from('asignaciones').select('id', { count: 'exact', head: true }).eq('parte_id', a.parte_id);
+  if (count === 0) await sb.from('partes').update({ estado: 'pendiente' }).eq('id', a.parte_id).eq('estado', 'asignado');
+  cerrarModal(); aviso('Visita quitada'); irA(vistaActual);
+}
+
+// =====================================================================
+//  PARTES
+// =====================================================================
+let filtroPartes = { texto: '', estado: 'abiertos', cia: '' };
+
+async function vistaPartes() {
+  $('#contenido').innerHTML = `
+    <div class="barra">
+      <h2>Partes</h2>
+      <input id="fp-texto" placeholder="Buscar nº, dirección, cliente…" style="max-width:280px" value="${esc(filtroPartes.texto)}">
+      <select id="fp-estado" style="max-width:170px">
+        <option value="abiertos">Abiertos</option>
+        ${ESTADOS_PARTE.map((e) => `<option value="${e}">${TXT_ESTADO[e]}</option>`).join('')}
+        <option value="todos">Todos</option>
+      </select>
+      <select id="fp-cia" style="max-width:160px"><option value="">Todas las compañías</option>${cache.companias.map((c) => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('')}</select>
+      <span class="esp"></span>
+      <button class="sec" onclick="exportarPartes()">Exportar CSV</button>
+      <button onclick="modalParte()">+ Nuevo parte</button>
+    </div>
+    <div id="tabla-partes">Cargando…</div>`;
+  $('#fp-estado').value = filtroPartes.estado;
+  $('#fp-cia').value = filtroPartes.cia;
+  let t; $('#fp-texto').oninput = (e) => { clearTimeout(t); t = setTimeout(() => { filtroPartes.texto = e.target.value.trim(); cargarPartes(); }, 300); };
+  $('#fp-estado').onchange = (e) => { filtroPartes.estado = e.target.value; cargarPartes(); };
+  $('#fp-cia').onchange = (e) => { filtroPartes.cia = e.target.value; cargarPartes(); };
+  cargarPartes();
+}
+
+let ultimosPartes = [];
+async function consultaPartes(limite) {
+  let q = sb.from('partes').select('*, compania:companias(nombre), asignaciones!asignaciones_parte_id_fkey(fecha, operario_id)')
+    .order('urgente', { ascending: false }).order('creado_en', { ascending: false }).limit(limite);
+  if (filtroPartes.estado === 'abiertos') q = q.in('estado', ['pendiente', 'asignado', 'en_curso', 'terminado']);
+  else if (filtroPartes.estado !== 'todos') q = q.eq('estado', filtroPartes.estado);
+  if (filtroPartes.cia) q = q.eq('compania_id', Number(filtroPartes.cia));
+  if (filtroPartes.texto) {
+    const t = filtroPartes.texto.replace(/[,()%*]/g, ' ');
+    q = q.or(`numero_servicio.ilike.%${t}%,direccion.ilike.%${t}%,asegurado.ilike.%${t}%,poblacion.ilike.%${t}%,telefono.ilike.%${t}%`);
+  }
+  return q;
+}
+async function cargarPartes() {
+  const { data, error } = await consultaPartes(300);
+  if (error) return fallo(error);
+  ultimosPartes = data;
+  const hoy = hoyISO();
+  $('#tabla-partes').innerHTML = data.length ? `
+    <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nº servicio</th><th class="opc">Compañía</th><th>Dirección</th><th class="opc">Cliente</th><th class="opc">Gremio</th><th>Estado</th><th>Próxima visita</th></tr></thead>
+    <tbody>${data.map((p) => {
+      const prox = (p.asignaciones || []).filter((a) => a.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+      return `<tr class="clic" onclick="modalParte('${p.id}')">
+        <td><b>${esc(p.numero_servicio)}</b> ${p.urgente ? '<span class="et urg">URG</span>' : ''}</td>
+        <td class="opc">${esc(p.compania?.nombre)}</td>
+        <td>${esc(p.direccion)}${p.poblacion ? '<br><small style="color:var(--suave)">' + esc(p.poblacion) + '</small>' : ''}</td>
+        <td class="opc">${esc(p.asegurado || '')}<br><small style="color:var(--suave)">${esc(p.telefono || '')}</small></td>
+        <td class="opc">${esc(p.gremio || '')}</td>
+        <td><span class="et ${p.estado}">${TXT_ESTADO[p.estado]}</span></td>
+        <td>${prox ? fCorta(prox.fecha) + '<br><small style="color:var(--suave)">' + esc(nombreDe(prox.operario_id)) + '</small>' : '—'}</td>
+      </tr>`;
+    }).join('')}</tbody></table></div>
+    <p style="color:var(--suave);font-size:12px">${data.length} parte(s)${data.length === 300 ? ' (máximo 300; afina la búsqueda)' : ''}</p>` : '<div class="tarjeta vacio">No hay partes con ese filtro.</div>';
+}
+function exportarPartes() {
+  const cols = ['compania', 'numero_servicio', 'estado', 'urgente', 'gremio', 'asegurado', 'telefono', 'telefono2', 'direccion', 'codigo_postal', 'poblacion', 'descripcion', 'creado_en'];
+  const csvCelda = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const filas = ultimosPartes.map((p) => cols.map((c) => csvCelda(c === 'compania' ? p.compania?.nombre : c === 'estado' ? TXT_ESTADO[p.estado] : c === 'urgente' ? (p.urgente ? 'Sí' : 'No') : p[c])).join(';'));
+  const blob = new Blob(['﻿' + [cols.join(';'), ...filas].join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `partes-kubel-${hoyISO()}.csv`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+async function modalParte(id) {
+  let p = { compania_id: cache.companias.find((c) => c.nombre === 'SIGMA')?.id, urgente: false, estado: 'pendiente' };
+  let historial = '';
+  if (id) {
+    const r = await sb.from('partes').select('*, asignaciones!asignaciones_parte_id_fkey(id, fecha, hora, estado, tipo, operario_id), informes!informes_parte_id_fkey(id, creado_en, texto, revisado, operario_id)').eq('id', id).single();
+    if (r.error) return fallo(r.error);
+    p = r.data;
+    const vis = (p.asignaciones || []).sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const infs = (p.informes || []).sort((a, b) => b.creado_en.localeCompare(a.creado_en));
+    historial = `
+      <label>Visitas</label>
+      ${vis.length ? vis.map((a) => `<div><a href="#" onclick="cerrarModal();modalAsignacion('${a.id}');return false">${fCorta(a.fecha)} ${hCorta(a.hora)}</a> · ${esc(nombreDe(a.operario_id))} · ${a.tipo} <span class="et ${a.estado}">${TXT_ESTADO[a.estado]}</span></div>`).join('') : '<div style="color:var(--suave)">Sin visitas.</div>'}
+      <label>Informes</label>
+      ${infs.length ? infs.map((i) => `<div style="margin-bottom:4px">${fHora(i.creado_en)} · ${esc(nombreDe(i.operario_id))} ${i.revisado ? '' : '<span class="et nuevo">Nuevo</span>'}<div style="color:var(--suave);white-space:pre-wrap">${esc(i.texto.length > 160 ? i.texto.slice(0, 160) + '…' : i.texto)}</div></div>`).join('') +
+        `<a href="#informes" onclick="filtroInformes={parte:'${p.id}'};cerrarModal()">Ver informes con fotos →</a>` : '<div style="color:var(--suave)">Sin informes.</div>'}`;
+  }
+  abrirModal(`
+    <h3>${id ? 'Parte ' + esc(p.numero_servicio) : 'Nuevo parte'}</h3>
+    ${id ? `<div style="color:var(--suave);font-size:12px">Creado ${fHora(p.creado_en)} · modificado ${fHora(p.actualizado_en)}</div>` : ''}
+    <div class="dos">
+      <div><label>Compañía *</label><select id="pt-cia">${cache.companias.map((c) => `<option value="${c.id}" ${c.id === p.compania_id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></div>
+      <div><label>Nº de servicio *</label><input id="pt-num" value="${esc(p.numero_servicio || '')}"></div>
+    </div>
+    <div class="dos">
+      <div><label>Asegurado / cliente</label><input id="pt-aseg" value="${esc(p.asegurado || '')}"></div>
+      <div><label>Gremio</label><input id="pt-gremio" list="gremios" value="${esc(p.gremio || '')}"><datalist id="gremios">${GREMIOS.map((g) => `<option value="${g}">`).join('')}</datalist></div>
+    </div>
+    <div class="dos">
+      <div><label>Teléfono</label><input id="pt-tel" type="tel" value="${esc(p.telefono || '')}"></div>
+      <div><label>Teléfono 2</label><input id="pt-tel2" type="tel" value="${esc(p.telefono2 || '')}"></div>
+    </div>
+    <label>Dirección *</label><input id="pt-dir" value="${esc(p.direccion || '')}" placeholder="Calle, número, piso">
+    <div class="dos">
+      <div><label>Población</label><input id="pt-pob" value="${esc(p.poblacion || '')}"></div>
+      <div><label>Código postal</label><input id="pt-cp" value="${esc(p.codigo_postal || '')}"></div>
+    </div>
+    <label>Descripción del trabajo</label><textarea id="pt-desc">${esc(p.descripcion || '')}</textarea>
+    <label>Notas internas para el operario</label><textarea id="pt-notas" style="min-height:50px">${esc(p.notas_oficina || '')}</textarea>
+    <div class="dos">
+      <div class="check"><input type="checkbox" id="pt-urg" ${p.urgente ? 'checked' : ''}><span>Urgente</span></div>
+      <div><label>Estado</label><select id="pt-estado">${ESTADOS_PARTE.map((e) => `<option value="${e}" ${e === p.estado ? 'selected' : ''}>${TXT_ESTADO[e]}</option>`).join('')}</select></div>
+    </div>
+    ${historial}
+    <div class="acciones">
+      ${id ? `<button class="sec" onclick="cerrarModal();modalAsignar({parteId:'${id}'})">Asignar visita</button>
+              <button class="sec" onclick="window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent('${esc(dirCompleta(p)).replace(/'/g, '')}'),'_blank')">Mapa</button>` : ''}
+      <span class="esp"></span>
+      <button class="sec" onclick="cerrarModal()">Cancelar</button>
+      <button onclick="guardarParte(${id ? `'${id}'` : ''})">${id ? 'Guardar' : 'Crear parte'}</button>
+    </div>`);
+}
+
+async function guardarParte(id) {
+  const fila = {
+    compania_id: Number(val('pt-cia')), numero_servicio: val('pt-num'), asegurado: val('pt-aseg') || null,
+    gremio: val('pt-gremio') || null, telefono: val('pt-tel') || null, telefono2: val('pt-tel2') || null,
+    direccion: val('pt-dir'), poblacion: val('pt-pob') || null, codigo_postal: val('pt-cp') || null,
+    descripcion: val('pt-desc') || null, notas_oficina: val('pt-notas') || null,
+    urgente: $('#pt-urg').checked, estado: val('pt-estado'),
+  };
+  if (!fila.numero_servicio || !fila.direccion) return alert('El nº de servicio y la dirección son obligatorios.');
+  const { error } = id ? await sb.from('partes').update(fila).eq('id', id) : await sb.from('partes').insert(fila);
+  if (error) return fallo(/duplicate key/.test(error.message) ? 'Ya existe un parte con ese número en esa compañía.' : error);
+  cerrarModal(); aviso(id ? 'Parte guardado' : 'Parte creado');
+  irA(vistaActual);
+}
+
+// =====================================================================
+//  INFORMES
+// =====================================================================
+let filtroInformes = { parte: null, soloNuevos: false };
+let fotosVisor = [], idxVisor = 0;
+
+async function vistaInformes() {
+  const f = filtroInformes;
+  $('#contenido').innerHTML = `
+    <div class="barra"><h2>Informes de operarios</h2>
+      ${f.parte ? `<button class="sec" onclick="filtroInformes={parte:null,soloNuevos:false};vistaInformes()">← Ver todos</button>` : `
+        <label class="check" style="margin:0;text-transform:none;font-size:14px;color:var(--texto)"><input type="checkbox" id="fi-nuevos" ${f.soloNuevos ? 'checked' : ''}> Solo sin revisar</label>`}
+      <span class="esp"></span><button class="sec" onclick="marcarTodosRevisados()">Marcar todos como revisados</button>
+    </div><div id="lista-inf">Cargando…</div>`;
+  if ($('#fi-nuevos')) $('#fi-nuevos').onchange = (e) => { filtroInformes.soloNuevos = e.target.checked; vistaInformes(); };
+  let q = sb.from('informes')
+    .select('*, parte:partes!informes_parte_id_fkey(id, numero_servicio, direccion, poblacion, compania:companias(nombre)), fotos!fotos_informe_id_fkey(id, tipo, ruta)')
+    .order('creado_en', { ascending: false }).limit(60);
+  if (f.parte) q = q.eq('parte_id', f.parte);
+  else if (f.soloNuevos) q = q.eq('revisado', false);
+  const { data, error } = await q;
+  if (error) return fallo(error);
+  if (!data.length) { $('#lista-inf').innerHTML = `<div class="tarjeta vacio">${f.soloNuevos ? 'No hay informes sin revisar 👍' : 'Todavía no hay informes.'}</div>`; return; }
+
+  const rutas = data.flatMap((i) => i.fotos.map((x) => x.ruta));
+  const urls = {};
+  if (rutas.length) {
+    const { data: firmadas } = await sb.storage.from('fotos').createSignedUrls(rutas, 3600);
+    (firmadas || []).forEach((x) => { if (x.signedUrl) urls[x.path] = x.signedUrl; });
+  }
+  const orden = { antes: 0, despues: 1, factura: 2 };
+  fotosVisor = [];
+  $('#lista-inf').innerHTML = data.map((i) => `
+    <div class="tarjeta informe ${i.revisado ? '' : 'sin-revisar'}">
+      <div class="cab">
+        <b><a href="#" onclick="modalParte('${i.parte.id}');return false">${esc(i.parte.numero_servicio)}</a></b>
+        <span>${esc(i.parte.direccion)}${i.parte.poblacion ? ', ' + esc(i.parte.poblacion) : ''}</span>
+        <span style="color:var(--suave)">· ${esc(i.parte.compania?.nombre || '')} · ${esc(nombreDe(i.operario_id))} · ${fHora(i.creado_en)}</span>
+        ${i.trabajo_terminado ? '<span class="et terminado">Terminado</span>' : '<span class="et en_curso">Sin terminar</span>'}
+        ${i.necesita_repaso ? '<span class="et pendiente">Necesita repaso</span>' : ''}
+        ${i.importe_gastos ? `<span class="et">Gastos ${euros(i.importe_gastos)}</span>` : ''}
+        <span class="esp"></span>
+        ${i.necesita_repaso ? `<button class="mini acento" onclick="modalAsignar({parteId:'${i.parte.id}'});setTimeout(()=>{if($('#as-tipo'))$('#as-tipo').value='repaso'},50)">Programar repaso</button>` : ''}
+        ${i.revisado ? `<span class="et revisado">✓ Revisado</span>` : `<button class="mini" onclick="marcarRevisado('${i.id}')">Marcar revisado</button>`}
+      </div>
+      <div class="txt">${esc(i.texto)}</div>
+      ${i.fotos.length ? `<div class="fotos">${i.fotos.sort((a, b) => orden[a.tipo] - orden[b.tipo]).map((x) => {
+        const n = fotosVisor.push({ url: urls[x.ruta], tipo: x.tipo, parte: i.parte.numero_servicio }) - 1;
+        return `<a href="#" onclick="abrirVisor(${n});return false"><img loading="lazy" src="${urls[x.ruta] || ''}" alt=""><span>${x.tipo === 'despues' ? 'después' : x.tipo}</span></a>`;
+      }).join('')}</div>` : ''}
+    </div>`).join('');
+}
+async function marcarRevisado(id) {
+  const { error } = await sb.from('informes').update({ revisado: true }).eq('id', id);
+  if (error) return fallo(error);
+  contarSinRevisar(); vistaInformes();
+}
+async function marcarTodosRevisados() {
+  if (!confirm('¿Marcar todos los informes como revisados?')) return;
+  const { error } = await sb.from('informes').update({ revisado: true }).eq('revisado', false);
+  if (error) return fallo(error);
+  contarSinRevisar(); vistaInformes();
+}
+function abrirVisor(n) {
+  idxVisor = n; const f = fotosVisor[n]; if (!f?.url) return;
+  $('#visor').innerHTML = `<div class="visor" onclick="if(event.target===this)cerrarVisor()">
+    <img src="${f.url}" alt="">
+    <div class="barra-v">
+      <button onclick="abrirVisor((idxVisor-1+fotosVisor.length)%fotosVisor.length)">‹</button>
+      <span>${esc(f.parte)} · ${f.tipo === 'despues' ? 'después' : f.tipo} · ${n + 1}/${fotosVisor.length}</span>
+      <button onclick="abrirVisor((idxVisor+1)%fotosVisor.length)">›</button>
+      <button onclick="window.open(fotosVisor[idxVisor].url,'_blank')">Abrir / descargar</button>
+      <button onclick="cerrarVisor()">✕</button>
+    </div></div>`;
+}
+function cerrarVisor() { $('#visor').innerHTML = ''; }
+document.addEventListener('keydown', (e) => {
+  if (!$('#visor').innerHTML) return;
+  if (e.key === 'ArrowRight') abrirVisor((idxVisor + 1) % fotosVisor.length);
+  if (e.key === 'ArrowLeft') abrirVisor((idxVisor - 1 + fotosVisor.length) % fotosVisor.length);
+});
+
+// =====================================================================
+//  OPERARIOS Y CUENTAS
+// =====================================================================
+async function funcionUsuarios(cuerpo) {
+  const { data, error } = await sb.functions.invoke('usuarios', { body: cuerpo });
+  if (error) {
+    let m = error.message;
+    try { const j = await error.context.json(); if (j?.error) m = j.error; } catch {}
+    throw new Error(m);
+  }
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+async function vistaOperarios() {
+  await cargarCatalogos();
+  $('#contenido').innerHTML = `
+    <div class="barra"><h2>Operarios y usuarios</h2><span class="esp"></span><button onclick="modalNuevoUsuario()">+ Nuevo operario</button></div>
+    <div class="nota" style="margin-bottom:14px">El operario entra en la app con su <b>correo y contraseña</b>. Enlace de la app para enviarle:
+      <b><a href="../operario/" target="_blank" id="enlace-op"></a></b> <button class="mini sec" onclick="copiarEnlace()">Copiar</button></div>
+    <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nombre</th><th>Correo</th><th>Teléfono</th><th>Gremios</th><th>Rol</th><th>Activo</th><th></th></tr></thead>
+    <tbody>${cache.todosPerfiles.map((p) => `
+      <tr>
+        <td><input id="op-n-${p.id}" value="${esc(p.nombre)}"></td>
+        <td id="op-e-${p.id}" style="color:var(--suave);font-size:13px">…</td>
+        <td><input id="op-t-${p.id}" type="tel" value="${esc(p.telefono || '')}"></td>
+        <td><input id="op-g-${p.id}" value="${esc((p.gremios || []).join(', '))}" placeholder="Fontanería, Pintura"></td>
+        <td><select id="op-r-${p.id}" ${p.id === yo.id ? 'disabled' : ''}><option value="operario" ${p.rol === 'operario' ? 'selected' : ''}>Operario</option><option value="oficina" ${p.rol === 'oficina' ? 'selected' : ''}>Oficina</option></select></td>
+        <td style="text-align:center"><input type="checkbox" id="op-a-${p.id}" ${p.activo ? 'checked' : ''} ${p.id === yo.id ? 'disabled' : ''} style="width:auto"></td>
+        <td style="white-space:nowrap"><button class="mini" onclick="guardarOperario('${p.id}')">Guardar</button>
+            <button class="mini sec" onclick="modalClave('${p.id}')">Contraseña</button></td>
+      </tr>`).join('')}</tbody></table></div>`;
+  const enlace = new URL('../operario/', location.href).href;
+  $('#enlace-op').textContent = enlace;
+  try {
+    const r = await funcionUsuarios({ accion: 'correos' });
+    cache.todosPerfiles.forEach((p) => { const td = $('#op-e-' + p.id); if (td) td.textContent = r.correos[p.id] || '—'; });
+  } catch (e) { cache.todosPerfiles.forEach((p) => { const td = $('#op-e-' + p.id); if (td) td.textContent = '—'; }); }
+}
+function copiarEnlace() {
+  navigator.clipboard?.writeText($('#enlace-op').textContent).then(() => aviso('Enlace copiado'), () => {});
+}
+async function guardarOperario(id) {
+  const fila = {
+    nombre: $('#op-n-' + id).value.trim(), telefono: $('#op-t-' + id).value.trim() || null,
+    gremios: $('#op-g-' + id).value.split(',').map((x) => x.trim()).filter(Boolean),
+  };
+  if (id !== yo.id) { fila.rol = $('#op-r-' + id).value; fila.activo = $('#op-a-' + id).checked; }
+  if (!fila.nombre) return alert('El nombre no puede quedar vacío.');
+  const { error } = await sb.from('perfiles').update(fila).eq('id', id);
+  if (error) return fallo(error);
+  await cargarCatalogos(); aviso('Guardado');
+}
+function claveAleatoria() {
+  const c = 'abcdefghjkmnpqrstuvwxyz23456789'; let s = '';
+  const r = crypto.getRandomValues(new Uint32Array(8)); r.forEach((n) => (s += c[n % c.length])); return s;
+}
+function modalNuevoUsuario() {
+  abrirModal(`
+    <h3>Nuevo operario</h3>
+    <p style="color:var(--suave);margin:0">Se crea la cuenta y ya puede entrar en la app con este correo y contraseña.</p>
+    <div class="dos">
+      <div><label>Nombre *</label><input id="nu-nombre" placeholder="Juan Pérez"></div>
+      <div><label>Teléfono</label><input id="nu-tel" type="tel"></div>
+    </div>
+    <label>Correo *</label><input id="nu-correo" type="email" autocomplete="off" placeholder="juan@ejemplo.com">
+    <div class="dos">
+      <div><label>Contraseña * (mín. 6)</label><input id="nu-clave" value="${claveAleatoria()}" autocomplete="new-password"></div>
+      <div><label>Rol</label><select id="nu-rol"><option value="operario">Operario</option><option value="oficina">Oficina</option></select></div>
+    </div>
+    <label>Gremios</label><input id="nu-gremios" placeholder="Fontanería, Pintura">
+    <div id="nu-error" class="error"></div>
+    <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button id="nu-btn" onclick="crearUsuario()">Crear cuenta</button></div>`);
+}
+async function crearUsuario() {
+  const datos = {
+    accion: 'crear', nombre: val('nu-nombre'), telefono: val('nu-tel') || null, email: val('nu-correo'),
+    password: $('#nu-clave').value, rol: val('nu-rol'), gremios: val('nu-gremios').split(',').map((x) => x.trim()).filter(Boolean),
+  };
+  $('#nu-error').textContent = ''; $('#nu-btn').disabled = true;
+  try {
+    await funcionUsuarios(datos);
+    const enlace = new URL('../operario/', location.href).href;
+    abrirModal(`<h3>✅ Cuenta creada</h3>
+      <p>Envíale estos datos a <b>${esc(datos.nombre)}</b>:</p>
+      <textarea id="nu-msg" style="min-height:120px">Hola ${datos.nombre}, ya tienes acceso a la app de KUBEL.\nApp: ${enlace}\nCorreo: ${datos.email}\nContraseña: ${datos.password}</textarea>
+      <div class="acciones"><button class="sec" onclick="navigator.clipboard?.writeText($('#nu-msg').value).then(()=>aviso('Copiado'))">Copiar mensaje</button>
+      <a class="sec" style="text-decoration:none" target="_blank" href="https://wa.me/?text=${encodeURIComponent(`Hola ${datos.nombre}, ya tienes acceso a la app de KUBEL.\nApp: ${enlace}\nCorreo: ${datos.email}\nContraseña: ${datos.password}`)}"><button class="sec">WhatsApp</button></a>
+      <button onclick="cerrarModal();vistaOperarios()">Hecho</button></div>`);
+  } catch (e) {
+    $('#nu-error').textContent = mensaje(e); $('#nu-btn').disabled = false;
+  }
+}
+function modalClave(id) {
+  abrirModal(`<h3>Nueva contraseña para ${esc(nombreDe(id))}</h3>
+    <label>Contraseña (mín. 6)</label><input id="cl-clave" value="${claveAleatoria()}" autocomplete="new-password">
+    <div id="cl-error" class="error"></div>
+    <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button id="cl-btn" onclick="cambiarClave('${id}')">Cambiar</button></div>`);
+}
+async function cambiarClave(id) {
+  $('#cl-error').textContent = ''; $('#cl-btn').disabled = true;
+  try {
+    const clave = $('#cl-clave').value;
+    await funcionUsuarios({ accion: 'clave', id, password: clave });
+    cerrarModal(); aviso('Contraseña cambiada: ' + clave);
+  } catch (e) { $('#cl-error').textContent = mensaje(e); $('#cl-btn').disabled = false; }
+}
+
+// Instalable como app
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

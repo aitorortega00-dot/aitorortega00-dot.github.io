@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KUBEL Operario</title>
+<meta name="theme-color" content="#1F4E5F">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="iconos/favicon.png">
+<link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="KUBEL">
+<meta name="format-detection" content="telephone=no">
+<script src="../comun/config.js"></script>
+<script src="../comun/cargar-supabase.js"></script>
+<style>
+  :root{
+    --fondo:#F3F1EC; --tarjeta:#fff; --texto:#1E2328; --suave:#5F6770; --borde:#E2DED6;
+    --marca:#1F4E5F; --marca-suave:#E3ECEF; --acento:#E07A1F; --peligro:#C0392B; --ok:#2E7D4F; --azul:#1B5A8C;
+    --arriba:env(safe-area-inset-top); --abajo:env(safe-area-inset-bottom);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--fondo);color:var(--texto);font:16px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+  body{min-height:100vh;overscroll-behavior-y:contain}
+  button,input,textarea{font:inherit}
+  .oculto{display:none!important}
+
+  .cab{background:var(--marca);color:#fff;padding:calc(var(--arriba) + 10px) 12px 12px;display:flex;align-items:center;position:sticky;top:0;z-index:5}
+  .cab .lado{width:84px;display:flex}
+  .cab .lado.der{justify-content:flex-end}
+  .cab .centro{flex:1;text-align:center;min-width:0}
+  .cab .t{font-weight:700;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cab .s{color:#C9DCE2;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cab button{background:none;border:0;color:#fff;font-weight:600;font-size:15px;padding:8px 4px;cursor:pointer}
+
+  .contenido{padding:14px 14px calc(var(--abajo) + 40px)}
+  .boton{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;border-radius:12px;border:1.5px solid var(--marca);background:var(--marca);color:#fff;font-weight:600;font-size:16px;padding:0 16px;cursor:pointer;text-decoration:none}
+  .boton.sec{background:#fff;color:var(--marca)}
+  .boton.acento{background:var(--acento);border-color:var(--acento)}
+  .boton.peligro{background:#fff;color:var(--peligro);border-color:var(--peligro)}
+  .boton:active{opacity:.8}
+  .boton:disabled{opacity:.5}
+  .pila{display:grid;gap:10px}
+  .fila{display:flex;gap:10px}
+  .fila > *{flex:1}
+
+  .seccion{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:14px;margin-bottom:12px}
+  .seccion h4{margin:0 0 8px;font-size:12px;color:var(--suave);text-transform:uppercase;letter-spacing:.6px}
+  .grande{font-size:17px;font-weight:700}
+  .suave{color:var(--suave);font-size:13px}
+  .pre{white-space:pre-wrap}
+  .et{display:inline-block;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:700;background:#ECEAE4;color:#4A5058}
+  .et.pendiente{background:#ECEAE4;color:#4A5058}
+  .et.en_camino{background:#DCEBF7;color:var(--azul)}
+  .et.hecho{background:#DDF0E3;color:var(--ok)}
+  .et.no_realizado,.et.urg{background:#F8DEDA;color:#A33224}
+  .et.repaso{background:#FDEBD8;color:#9A4E0B}
+  .etiquetas{display:flex;gap:6px;flex-wrap:wrap}
+
+  /* Login */
+  .login{min-height:100vh;background:var(--marca);display:flex;align-items:center;justify-content:center;padding:20px}
+  .login form{background:#fff;border-radius:18px;padding:24px;width:100%;max-width:420px}
+  .login h1{margin:0;text-align:center;color:var(--marca);letter-spacing:4px;font-size:32px}
+  .login p{text-align:center;color:var(--suave);margin:2px 0 18px}
+  label{display:block;font-weight:600;font-size:14px;margin:12px 0 6px}
+  input[type=email],input[type=password],input[type=text],input[inputmode],textarea{width:100%;border:1px solid var(--borde);border-radius:12px;padding:12px 14px;font-size:16px;background:#FAFAF8;color:var(--texto)}
+  textarea{min-height:140px;resize:vertical}
+  .error{color:var(--peligro);font-size:14px;margin-top:12px}
+
+  /* Día */
+  .selector{display:flex;align-items:center;background:#fff;border-bottom:1px solid var(--borde);padding:6px 0}
+  .selector button{width:64px;height:56px;border:0;background:none;font-size:36px;color:var(--marca);cursor:pointer}
+  .selector .f{flex:1;text-align:center;cursor:pointer}
+  .selector .r{font-size:13px;font-weight:700;color:var(--acento);text-transform:uppercase;min-height:18px}
+  .selector .l{font-size:19px;font-weight:700;text-transform:capitalize}
+  .selector .h{font-size:11px;color:var(--suave)}
+  .semana{display:flex;gap:6px;overflow-x:auto;padding:10px 14px 0;scrollbar-width:none}
+  .semana::-webkit-scrollbar{display:none}
+  .semana button{flex:0 0 auto;border:1px solid var(--borde);background:#fff;border-radius:10px;padding:6px 10px;text-align:center;min-width:52px;cursor:pointer;color:var(--texto)}
+  .semana button.activo{background:var(--marca);color:#fff;border-color:var(--marca)}
+  .semana button small{display:block;font-size:11px;text-transform:uppercase;opacity:.75}
+  .semana button b{font-size:16px}
+  .semana button i{display:block;font-style:normal;font-size:11px;font-weight:700;color:var(--acento);min-height:14px}
+  .semana button.activo i{color:#FFD7B0}
+  .resumen{color:var(--suave);font-size:14px;margin-bottom:10px}
+  .tarjeta{display:flex;gap:12px;background:#fff;border:1px solid var(--borde);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer}
+  .tarjeta:active{opacity:.85}
+  .tarjeta.terminada{opacity:.6}
+  .tarjeta .izq{width:48px;display:flex;flex-direction:column;align-items:center}
+  .tarjeta .num{width:32px;height:32px;border-radius:16px;background:var(--marca);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .tarjeta.terminada .num{background:var(--suave)}
+  .tarjeta .hora{margin-top:6px;font-weight:700;font-size:14px}
+  .tarjeta .der{flex:1;min-width:0}
+  .tarjeta .dir{font-weight:700;margin-top:6px}
+  .tarjeta .meta{color:var(--suave);font-size:13px;margin-top:3px}
+  .tarjeta .desc{font-size:14px;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .vacio{text-align:center;padding:70px 20px;color:var(--suave)}
+  .vacio b{display:block;color:var(--texto);font-size:17px;margin-bottom:6px}
+
+  /* Parte */
+  .cita{font-size:18px;font-weight:700;margin:10px 0;text-transform:capitalize}
+  .tel{display:flex;justify-content:space-between;align-items:center;background:var(--marca-suave);border-radius:10px;padding:0 14px;height:50px;margin-top:10px;color:var(--marca);font-weight:600;text-decoration:none}
+  .informe-prev{padding:8px 0;border-top:1px solid var(--borde)}
+  .informe-prev:first-of-type{border-top:0}
+
+  /* Informe */
+  .interruptor{display:flex;align-items:center;justify-content:space-between;margin-top:14px;gap:10px}
+  .interruptor input{display:none}
+  .interruptor .sw{width:52px;height:32px;border-radius:16px;background:#CFCBC3;position:relative;transition:.2s;flex:0 0 auto}
+  .interruptor .sw::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:13px;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .interruptor input:checked + .sw{background:var(--marca)}
+  .interruptor input:checked + .sw::after{left:23px}
+  .rejilla{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  .mini{position:relative;width:92px;height:92px}
+  .mini img{width:100%;height:100%;object-fit:cover;border-radius:8px;background:var(--borde)}
+  .mini button{position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:13px;border:0;background:rgba(0,0,0,.6);color:#fff;font-weight:700;cursor:pointer}
+  .progreso{text-align:center;color:var(--suave);margin:8px 0}
+  .barra-prog{height:6px;background:#ECEAE4;border-radius:3px;overflow:hidden;margin:6px 0 10px}
+  .barra-prog div{height:100%;background:var(--acento);transition:width .2s}
+
+  .banda{padding:10px 14px;font-size:14px;display:flex;gap:10px;align-items:center}
+  .banda.offline{background:#F8DEDA;color:#A33224;font-weight:600}
+  .banda.instalar{background:#FFF4E5;color:#8A4B00}
+  .banda.instalar button{margin-left:auto;background:none;border:0;color:#8A4B00;font-size:20px;cursor:pointer}
+  .aviso{position:fixed;left:50%;bottom:calc(var(--abajo) + 24px);transform:translateX(-50%);background:var(--texto);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;z-index:30;max-width:calc(100vw - 32px);text-align:center}
+  .velo{position:fixed;inset:0;background:rgba(20,25,30,.5);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+  .hoja{background:#fff;border-radius:18px 18px 0 0;padding:20px 16px calc(var(--abajo) + 16px);width:100%;max-width:560px}
+  .hoja h3{margin:0 0 6px}
+  .hoja p{color:var(--suave);margin:0 0 16px}
+  .cargando{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--marca);color:#fff;font-weight:800;letter-spacing:4px;font-size:24px}
+  .ancho{max-width:640px;margin:0 auto}
+</style>
+</head>
+<body>
+<div id="raiz"><div class="cargando">KUBEL</div></div>
+<div id="hoja"></div>
+<div id="aviso" class="aviso oculto"></div>
+
+<script>
+/* =====================================================================
+   KUBEL Operario — web app (iPhone: añadir a inicio · Android: APK)
+   ===================================================================== */
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const dos = (n) => String(n).padStart(2, '0');
+const aISO = (d) => `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+const deISO = (s) => { const [a, m, d] = s.split('-').map(Number); return new Date(a, m - 1, d); };
+const hoyISO = () => aISO(new Date());
+const sumar = (iso, n) => { const d = deISO(iso); d.setDate(d.getDate() + n); return aISO(d); };
+const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const fLarga = (iso) => { const d = deISO(iso); return `${DIAS[d.getDay()]} ${d.getDate()} ${MESES[d.getMonth()]}`; };
+const fRel = (iso) => { const h = hoyISO(); return iso === h ? 'Hoy' : iso === sumar(h, 1) ? 'Mañana' : iso === sumar(h, -1) ? 'Ayer' : ''; };
+const hCorta = (h) => (h ? h.slice(0, 5) : '');
+const fHora = (ts) => { const d = new Date(ts); return `${dos(d.getDate())}/${dos(d.getMonth() + 1)} ${dos(d.getHours())}:${dos(d.getMinutes())}`; };
+const dirCompleta = (p) => [p?.direccion, p?.codigo_postal, p?.poblacion].filter(Boolean).join(', ');
+const EST = { pendiente: 'Pendiente', en_camino: 'En camino', hecho: 'Hecho', no_realizado: 'No realizado' };
+const SELECT_ASIG = `id, fecha, hora, orden, tipo, estado, notas,
+  parte:partes!asignaciones_parte_id_fkey(id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, codigo_postal, gremio, descripcion, urgente, estado, notas_oficina, compania:companias(nombre))`;
+const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const esAndroid = /Android/i.test(navigator.userAgent);
+const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || document.referrer.startsWith('android-app://');
+const URL_APK = 'https://github.com/aitorortega00-dot/aitorortega00-dot.github.io/releases/latest/download/kubel-operario.apk';
+
+function mensaje(e) {
+  const m = e?.message || String(e);
+  if (/Invalid login credentials/i.test(m)) return 'Correo o contraseña incorrectos.';
+  if (/Failed to fetch|NetworkError|Load failed|network/i.test(m)) return 'Sin conexión a internet. Inténtalo de nuevo.';
+  if (/exceeded the maximum allowed size|Payload too large/i.test(m)) return 'Una foto es demasiado grande (máx. 6 MB).';
+  if (/JWT expired/i.test(m)) return 'La sesión ha caducado. Vuelve a entrar.';
+  return m;
+}
+function aviso(t, ms = 2600) { const a = $('#aviso'); a.textContent = t; a.classList.remove('oculto'); clearTimeout(aviso.t); aviso.t = setTimeout(() => a.classList.add('oculto'), ms); }
+
+// Hoja de confirmación (sustituye a confirm(), que en apps instaladas queda feo)
+function preguntar(titulo, texto, si = 'Aceptar', peligro = false) {
+  return new Promise((ok) => {
+    $('#hoja').innerHTML = `<div class="velo"><div class="hoja ancho">
+      <h3>${esc(titulo)}</h3><p>${esc(texto)}</p>
+      <div class="pila"><button class="boton ${peligro ? 'peligro' : ''}" id="h-si">${esc(si)}</button>
+      <button class="boton sec" id="h-no">Cancelar</button></div></div></div>`;
+    const fin = (v) => { $('#hoja').innerHTML = ''; ok(v); };
+    $('#h-si').onclick = () => fin(true); $('#h-no').onclick = () => fin(false);
+    $('.velo').onclick = (e) => { if (e.target.classList.contains('velo')) fin(false); };
+  });
+}
+function informar(titulo, texto) {
+  return new Promise((ok) => {
+    $('#hoja').innerHTML = `<div class="velo"><div class="hoja ancho"><h3>${esc(titulo)}</h3><p class="pre">${esc(texto)}</p>
+      <button class="boton" id="h-ok">Entendido</button></div></div>`;
+    $('#h-ok').onclick = () => { $('#hoja').innerHTML = ''; ok(); };
+  });
+}
+
+// ---------- Arranque ----------
+let sb = null, yo = null;
+let estado = { fecha: hoyISO(), pantalla: 'dia', asig: null };
+
+function alFallarSupabase() {
+  $('#raiz').innerHTML = `<div class="login"><form onsubmit="return false"><h1>KUBEL</h1><p>No hay conexión con el servidor.</p>
+    <button class="boton" onclick="location.reload()">Reintentar</button></form></div>`;
+}
+function alCargarSupabase() {
+  if (sb) return;
+  const c = window.KUBEL_CONFIG;
+  sb = window.supabase.createClient(c.url, c.key, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'kubel-operario' } });
+  sb.auth.onAuthStateChange((_ev, s) => setTimeout(() => alCambiarSesion(s), 0));
+}
+if (window.KUBEL_SB === 'listo') alCargarSupabase(); else if (window.KUBEL_SB === 'error') alFallarSupabase();
+document.addEventListener('supabase-listo', alCargarSupabase);
+document.addEventListener('supabase-error', alFallarSupabase);
+
+let sesionId;
+async function alCambiarSesion(s) {
+  const id = s?.user?.id ?? null;
+  if (id === sesionId) return;
+  sesionId = id;
+  if (!id) { yo = null; pararTiempoReal(); return pintarLogin(); }
+  const { data, error } = await sb.from('perfiles').select('id, nombre, rol, activo').eq('id', id).single();
+  if (error || !data) {
+    $('#raiz').innerHTML = `<div class="login"><form onsubmit="return false"><h1>KUBEL</h1>
+      <p>No se pudo cargar tu perfil.<br>${esc(mensaje(error))}</p>
+      <div class="pila"><button class="boton" onclick="location.reload()">Reintentar</button><button class="boton sec" onclick="sb.auth.signOut()">Salir</button></div></form></div>`;
+    return;
+  }
+  if (!data.activo) { await informar('Cuenta desactivada', 'Habla con la oficina.'); return sb.auth.signOut(); }
+  yo = data;
+  arrancarTiempoReal();
+  history.replaceState({ p: 'dia' }, '');
+  estado.pantalla = 'dia';
+  pintar();
+}
+
+// ---------- Navegación (botón atrás de Android / gesto de iPhone) ----------
+function ir(pantalla, asig) {
+  estado.pantalla = pantalla; estado.asig = asig || estado.asig;
+  history.pushState({ p: pantalla }, '');
+  window.scrollTo(0, 0);
+  pintar();
+}
+async function volver() {
+  if (estado.pantalla === 'informe' && informeConDatos() && !(await preguntar('¿Salir sin enviar?', 'Se guarda el texto como borrador, pero las fotos se perderán.', 'Salir', true))) return;
+  history.back();
+}
+window.addEventListener('popstate', async (e) => {
+  if ($('#hoja').innerHTML) { $('#hoja').innerHTML = ''; }
+  const p = e.state?.p || 'dia';
+  estado.pantalla = p;
+  pintar();
+});
+function pintar() {
+  if (!yo) return;
+  ({ dia: pintarDia, parte: pintarParte, informe: pintarInforme }[estado.pantalla] || pintarDia)();
+}
+
+// ---------- Login ----------
+function pintarLogin() {
+  $('#raiz').innerHTML = `<div class="login"><form id="f-login">
+    <h1>KUBEL</h1><p>Acceso operarios</p>
+    <label>Correo</label><input id="l-correo" type="email" autocomplete="username" autocapitalize="none" inputmode="email" placeholder="nombre@empresa.com">
+    <label>Contraseña</label><input id="l-clave" type="password" autocomplete="current-password">
+    <div id="l-error" class="error"></div>
+    <button class="boton" style="margin-top:20px" id="l-btn">Entrar</button>
+    ${bandaInstalarHTML(true)}
+  </form></div>`;
+  $('#f-login').onsubmit = async (e) => {
+    e.preventDefault();
+    const correo = $('#l-correo').value.trim().toLowerCase(), clave = $('#l-clave').value;
+    if (!correo || !clave) return ($('#l-error').textContent = 'Escribe tu correo y tu contraseña.');
+    $('#l-btn').disabled = true; $('#l-error').textContent = '';
+    const { error } = await sb.auth.signInWithPassword({ email: correo, password: clave });
+    $('#l-btn').disabled = false;
+    if (error) $('#l-error').textContent = mensaje(error);
+  };
+}
+
+// ---------- Instalación ----------
+let promptInstalar = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); promptInstalar = e; if (estado.pantalla === 'dia' && yo) pintarBandas(); });
+function instalacionDescartada() { try { return localStorage.getItem('kubel-sin-aviso-instalar') === '1'; } catch { return false; } }
+function descartarInstalacion() { try { localStorage.setItem('kubel-sin-aviso-instalar', '1'); } catch {} pintarBandas(); }
+function bandaInstalarHTML(enLogin) {
+  if (instalada || (!enLogin && instalacionDescartada())) return '';
+  let txt = '';
+  if (esIOS) txt = 'Para tenerla como app: pulsa <b>Compartir</b> <span style="font-size:18px">⎋</span> y luego <b>“Añadir a pantalla de inicio”</b>.';
+  else if (esAndroid) txt = `Para tenerla como app: <a href="${URL_APK}">descarga la APK</a>${promptInstalar ? ' o <a href="#" onclick="promptInstalar.prompt();return false">instálala desde Chrome</a>' : ''}.`;
+  else return '';
+  if (enLogin) return `<p class="suave" style="margin-top:18px;text-align:left">${txt}</p>`;
+  return `<div class="banda instalar"><span>${txt}</span><button onclick="descartarInstalacion()" aria-label="Cerrar">✕</button></div>`;
+}
+function pintarBandas() {
+  const b = $('#bandas'); if (!b) return;
+  b.innerHTML = (navigator.onLine ? '' : '<div class="banda offline">Sin conexión. Los datos pueden no estar al día.</div>') + bandaInstalarHTML(false);
+}
+window.addEventListener('online', () => { pintarBandas(); if (estado.pantalla === 'dia') cargarDia(); });
+window.addEventListener('offline', pintarBandas);
+
+// ---------- Tiempo real: la oficina cambia algo y aparece solo ----------
+let canal = null, recT = null;
+function arrancarTiempoReal() {
+  pararTiempoReal();
+  canal = sb.channel('operario-' + yo.id)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'asignaciones', filter: `operario_id=eq.${yo.id}` }, (p) => {
+      if (p.eventType === 'INSERT' && p.new?.fecha) aviso(`Nuevo servicio asignado (${fRel(p.new.fecha) || fLarga(p.new.fecha)})`, 4000);
+      clearTimeout(recT); recT = setTimeout(() => { if (estado.pantalla === 'dia') cargarDia(); }, 500);
+    })
+    .subscribe();
+}
+function pararTiempoReal() { if (canal) { sb.removeChannel(canal); canal = null; } }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && yo && estado.pantalla === 'dia') cargarDia(); });
+
+// ---------- Mis servicios (día) ----------
+let listaDia = [];
+function pintarDia() {
+  const f = estado.fecha, rel = fRel(f);
+  const lunes = sumar(f, -((deISO(f).getDay() + 6) % 7));
+  $('#raiz').innerHTML = `
+    <div class="cab"><div class="lado"></div>
+      <div class="centro"><div class="t">Hola, ${esc(yo.nombre)}</div><div class="s">Mis servicios</div></div>
+      <div class="lado der"><button onclick="salir()">Salir</button></div></div>
+    <div id="bandas"></div>
+    <div class="selector">
+      <button onclick="cambiarDia(-1)" aria-label="Día anterior">‹</button>
+      <div class="f" onclick="irAFecha(hoyISO())"><div class="r">${rel}</div><div class="l">${fLarga(f)}</div>${f !== hoyISO() ? '<div class="h">Toca para volver a hoy</div>' : ''}</div>
+      <button onclick="cambiarDia(1)" aria-label="Día siguiente">›</button>
+    </div>
+    <div class="semana" id="semana">${[...Array(7)].map((_, i) => {
+      const d = sumar(lunes, i), dd = deISO(d);
+      return `<button class="${d === f ? 'activo' : ''}" onclick="irAFecha('${d}')"><small>${DIAS[dd.getDay()].slice(0, 3)}</small><b>${dd.getDate()}</b><i id="n-${d}"></i></button>`;
+    }).join('')}</div>
+    <div class="contenido ancho" id="lista"><div class="vacio">Cargando…</div></div>`;
+  pintarBandas();
+  cargarDia(lunes);
+}
+function cambiarDia(n) { irAFecha(sumar(estado.fecha, n)); }
+function irAFecha(f) { estado.fecha = f; pintarDia(); }
+async function salir() { if (await preguntar('Cerrar sesión', '¿Seguro que quieres salir?', 'Salir', true)) sb.auth.signOut(); }
+
+async function cargarDia(lunes) {
+  const f = estado.fecha;
+  lunes = lunes || sumar(f, -((deISO(f).getDay() + 6) % 7));
+  const [r, sem] = await Promise.all([
+    sb.from('asignaciones').select(SELECT_ASIG).eq('operario_id', yo.id).eq('fecha', f).order('orden').order('hora', { nullsFirst: false }),
+    sb.from('asignaciones').select('fecha, estado').eq('operario_id', yo.id).gte('fecha', lunes).lte('fecha', sumar(lunes, 6)),
+  ]);
+  if (estado.pantalla !== 'dia' || f !== estado.fecha) return;
+  const cont = $('#lista'); if (!cont) return;
+  const cuenta = {}; (sem.data || []).forEach((a) => { cuenta[a.fecha] = (cuenta[a.fecha] || 0) + 1; });
+  Object.entries(cuenta).forEach(([d, n]) => { const el = document.getElementById('n-' + d); if (el) el.textContent = n; });
+  if (r.error) {
+    cont.innerHTML = `<div class="vacio"><b>No se pudieron cargar los servicios</b>${esc(mensaje(r.error))}<br><br><button class="boton sec" onclick="cargarDia()">Reintentar</button></div>`;
+    return;
+  }
+  listaDia = r.data || [];
+  if (!listaDia.length) { cont.innerHTML = '<div class="vacio"><b>Sin servicios este día</b>Cuando la oficina te asigne algo aparecerá aquí solo.</div>'; return; }
+  const pend = listaDia.filter((a) => a.estado === 'pendiente' || a.estado === 'en_camino');
+  const hechos = listaDia.filter((a) => a.estado === 'hecho').length;
+  cont.innerHTML = `
+    <div class="resumen">${listaDia.length} ${listaDia.length === 1 ? 'servicio' : 'servicios'} · ${hechos} hecho${hechos === 1 ? '' : 's'}</div>
+    ${pend.length ? `<button class="boton acento" style="margin-bottom:14px" onclick="abrirRuta()">🗺&nbsp; Abrir ruta (${pend.length} parada${pend.length === 1 ? '' : 's'})</button>` : ''}
+    ${listaDia.map((a, i) => {
+      const p = a.parte, term = a.estado === 'hecho' || a.estado === 'no_realizado';
+      return `<div class="tarjeta ${term ? 'terminada' : ''}" onclick="abrirParte(${i})">
+        <div class="izq"><div class="num">${i + 1}</div><div class="hora">${hCorta(a.hora) || '--:--'}</div></div>
+        <div class="der">
+          <div class="etiquetas"><span class="et ${a.estado}">${EST[a.estado]}</span>${p.urgente ? '<span class="et urg">URGENTE</span>' : ''}${a.tipo === 'repaso' ? '<span class="et repaso">Repaso</span>' : ''}</div>
+          <div class="dir">${esc(dirCompleta(p))}</div>
+          <div class="meta">${esc([p.compania?.nombre, p.numero_servicio, p.gremio].filter(Boolean).join(' · '))}</div>
+          ${p.descripcion ? `<div class="desc">${esc(p.descripcion)}</div>` : ''}
+        </div></div>`;
+    }).join('')}`;
+}
+function abrirParte(i) { ir('parte', listaDia[i]); }
+
+function abrirMapa(url) { window.open(url, '_blank', 'noopener'); }
+function abrirRuta() {
+  let dirs = listaDia.filter((a) => a.estado === 'pendiente' || a.estado === 'en_camino').map((a) => dirCompleta(a.parte));
+  if (!dirs.length) return;
+  if (dirs.length > 10) { aviso('Google Maps admite 10 paradas: se abren las 10 primeras'); dirs = dirs.slice(0, 10); }
+  let url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dirs[dirs.length - 1])}&travelmode=driving`;
+  if (dirs.length > 1) url += `&waypoints=${encodeURIComponent(dirs.slice(0, -1).join('|'))}`;
+  abrirMapa(url);
+}
+
+// ---------- Ficha del parte ----------
+async function pintarParte() {
+  const a = estado.asig; if (!a) return history.back();
+  const p = a.parte;
+  const tels = [p.telefono, p.telefono2].filter(Boolean);
+  const dir = dirCompleta(p);
+  $('#raiz').innerHTML = `
+    <div class="cab"><div class="lado"><button onclick="volver()">‹ Volver</button></div>
+      <div class="centro"><div class="t">${esc(p.numero_servicio)}</div><div class="s">${esc([p.compania?.nombre, p.gremio].filter(Boolean).join(' · '))}</div></div>
+      <div class="lado der"></div></div>
+    <div class="contenido ancho">
+      <div class="etiquetas"><span class="et ${a.estado}">${EST[a.estado]}</span>${p.urgente ? '<span class="et urg">URGENTE</span>' : ''}${a.tipo === 'repaso' ? '<span class="et repaso">Repaso</span>' : ''}</div>
+      <div class="cita">${fLarga(a.fecha)}${a.hora ? ' · ' + hCorta(a.hora) : ''}</div>
+      <div class="seccion"><h4>Dirección</h4><div class="grande">${esc(dir)}</div>
+        <button class="boton" style="margin-top:12px" onclick="abrirMapa('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(${esc(JSON.stringify(dir))})+'&travelmode=driving')">🧭&nbsp; Cómo llegar</button></div>
+      <div class="seccion"><h4>Cliente</h4><div class="grande">${esc(p.asegurado || 'Sin nombre')}</div>
+        ${tels.length ? tels.map((t) => `<a class="tel" href="tel:${esc(t.replace(/\s/g, ''))}"><span>📞&nbsp; ${esc(t)}</span><span>Llamar</span></a>`).join('') : '<div class="suave">Sin teléfono</div>'}</div>
+      ${p.descripcion ? `<div class="seccion"><h4>Descripción del trabajo</h4><div class="pre">${esc(p.descripcion)}</div></div>` : ''}
+      ${a.notas || p.notas_oficina ? `<div class="seccion"><h4>Notas de la oficina</h4>${a.notas ? `<div class="pre">${esc(a.notas)}</div>` : ''}${p.notas_oficina ? `<div class="pre" style="${a.notas ? 'margin-top:8px' : ''}">${esc(p.notas_oficina)}</div>` : ''}</div>` : ''}
+      <div class="pila" style="margin-top:4px">
+        ${a.estado === 'pendiente' ? `<button class="boton sec" onclick="cambiarEstado('en_camino')">🚐&nbsp; Voy en camino</button>` : ''}
+        <button class="boton acento" onclick="ir('informe')">📝&nbsp; <span id="txt-inf">Hacer informe y fotos</span></button>
+        ${a.estado === 'pendiente' || a.estado === 'en_camino' ? `<button class="boton peligro" onclick="noRealizado()">No se pudo realizar</button>` : ''}
+      </div>
+      <div id="mis-informes" style="margin-top:20px"></div>
+    </div>`;
+  // refrescar datos
+  const [r1, r2] = await Promise.all([
+    sb.from('asignaciones').select(SELECT_ASIG).eq('id', a.id).single(),
+    sb.from('informes').select('id, texto, trabajo_terminado, necesita_repaso, importe_gastos, creado_en, fotos!fotos_informe_id_fkey(count)').eq('parte_id', p.id).order('creado_en', { ascending: false }),
+  ]);
+  if (estado.pantalla !== 'parte') return;
+  if (r1.data && (r1.data.estado !== a.estado || r1.data.fecha !== a.fecha || r1.data.notas !== a.notas)) { estado.asig = r1.data; return pintarParte(); }
+  const infs = r2.data || [];
+  if (infs.length) {
+    $('#txt-inf').textContent = 'Añadir otro informe';
+    $('#mis-informes').innerHTML = `<div class="seccion"><h4>Mis informes de este parte (${infs.length})</h4>${infs.map((i) => `
+      <div class="informe-prev"><div class="suave">${fHora(i.creado_en)} · ${i.fotos?.[0]?.count ?? 0} foto(s)${i.trabajo_terminado ? ' · Terminado' : ''}${i.necesita_repaso ? ' · Necesita repaso' : ''}${i.importe_gastos ? ' · Gastos ' + Number(i.importe_gastos).toFixed(2).replace('.', ',') + ' €' : ''}</div>
+      <div class="pre">${esc(i.texto)}</div></div>`).join('')}</div>`;
+  }
+}
+async function cambiarEstado(nuevo) {
+  const { error } = await sb.from('asignaciones').update({ estado: nuevo }).eq('id', estado.asig.id);
+  if (error) return informar('No se pudo guardar', mensaje(error));
+  estado.asig = { ...estado.asig, estado: nuevo };
+  aviso(nuevo === 'en_camino' ? 'La oficina ya sabe que vas en camino' : 'Guardado');
+  pintarParte();
+}
+async function noRealizado() {
+  if (await preguntar('No se pudo realizar', 'La visita quedará marcada como NO realizada y la oficina lo verá. Si quieres explicar el motivo, haz también un informe.', 'Marcar como no realizada', true)) cambiarEstado('no_realizado');
+}
+
+// ---------- Informe con fotos ----------
+let fotos = []; // { clave, tipo, blob, url }
+const claveBorrador = () => 'kubel-borrador-' + estado.asig?.id;
+function informeConDatos() { return ($('#i-texto')?.value.trim() || '') !== '' || fotos.length > 0; }
+function guardarBorrador() {
+  try {
+    localStorage.setItem(claveBorrador(), JSON.stringify({
+      texto: $('#i-texto').value, terminado: $('#i-term').checked, repaso: $('#i-rep').checked, gastos: $('#i-gastos').value,
+    }));
+  } catch {}
+}
+function pintarInforme() {
+  const a = estado.asig; if (!a) return history.back();
+  fotos.forEach((f) => URL.revokeObjectURL(f.url)); fotos = [];
+  let b = {}; try { b = JSON.parse(localStorage.getItem(claveBorrador()) || '{}'); } catch {}
+  $('#raiz').innerHTML = `
+    <div class="cab"><div class="lado"><button onclick="volver()">‹ Volver</button></div>
+      <div class="centro"><div class="t">Informe de visita</div><div class="s">${esc(a.parte.numero_servicio)}</div></div>
+      <div class="lado der"></div></div>
+    <div class="contenido ancho">
+      <div class="seccion"><h4>¿Qué se ha hecho?</h4>
+        <textarea id="i-texto" placeholder="Trabajo realizado, materiales, causa de la avería, qué falta por hacer…">${esc(b.texto || '')}</textarea>
+        <label class="interruptor"><span>Trabajo terminado</span><input type="checkbox" id="i-term" ${b.terminado ? 'checked' : ''}><span class="sw"></span></label>
+        <label class="interruptor"><span>Hace falta volver (repaso)</span><input type="checkbox" id="i-rep" ${b.repaso ? 'checked' : ''}><span class="sw"></span></label>
+      </div>
+      ${bloqueFotos('antes', 'Fotos ANTES')}
+      ${bloqueFotos('despues', 'Fotos DESPUÉS')}
+      <div class="seccion"><h4>Gastos (si compraste material)</h4>
+        <label style="margin-top:0" class="suave">Importe total en €</label>
+        <input id="i-gastos" inputmode="decimal" placeholder="0,00" value="${esc(b.gastos || '')}"></div>
+      ${bloqueFotos('factura', 'Fotos de FACTURAS / TICKETS')}
+      <div id="i-prog" class="oculto"><div class="progreso" id="i-prog-t"></div><div class="barra-prog"><div id="i-prog-b" style="width:0"></div></div></div>
+      <button class="boton acento" id="i-enviar" onclick="enviarInforme()">Enviar informe</button>
+      <input type="file" id="i-cam" accept="image/*" capture="environment" class="oculto">
+      <input type="file" id="i-gal" accept="image/*" multiple class="oculto">
+    </div>`;
+  ['i-texto', 'i-gastos'].forEach((id) => $('#' + id).addEventListener('input', guardarBorrador));
+  ['i-term', 'i-rep'].forEach((id) => $('#' + id).addEventListener('change', guardarBorrador));
+  $('#i-cam').onchange = (e) => anadirFotos(e.target);
+  $('#i-gal').onchange = (e) => anadirFotos(e.target);
+}
+function bloqueFotos(tipo, titulo) {
+  return `<div class="seccion"><h4>${titulo} <span id="c-${tipo}"></span></h4><div class="rejilla" id="r-${tipo}"></div>
+    <div class="fila"><button class="boton sec" onclick="pedirFoto('${tipo}','cam')">📷&nbsp; Cámara</button>
+    <button class="boton sec" onclick="pedirFoto('${tipo}','gal')">🖼&nbsp; Galería</button></div></div>`;
+}
+let tipoFoto = 'antes';
+function pedirFoto(tipo, origen) {
+  tipoFoto = tipo;
+  const inp = $(origen === 'cam' ? '#i-cam' : '#i-gal');
+  inp.value = '';
+  inp.click();
+}
+
+// Reduce la foto a JPEG ≤ 1920 px (≈ 300-900 KB): rápida de subir y aceptada por SIGMA (≤ 6 MB)
+async function comprimir(file) {
+  const MAX = 1920;
+  let fuente, w, h;
+  try {
+    fuente = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    w = fuente.width; h = fuente.height;
+  } catch {
+    fuente = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = mal; i.src = URL.createObjectURL(file); });
+    w = fuente.naturalWidth; h = fuente.naturalHeight;
+  }
+  const k = Math.min(1, MAX / Math.max(w, h));
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * k); c.height = Math.round(h * k);
+  c.getContext('2d').drawImage(fuente, 0, 0, c.width, c.height);
+  if (fuente.close) fuente.close();
+  for (const q of [0.8, 0.65, 0.5]) {
+    const blob = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', q));
+    if (blob && blob.size < 5.5 * 1024 * 1024) return blob;
+  }
+  throw new Error('La foto es demasiado grande');
+}
+async function anadirFotos(input) {
+  const files = [...(input.files || [])];
+  if (!files.length) return;
+  aviso(files.length > 1 ? `Preparando ${files.length} fotos…` : 'Preparando foto…', 1500);
+  let fallos = 0;
+  for (const f of files) {
+    try {
+      const blob = await comprimir(f);
+      fotos.push({ clave: crypto.randomUUID ? crypto.randomUUID() : String(Math.random()), tipo: tipoFoto, blob, url: URL.createObjectURL(blob) });
+    } catch { fallos++; }
+  }
+  if (fallos) informar('Alguna foto no se pudo leer', 'Prueba a hacerla de nuevo con la cámara.');
+  pintarFotos();
+}
+function pintarFotos() {
+  ['antes', 'despues', 'factura'].forEach((t) => {
+    const g = fotos.filter((f) => f.tipo === t);
+    const r = $('#r-' + t); if (!r) return;
+    $('#c-' + t).textContent = g.length ? `(${g.length})` : '';
+    r.innerHTML = g.map((f) => `<div class="mini"><img src="${f.url}" alt=""><button onclick="quitarFoto('${f.clave}')" aria-label="Quitar">✕</button></div>`).join('');
+  });
+}
+async function quitarFoto(clave) {
+  if (!(await preguntar('Quitar foto', '¿Quitar esta foto del informe?', 'Quitar', true))) return;
+  const f = fotos.find((x) => x.clave === clave); if (f) URL.revokeObjectURL(f.url);
+  fotos = fotos.filter((x) => x.clave !== clave); pintarFotos();
+}
+function progreso(txt, pct) {
+  $('#i-prog').classList.remove('oculto'); $('#i-prog-t').textContent = txt; $('#i-prog-b').style.width = pct + '%';
+}
+async function enviarInforme() {
+  const a = estado.asig;
+  const texto = $('#i-texto').value.trim();
+  const g = $('#i-gastos').value.trim();
+  const importe = g ? Number(g.replace(',', '.')) : null;
+  if (!texto) return informar('Falta el informe', 'Escribe qué se ha hecho en la visita.');
+  if (importe !== null && (isNaN(importe) || importe < 0)) return informar('Importe no válido', 'Escribe solo números, p. ej. 25,50');
+  if (importe && !fotos.some((f) => f.tipo === 'factura')) return informar('Falta la factura', 'Has puesto gastos: añade la foto de la factura o ticket.');
+  if (!navigator.onLine) return informar('Sin conexión', 'No tienes internet ahora mismo. El texto queda guardado; envíalo cuando tengas cobertura (no cierres esta pantalla para no perder las fotos).');
+
+  const btn = $('#i-enviar'); btn.disabled = true;
+  const informeId = crypto.randomUUID ? crypto.randomUUID() : ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16));
+  const parteId = a.parte.id;
+  try {
+    const subidas = [];
+    for (let i = 0; i < fotos.length; i++) {
+      progreso(`Subiendo foto ${i + 1} de ${fotos.length}…`, Math.round((i / (fotos.length + 1)) * 100));
+      const f = fotos[i];
+      const ruta = `${yo.id}/${parteId}/${informeId}/${f.tipo}-${i + 1}.jpg`;
+      let intento = 0, error;
+      do {
+        ({ error } = await sb.storage.from('fotos').upload(ruta, f.blob, { contentType: 'image/jpeg' }));
+        if (error && /already exists|Duplicate/i.test(error.message)) error = null; // ya se subió en un intento anterior
+        intento++;
+      } while (error && intento < 3);
+      if (error) throw error;
+      subidas.push({ tipo: f.tipo, ruta });
+    }
+    progreso('Guardando informe…', 92);
+    const { error: e1 } = await sb.from('informes').insert({
+      id: informeId, asignacion_id: a.id, parte_id: parteId, operario_id: yo.id,
+      texto, trabajo_terminado: $('#i-term').checked, necesita_repaso: $('#i-rep').checked, importe_gastos: importe,
+    });
+    if (e1) throw e1;
+    if (subidas.length) {
+      const { error: e2 } = await sb.from('fotos').insert(subidas.map((x) => ({ informe_id: informeId, parte_id: parteId, tipo: x.tipo, ruta: x.ruta, subido_por: yo.id })));
+      if (e2) throw e2;
+    }
+    progreso('¡Enviado!', 100);
+    try { localStorage.removeItem(claveBorrador()); } catch {}
+    fotos.forEach((f) => URL.revokeObjectURL(f.url)); fotos = [];
+    await informar('Informe enviado ✅', 'La oficina ya lo puede ver.');
+    estado.pantalla = 'dia';
+    history.go(-2);
+    setTimeout(() => { if (estado.pantalla !== 'dia') { estado.pantalla = 'dia'; pintar(); } }, 400);
+  } catch (e) {
+    $('#i-prog').classList.add('oculto'); btn.disabled = false;
+    informar('No se pudo enviar', `${mensaje(e)}\n\nNo se ha perdido nada: comprueba la conexión y pulsa Enviar otra vez.`);
+  }
+}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

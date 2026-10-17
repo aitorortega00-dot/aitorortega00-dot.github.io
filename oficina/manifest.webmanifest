@@ -1,0 +1,17 @@
+{
+  "name": "KUBEL Oficina",
+  "short_name": "KUBEL Oficina",
+  "id": "/oficina/",
+  "start_url": "/oficina/",
+  "scope": "/oficina/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F3F1EC",
+  "theme_color": "#1F4E5F",
+  "lang": "es",
+  "icons": [
+    { "src": "iconos/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "iconos/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "iconos/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
