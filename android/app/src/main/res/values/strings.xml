@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">KUBEL</string>
-    <string name="launch_url">https://aitorortega00-dot.github.io/operario/</string>
-    <string name="asset_statements" translatable="false">[{\"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\": \"web\", \"site\": \"https://aitorortega00-dot.github.io\"}}]</string>
+    <string name="launch_url">https://kubelapp.github.io/operario/</string>
+    <string name="asset_statements" translatable="false">[{\"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\": \"web\", \"site\": \"https://kubelapp.github.io\"}}]</string>
 </resources>

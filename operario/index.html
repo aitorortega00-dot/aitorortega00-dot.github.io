@@ -163,7 +163,7 @@ const SELECT_ASIG = `id, fecha, hora, orden, tipo, estado, notas,
 const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const esAndroid = /Android/i.test(navigator.userAgent);
 const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || document.referrer.startsWith('android-app://');
-const URL_APK = 'https://github.com/aitorortega00-dot/aitorortega00-dot.github.io/releases/latest/download/kubel-operario.apk';
+const URL_APK = 'https://github.com/kubelapp/kubelapp.github.io/releases/latest/download/kubel-operario.apk';
 
 function mensaje(e) {
   const m = e?.message || String(e);

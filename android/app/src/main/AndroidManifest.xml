@@ -37,7 +37,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="aitorortega00-dot.github.io" android:pathPrefix="/operario" />
+                <data android:scheme="https" android:host="kubelapp.github.io" android:pathPrefix="/operario" />
             </intent-filter>
         </activity>
 

@@ -4,7 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import webpush from 'npm:web-push@3.6.7';
 import postgres from 'npm:postgres@3.4.4';
 
-const BASE = 'https://aitorortega00-dot.github.io';
+const BASE = 'https://kubelapp.github.io';
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
