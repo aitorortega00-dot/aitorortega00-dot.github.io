@@ -192,6 +192,43 @@
   .et.borrador{background:#FDEBD8;color:#9A4E0B}.et.aprobado,.et.enviando{background:#DCEBF7;color:var(--azul)}
   .et.enviado{background:#DDF0E3;color:var(--ok)}.et.error{background:#F8DEDA;color:#A33224}.et.descartado{background:#ECEAE4;color:#6B7178}
 
+  /* Repasos · Caducadas: grupos arriba y carriles de estado (izquierda → derecha) */
+  .cad-grupos{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:14px}
+  .cad-g{--c:var(--marca);background:#fff;border:1px solid var(--borde);border-top:4px solid var(--c);border-radius:12px;padding:12px 14px;text-align:left;color:inherit;font-weight:400;display:block;width:100%}
+  .cad-g:hover{border-color:var(--c)}
+  .cad-g.activo{box-shadow:inset 0 0 0 2px var(--c);border-color:var(--c)}
+  .cad-g .t{font-size:12px;font-weight:800;letter-spacing:.6px;color:var(--c);text-transform:uppercase}
+  .cad-g .n{font-size:30px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+  .cad-g .n small{font-size:13px;font-weight:600;color:var(--suave);margin-left:4px}
+  .cad-g .s{font-size:12px;color:var(--suave);margin-top:2px}
+  .cad-g .progreso{margin:8px 0 0}
+  .g-redes{--c:#1B5A8C}.g-resto{--c:#8A5A00}.g-cliente{--c:#6B3FA0}.g-todas{--c:var(--marca)}
+  .et.gr{background:color-mix(in srgb,var(--c) 12%,#fff);color:var(--c)}
+  .carriles{display:grid;grid-template-columns:repeat(4,minmax(230px,1fr));gap:12px;align-items:start;overflow-x:auto;padding-bottom:4px}
+  .carril{--c:var(--suave);background:#ECEAE4;border-radius:12px;padding:8px;min-width:0}
+  .carril>h3{margin:2px 4px 8px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--c);display:flex;align-items:center;gap:6px}
+  .carril>h3::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c)}
+  .carril>h3 .n{margin-left:auto;background:#fff;color:var(--texto);border-radius:9px;padding:0 8px;font-size:12px}
+  .carril>p{margin:-4px 4px 8px;font-size:11px;color:var(--suave)}
+  .c-caducada{--c:var(--peligro)}.c-bandeja{--c:#B8660B}.c-enviada{--c:var(--azul)}.c-resuelta{--c:var(--ok)}
+  .cad{background:#fff;border:1px solid var(--borde);border-left:4px solid var(--c,var(--borde));border-radius:9px;padding:9px 10px;margin-bottom:8px;cursor:pointer;font-size:13px}
+  .cad:hover{border-color:var(--c)}
+  .cad .l1{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .cad .l1 b{font-size:14px;font-variant-numeric:tabular-nums}
+  .cad .l1 .esp{flex:1}
+  .cad .est{margin-top:4px;font-weight:600}
+  .cad .met{color:var(--suave);font-size:12px}
+  .cad .pie{display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap}
+  .cad .pie .esp{flex:1}
+  .cambio{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px;font-size:12px}
+  .cambio .de{background:#F8DEDA;color:#A33224;border-radius:6px;padding:1px 7px;text-decoration:line-through}
+  .cambio .a{background:#DDF0E3;color:var(--ok);border-radius:6px;padding:1px 7px;font-weight:700}
+  .c-resuelta .cad{opacity:.85}
+  .cad.salto{animation:salto 1.6s ease-out}
+  @keyframes salto{0%{box-shadow:0 0 0 4px var(--c);transform:scale(1.03)}100%{box-shadow:0 0 0 0 transparent;transform:none}}
+  @media (prefers-reduced-motion:reduce){.cad.salto{animation:none;outline:2px solid var(--c)}}
+  @media (max-width:900px){.carriles{grid-template-columns:1fr}}
+
   @media (max-width:1000px){.hoy-grid{grid-template-columns:1fr}}
   @media (max-width:900px){
     .plan{grid-template-columns:1fr}.sin-plan{position:static;max-height:none}
@@ -232,7 +269,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.6 (Inicio con partes + Repasos por clasificaciones)
+   KUBEL Oficina — v2.7 (Repasos: Caducadas REDES / RESTO / CLIENTE con carriles de estado)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -506,6 +543,7 @@ function alCambioEnvio(p) {
     if (p.new.estado === 'error') aviso('⚠️ Un envío a SIGMA ha fallado: revisa la bandeja');
   }
   if (vistaActual === 'envios' && !$('#modal').innerHTML) { clearTimeout(alCambioEnvio.t); alCambioEnvio.t = setTimeout(vistaEnvios, 400); }
+  if (vistaActual === 'repasos' && !$('#modal').innerHTML) { clearTimeout(alCambioEnvio.t); alCambioEnvio.t = setTimeout(vistaRepasos, 400); }
 }
 async function vistaEnvios() {
   const grupos = { revisar: ['borrador', 'error'], cola: ['aprobado', 'enviando'], enviados: ['enviado'], descartados: ['descartado'] };
@@ -725,8 +763,9 @@ async function vistaHoy() {
 //  Cada clasificador: id, nombre, ayuda, contar() → nº, pintar(destino).
 //  Para añadir uno nuevo basta con sumarlo a CLASIF_REPASOS.
 // =====================================================================
-let clasifRepaso = 'sincontacto';
+let clasifRepaso = 'caducadas';
 const CLASIF_REPASOS = [
+  { id: 'caducadas', nombre: 'Caducadas / caducan hoy', contar: contarCaducadas, pintar: pintarCaducadas },
   { id: 'sincontacto', nombre: 'Sin primer contacto', contar: contarSinContacto, pintar: pintarSinContacto },
 ];
 async function contarRepasos() {
@@ -748,6 +787,122 @@ async function vistaRepasos() {
   document.querySelectorAll('.clasif button').forEach((x) => x.classList.toggle('activo', x.dataset.c === clasifRepaso));
   contarRepasos();
   await CLASIF_REPASOS.find((c) => c.id === clasifRepaso).pintar($('#rep-cont'));
+}
+
+// ---------- Clasificador: CADUCADAS / CADUCAN HOY ----------
+// El robot lee el filtro Caducidad del listado del portal (REDES / RESTO / CLIENTE) y guarda en cada
+// parte cuándo entró (sigma_cad_desde) y cuándo salió (sigma_cad_hasta) con el estado de antes y después.
+// Aquí se ven en carriles de izquierda a derecha según avanza el repaso de la mañana:
+//   Caducada → Repaso en bandeja → Enviado (esperando al portal) → Resuelta hoy
+const GRUPOS_CAD = {
+  redes: { nombre: 'REDES', ayuda: 'Nos toca a nosotros: contactar, citar o visitar' },
+  resto: { nombre: 'RESTO', ayuda: 'Pendientes de compañía, perito o MA' },
+  cliente: { nombre: 'CLIENTE', ayuda: 'Pendientes de instrucciones del cliente' },
+};
+const CARRILES_CAD = [
+  ['caducada', 'Caducada', 'Sin repaso preparado'],
+  ['bandeja', 'Repaso en bandeja', 'Preparado; falta aprobar o enviar'],
+  ['enviada', 'Enviado', 'Esperando a que el portal lo actualice'],
+  ['resuelta', 'Resuelta hoy', 'Ya no sale como caducada'],
+];
+let filtroCadGrupo = '', filtroCadCuenta = '';
+const carrilAntes = new Map();
+const inicioHoy = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); };
+const textoEstado = (c) => (c ? `${c} · ${codigo('estado', c) || 'estado ' + c}` : '');
+
+async function contarCaducadas() {
+  const { count, error } = await sb.from('partes').select('id', { count: 'exact', head: true })
+    .not('sigma_cad_desde', 'is', null).is('sigma_cad_hasta', null).eq('sigma_en_curso', true);
+  if (error) throw error;
+  return count || 0;
+}
+function carrilDe(p) {
+  if (p.sigma_cad_hasta) return 'resuelta';
+  const desde = p.sigma_cad_desde || '';
+  const env = (p.sigma_envios || []).filter((e) => e.tipo === 'repaso' && e.estado !== 'descartado' && (e.creado_en >= desde || ['borrador', 'aprobado', 'enviando', 'error'].includes(e.estado)));
+  if (env.some((e) => ['borrador', 'aprobado', 'enviando', 'error'].includes(e.estado))) return 'bandeja';
+  if (env.some((e) => e.estado === 'enviado')) return 'enviada';
+  return 'caducada';
+}
+function tarjetaCad(p, carril) {
+  const g = GRUPOS_CAD[p.sigma_cad_grupo];
+  const tels = [p.telefono, p.telefono2].filter(Boolean);
+  const envs = (p.sigma_envios || []).filter((e) => e.tipo === 'repaso' && e.estado !== 'descartado').sort((a, b) => b.creado_en.localeCompare(a.creado_en));
+  const pend = envs.find((e) => ['borrador', 'aprobado', 'enviando', 'error'].includes(e.estado));
+  const env = envs.find((e) => e.estado === 'enviado');
+  let estado, accion;
+  if (carril === 'resuelta') {
+    estado = `<div class="cambio"><span class="de" title="Estado al caducar">${esc(textoEstado(p.sigma_cad_estado))}</span>→<span class="a" title="Estado ahora">${p.sigma_cad_estado_fin ? esc(textoEstado(p.sigma_cad_estado_fin)) : 'Fuera de curso'}</span></div>`;
+    accion = `<span class="met">Resuelta ${hace(p.sigma_cad_hasta)}</span>`;
+  } else {
+    estado = `<div class="est">${esc(textoEstado(p.sigma_estado))}</div>`;
+    if (carril === 'bandeja') accion = `<span class="et ${pend.estado}">${TXT_ENVIO[pend.estado]}</span> <button class="mini ${pend.estado === 'error' ? 'peligro' : ''}" onclick="modalEnvio('${pend.id}')">${pend.estado === 'borrador' || pend.estado === 'error' ? 'Revisar y enviar' : 'Ver'}</button>`;
+    else if (carril === 'enviada') accion = `<span class="met">Enviado ${env?.enviado_en ? hace(env.enviado_en) : ''}</span>`;
+    else accion = `<button class="mini acento" onclick="nuevoEnvio('${p.id}')">Repaso</button>`;
+  }
+  const salto = carrilAntes.has(p.id) && carrilAntes.get(p.id) !== carril;
+  return `<div class="cad ${salto ? 'salto' : ''}" onclick="modalParte('${p.id}')">
+    <div class="l1">${p.sigma_alerta ? `<span class="punto ${p.sigma_alerta}" title="Alerta ${p.sigma_alerta}"></span>` : ''}<b>${esc(p.numero_servicio)}</b>
+      ${p.urgente ? '<span class="et urg">URG</span>' : ''}<span class="esp"></span>
+      ${g ? `<span class="et gr g-${p.sigma_cad_grupo}">${g.nombre}</span>` : ''}<span class="et sigma">${p.sigma_cuenta === 'PAL' ? 'PA' : 'VA'}</span></div>
+    ${estado}
+    <div class="met">${esc(p.asegurado || '—')}${tels.length ? ' · ' + tels.map((t) => `<a href="tel:${esc(t)}" onclick="event.stopPropagation()">${esc(t)}</a>`).join(' · ') : ''}</div>
+    <div class="met">${esc([p.direccion, p.poblacion].filter(Boolean).join(', '))}</div>
+    ${carril !== 'resuelta' && p.sigma_caducidad !== null && p.sigma_caducidad !== undefined ? `<div class="met">Caducidad ${p.sigma_caducidad} d${p.sigma_llamadas ? ' · ' + p.sigma_llamadas + ' llamadas' : ''} · en la lista ${hace(p.sigma_cad_desde)}</div>` : ''}
+    <div class="pie" onclick="event.stopPropagation()">${accion}<span class="esp"></span>
+      <a class="mini" href="https://web.multiasistencia.com/w3multi/repasos1.php?reparacion=${encodeURIComponent(p.numero_servicio)}" target="_blank" rel="noopener" title="Abrir en el portal">↗</a></div>
+  </div>`;
+}
+async function pintarCaducadas(destino) {
+  if (!$('#cad-raiz')) {
+    destino.innerHTML = `<div id="cad-raiz">
+      <div class="barra" style="margin-bottom:8px">
+        <select id="cad-cuenta" style="max-width:190px"><option value="">Valladolid y Palencia</option>${Object.entries(CUENTAS_SIGMA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+        <span class="esp"></span><span id="cad-leido" style="font-size:12px;color:var(--suave)"></span></div>
+      <div id="cad-grupos" class="cad-grupos"></div>
+      <div id="cad-tablero">Cargando…</div></div>`;
+    $('#cad-cuenta').value = filtroCadCuenta;
+    $('#cad-cuenta').onchange = (e) => { filtroCadCuenta = e.target.value; pintarCaducadas(destino); };
+  }
+  let q = sb.from('partes').select('id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, urgente, sigma_cuenta, sigma_alerta, sigma_estado, sigma_caducidad, sigma_llamadas, sigma_cad_grupo, sigma_cad_desde, sigma_cad_hasta, sigma_cad_estado, sigma_cad_estado_fin, sigma_envios(id, tipo, estado, creado_en, enviado_en)')
+    .not('sigma_cad_desde', 'is', null).or(`sigma_cad_hasta.is.null,sigma_cad_hasta.gte.${inicioHoy()}`);
+  if (filtroCadCuenta) q = q.eq('sigma_cuenta', filtroCadCuenta);
+  const { data, error } = await q;
+  if (error) return fallo(error);
+  const todas = (data || []).map((p) => ({ ...p, carril: carrilDe(p) }));
+
+  // Grupos: pendientes y avance del día
+  const resumen = (lista) => { const res = lista.filter((p) => p.carril === 'resuelta').length; return { pend: lista.length - res, res, tot: lista.length }; };
+  const tile = (id, nombre, ayuda, r) => `<button class="cad-g g-${id} ${filtroCadGrupo === (id === 'todas' ? '' : id) ? 'activo' : ''}" onclick="filtroCadGrupo='${id === 'todas' ? '' : id}';pintarCaducadas($('#rep-cont'))">
+    <div class="t">${nombre}</div><div class="n">${r.pend}<small>por repasar</small></div>
+    <div class="s">${ayuda}</div>
+    <div class="progreso" title="${r.res} de ${r.tot} resueltas hoy"><div style="width:${r.tot ? Math.round((r.res / r.tot) * 100) : 0}%"></div></div>
+    <div class="s">${r.res} de ${r.tot} resueltas hoy</div></button>`;
+  $('#cad-grupos').innerHTML = tile('todas', 'Todas', 'Caducadas o caducan hoy', resumen(todas))
+    + Object.entries(GRUPOS_CAD).map(([id, g]) => tile(id, g.nombre, g.ayuda, resumen(todas.filter((p) => p.sigma_cad_grupo === id)))).join('');
+
+  const ult = Object.values(ultimaSigma()).map((s) => s.fin).sort().pop();
+  $('#cad-leido').textContent = ult ? `Portal leído ${hace(ult)} · se actualiza solo cada 15 min` : '';
+
+  const lista = todas.filter((p) => !filtroCadGrupo || p.sigma_cad_grupo === filtroCadGrupo);
+  const orden = { rojo: 0, amarillo: 1, verde: 2 };
+  if (!todas.length) {
+    $('#cad-tablero').innerHTML = '<div class="tarjeta vacio">No hay servicios caducados ni que caduquen hoy. 👍<br><small>Si acabas de activar esta vista, aparecerán tras la próxima lectura del portal.</small></div>';
+  } else {
+    $('#cad-tablero').innerHTML = `<div class="carriles">${CARRILES_CAD.map(([id, nombre, ayuda]) => {
+      const en = lista.filter((p) => p.carril === id).sort(id === 'resuelta'
+        ? (a, b) => b.sigma_cad_hasta.localeCompare(a.sigma_cad_hasta)
+        : (a, b) => (b.urgente - a.urgente) || ((orden[a.sigma_alerta] ?? 3) - (orden[b.sigma_alerta] ?? 3)) || ((b.sigma_caducidad ?? -99) - (a.sigma_caducidad ?? -99)));
+      return `<section class="carril c-${id}"><h3>${nombre}<span class="n">${en.length}</span></h3><p>${ayuda}</p>
+        ${en.map((p) => tarjetaCad(p, id)).join('') || '<div class="vacio" style="padding:10px;font-size:12px">—</div>'}</section>`;
+    }).join('')}</div>`;
+  }
+  // Avisar de lo que acaba de cambiar de carril y recordar el carril de cada uno
+  for (const p of todas) {
+    const antes = carrilAntes.get(p.id);
+    if (antes && antes !== p.carril && p.carril === 'resuelta') aviso(`✅ ${p.numero_servicio} ya no está caducada`);
+    carrilAntes.set(p.id, p.carril);
+  }
 }
 
 // ---------- Clasificador: SIN PRIMER CONTACTO ----------

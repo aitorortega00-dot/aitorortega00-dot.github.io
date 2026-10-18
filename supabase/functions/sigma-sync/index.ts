@@ -3,6 +3,7 @@
 // y vuelca en Supabase: partes nuevos, cambios y servicios que dejan de estar en curso.
 // Si el portal tiene servicios ofrecidos pendientes de confirmación, los ACEPTA TODOS y avisa a la oficina.
 // Marca los partes SIN PRIMER CONTACTO (Gestión repaso del portal + estado 15).
+// Marca las CADUCADAS / CADUCAN HOY (filtro Caducidad del listado: REDES, RESTO, CLIENTE) y cuándo salen.
 // También manda a SIGMA lo que la oficina ha aprobado en "Envíos a SIGMA" (Repaso e Informar citas).
 // Lo llama pg_cron cada 15 minutos con la cabecera secreta x-kubel-secreto.
 // ?prueba=1  → lee el portal pero NO escribe ni acepta nada y devuelve un resumen.
@@ -199,6 +200,33 @@ async function leerTodoElListado(s: Sesion) {
   }
   const unicos = [...new Map(filas.map((f) => [f.numero, f])).values()];
   return { total: p1.total, paginas: p1.paginas, filas: unicos, leidas: filas.length, codigos: p1.codigos, aviso: p1.aviso };
+}
+
+// ---------------------------------------------------------------- Filtro "Caducidad" (vigencia) del listado
+// Valores del desplegable: 1 Caducadas/Caducan hoy REDES · 2 No caducadas REDES · 5 Caducadas RESTO
+// 6 No caducadas RESTO · 3 Caducadas CLIENTE · 4 No caducadas CLIENTE. Solo se leen las caducadas.
+// El filtro queda en la sesión del portal: la página 1 lleva "filtrar" y las siguientes no.
+// Devuelve número → grupo, o null si no se pudo leer (entonces no se tocan las marcas).
+const VIGENCIA_CADUCADAS: [string, 'redes' | 'resto' | 'cliente'][] = [['1', 'redes'], ['5', 'resto'], ['3', 'cliente']];
+async function leerCaducadas(s: Sesion): Promise<Map<string, 'redes' | 'resto' | 'cliente'> | null> {
+  try {
+    const grupos = new Map<string, 'redes' | 'resto' | 'cliente'>();
+    for (const [vigencia, grupo] of VIGENCIA_CADUCADAS) {
+      const p1 = leerListado(await s.pedir('frepasos_new.php', { ...FILTROS_VACIOS, vigencia, refresh: '1', paginasiguiente: '1', filtrar: 'Filtrar' }));
+      const filas = [...p1.filas];
+      for (let p = 2; p <= Math.min(p1.paginas, 20); p++) {
+        filas.push(...leerListado(await s.pedir('frepasos_new.php', { ...FILTROS_VACIOS, vigencia, refresh: '1', paginasiguiente: String(p) })).filas);
+      }
+      if (p1.total !== null && new Set(filas.map((f) => f.numero)).size < p1.total) return null; // lectura incompleta
+      for (const f of filas) grupos.set(f.numero, grupo);
+    }
+    // Dejar la sesión sin filtro
+    await s.pedir('frepasos_new.php', { ...FILTROS_VACIOS, refresh: '1', paginasiguiente: '1', filtrar: 'Filtrar' });
+    return grupos;
+  } catch (err) {
+    console.error('caducadas', (err as Error).message);
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------- Gestión repaso → "Pendiente de primer contacto"
@@ -638,7 +666,7 @@ type Resumen = {
   cuenta: string; ok: boolean; en_listado: number; total_portal: number | null; paginas: number;
   nuevos: { numero: string; direccion: string; gremio: string; urgente: boolean }[];
   cambiados: number; fichas: number; desaparecidos: string[]; pendientes: number; error?: string; diagnostico?: unknown;
-  aceptados?: Ofrecido[]; sin_contacto?: number;
+  aceptados?: Ofrecido[]; sin_contacto?: number; caducadas?: number;
 };
 
 function partirDireccion(d: string) {
@@ -669,6 +697,7 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
     lis = await leerTodoElListado(s);
   }
   const sinContactoPortal = await leerSinContacto(s);
+  const caducadasPortal = await leerCaducadas(s);
   r.en_listado = lis.filas.length; r.total_portal = lis.total; r.paginas = lis.paginas;
   const completo = lis.total !== null && lis.filas.length === lis.total;
 
@@ -773,6 +802,7 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
       filas_sin_direccion: lis.filas.filter((f) => !f.direccion).length,
       errores_ficha: erroresFicha.slice(0, 5),
       sin_primer_contacto: { portal: sinContactoPortal ? [...sinContactoPortal] : 'no leído', estado_15: lis.filas.filter((f) => f.estado === '15').map((f) => f.numero) },
+      caducadas: caducadasPortal ? Object.fromEntries(['redes', 'resto', 'cliente'].map((g) => [g, [...caducadasPortal].filter(([, x]) => x === g).map(([n]) => n)])) : 'no leído',
       procedencias: [...new Map(nuevosCodigos.filter((c) => c.tipo === 'procedencia' && c.texto).map((c) => [c.codigo, c.texto])).entries()],
       ficha_ejemplo: una && {
         tiene_cliente: !!una.cliente, tiene_direccion: !!una.direccion, cp: !!una.cp, procedencia: !!una.procedenciaTexto,
@@ -831,6 +861,30 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
       if (error) console.error('sin contacto (poner)', error.message);
     }
     r.sin_contacto = sinContacto.size;
+  }
+  // CADUCADAS / CADUCAN HOY: entradas, cambios de grupo y salidas (con el estado de antes y de después)
+  if (caducadasPortal) {
+    const { data: marcados } = await admin.from('partes').select('id, numero_servicio, sigma_cad_grupo')
+      .eq('compania_id', ciaId).eq('sigma_cuenta', cuenta).not('sigma_cad_desde', 'is', null).is('sigma_cad_hasta', null);
+    const estadoDe = new Map(lis.filas.map((f) => [f.numero, f.estado]));
+    const ya = new Map((marcados || []).map((m) => [m.numero_servicio, m]));
+    for (const m of marcados || []) {
+      const g = caducadasPortal.get(m.numero_servicio);
+      if (!g) {
+        const { error } = await admin.from('partes').update({ sigma_cad_hasta: ahora, sigma_cad_estado_fin: estadoDe.get(m.numero_servicio) ?? null }).eq('id', m.id);
+        if (error) console.error('caducadas (salida)', error.message);
+      } else if (g !== m.sigma_cad_grupo) {
+        await admin.from('partes').update({ sigma_cad_grupo: g }).eq('id', m.id);
+      }
+    }
+    for (const [n, g] of caducadasPortal) {
+      if (ya.has(n) || !estadoDe.has(n)) continue;
+      const { error } = await admin.from('partes').update({
+        sigma_cad_grupo: g, sigma_cad_desde: ahora, sigma_cad_hasta: null, sigma_cad_estado: estadoDe.get(n), sigma_cad_estado_fin: null,
+      }).eq('compania_id', ciaId).eq('numero_servicio', n);
+      if (error) console.error('caducadas (entrada)', error.message);
+    }
+    r.caducadas = caducadasPortal.size;
   }
   // Datos de las fichas: los campos SIGMA siempre; los generales solo si están vacíos (no pisar a la oficina)
   if (fichas.size) {
