@@ -16,6 +16,7 @@
 <script src="../comun/config.js"></script>
 <script src="../comun/cargar-supabase.js"></script>
 <script src="../comun/avisos.js"></script>
+<script src="../comun/acceso.js"></script>
 <style>
   :root{
     --fondo:#F3F1EC; --tarjeta:#fff; --texto:#1E2328; --suave:#5F6770; --borde:#E2DED6;
@@ -226,8 +227,9 @@ async function alCambiarSesion(s) {
       <div class="pila"><button class="boton" onclick="location.reload()">Reintentar</button><button class="boton sec" onclick="sb.auth.signOut()">Salir</button></div></form></div>`;
     return;
   }
-  if (!data.activo) { await informar('Cuenta desactivada', 'Habla con la oficina.'); return sb.auth.signOut(); }
-  if (data.rol === 'admin') { await informar('Cuenta de administrador', 'Esta cuenta se usa en el panel de administrador, no en la app.'); return sb.auth.signOut({ scope: 'local' }); }
+  if (!data.activo) { KubelAcceso.dejarMensaje('Esta cuenta está desactivada. Habla con la oficina.'); return sb.auth.signOut({ scope: 'local' }); }
+  // Solo cuentas de operario: oficina y administrador se van a su web
+  if (data.rol !== 'operario') return KubelAcceso.mover(sb, s, data.rol);
   yo = data;
   arrancarTiempoReal();
   KubelAvisos.sincronizar(sb).then(() => pintarBandas());
@@ -260,24 +262,8 @@ function pintar() {
 
 // ---------- Login ----------
 function pintarLogin() {
-  $('#raiz').innerHTML = `<div class="login"><form id="f-login">
-    <h1>KUBEL</h1><p>Acceso operarios</p>
-    <label>Usuario</label><input id="l-correo" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ALEJANDRO">
-    <label>Contraseña</label><input id="l-clave" type="password" autocomplete="current-password">
-    <div id="l-error" class="error"></div>
-    <button class="boton" style="margin-top:20px" id="l-btn">Entrar</button>
-    ${bandaInstalarHTML(true)}
-  </form></div>`;
-  $('#f-login').onsubmit = async (e) => {
-    e.preventDefault();
-    let correo = $('#l-correo').value.trim().toLowerCase(); const clave = $('#l-clave').value;
-    if (correo && !correo.includes('@')) correo += '@kubel.app';
-    if (!correo || !clave) return ($('#l-error').textContent = 'Escribe tu usuario y tu contraseña.');
-    $('#l-btn').disabled = true; $('#l-error').textContent = '';
-    const { error } = await sb.auth.signInWithPassword({ email: correo, password: clave });
-    $('#l-btn').disabled = false;
-    if (error) $('#l-error').textContent = mensaje(error);
-  };
+  $('#raiz').innerHTML = '<div class="login"><div id="acceso" style="width:100%"></div></div>';
+  KubelAcceso.pintar($('#acceso'), { app: 'operario', extra: bandaInstalarHTML(true) });
 }
 
 // ---------- Instalación ----------

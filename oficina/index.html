@@ -14,6 +14,7 @@
 <script src="../comun/config.js"></script>
 <script src="../comun/cargar-supabase.js"></script>
 <script src="../comun/avisos.js"></script>
+<script src="../comun/acceso.js"></script>
 <style>
   :root{
     --fondo:#F3F1EC; --tarjeta:#fff; --texto:#1E2328; --suave:#5F6770; --borde:#E2DED6;
@@ -203,16 +204,7 @@
 
 <div id="v-carga" class="centro"><div style="color:#fff;font-weight:700;letter-spacing:3px">KUBEL…</div></div>
 
-<div id="v-login" class="centro oculto">
-  <form class="caja" onsubmit="entrar(event)">
-    <h1>KUBEL</h1><p>Oficina</p>
-    <label>Usuario</label><input id="lg-correo" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="NANCY" required>
-    <label>Contraseña</label><input id="lg-clave" type="password" autocomplete="current-password" required>
-    <div id="lg-error" class="error"></div>
-    <button id="lg-btn">Entrar</button>
-    <p style="margin-top:14px;font-size:12px">¿Eres operario? <a href="../operario/">Ir a la app de operarios</a></p>
-  </form>
-</div>
+<div id="v-login" class="centro oculto"><div id="acceso" style="width:100%"></div></div>
 
 <div id="v-app" class="oculto">
   <header>
@@ -309,17 +301,13 @@ async function alCambiarSesion(sesion) {
   const id = sesion?.user?.id ?? null;
   if (id === sesionActual) return;
   sesionActual = id;
-  if (!id) { yo = null; pararTiempoReal(); return mostrar('v-login'); }
+  if (!id) { yo = null; pararTiempoReal(); KubelAcceso.pintar($('#acceso'), { app: 'oficina' }); return mostrar('v-login'); }
   const { data, error } = await sb.from('perfiles').select('*').eq('id', id).single();
-  if (error || !data) { alert('No se encontró tu perfil.'); return sb.auth.signOut({ scope: 'local' }); }
-  if (data.rol !== 'oficina' || !data.activo) {
-    // Solo cierra la sesión en este navegador; no afecta a otros dispositivos
-    await sb.auth.signOut({ scope: 'local' });
-    $('#lg-error').innerHTML = !data.activo ? 'Esta cuenta está desactivada.'
-      : data.rol === 'admin' ? 'Esta cuenta es de administrador: entra por <a href="../admin/">el panel de administrador</a>.'
-      : 'Esta cuenta es de operario: entra por <a href="../operario/">la app de operarios</a>.';
-    return;
-  }
+  // Solo cierra la sesión en este navegador; no afecta a otros dispositivos
+  if (error || !data) { KubelAcceso.dejarMensaje('No se encontró tu perfil.'); return sb.auth.signOut({ scope: 'local' }); }
+  if (!data.activo) { KubelAcceso.dejarMensaje('Esta cuenta está desactivada.'); return sb.auth.signOut({ scope: 'local' }); }
+  // Operario y administrador se van a su web
+  if (data.rol !== 'oficina') return KubelAcceso.mover(sb, sesion, data.rol);
   yo = data;
   $('#yo').textContent = yo.nombre;
   mostrar('v-app');
@@ -334,13 +322,6 @@ async function alCambiarSesion(sesion) {
 // Usuario → correo interno (NANCY → nancy@kubel.app). Si lleva @ se usa tal cual (cuentas antiguas).
 const aCorreo = (s) => { s = String(s || '').trim().toLowerCase(); return s && !s.includes('@') ? s + '@kubel.app' : s; };
 const verUsuario = (e) => /@kubel\.app$/i.test(e || '') ? e.replace(/@kubel\.app$/i, '').toUpperCase() : (e || '—');
-async function entrar(ev) {
-  ev.preventDefault();
-  $('#lg-error').textContent = ''; $('#lg-btn').disabled = true;
-  const { error } = await sb.auth.signInWithPassword({ email: aCorreo(val('lg-correo')), password: $('#lg-clave').value });
-  $('#lg-btn').disabled = false;
-  if (error) $('#lg-error').textContent = /Invalid login/i.test(error.message) ? 'Usuario o contraseña incorrectos.' : mensaje(error);
-}
 async function pintarBotonAvisos() {
   const b = $('#btn-avisos'); if (!b) return;
   if (!KubelAvisos.soportado()) { b.classList.add('oculto'); return; }

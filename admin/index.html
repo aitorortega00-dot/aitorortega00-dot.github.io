@@ -9,6 +9,7 @@
 <link rel="icon" type="image/png" href="../favicon.png">
 <script src="../comun/config.js"></script>
 <script src="../comun/cargar-supabase.js"></script>
+<script src="../comun/acceso.js"></script>
 <style>
   :root{
     --fondo:#F3F1EC; --tarjeta:#fff; --texto:#1E2328; --suave:#5F6770; --borde:#E2DED6;
@@ -89,18 +90,7 @@
 
 <div id="v-carga" class="centro"><div class="caja"><h1>KUBEL</h1><p>Cargando…</p></div></div>
 
-<div id="v-login" class="centro oculto">
-  <form class="caja" onsubmit="entrar(event)">
-    <h1>KUBEL</h1>
-    <p>Panel de administrador</p>
-    <label>Usuario</label>
-    <input id="lg-usuario" autocomplete="username" autocapitalize="none" placeholder="ADMINISTRADOR" required>
-    <label>Contraseña</label>
-    <input id="lg-clave" type="password" autocomplete="current-password" required>
-    <button id="lg-btn">Entrar</button>
-    <div id="lg-error" class="error"></div>
-  </form>
-</div>
+<div id="v-login" class="centro oculto"><div id="acceso" style="width:100%"></div></div>
 
 <div id="v-app" class="oculto">
   <header>
@@ -166,25 +156,15 @@ async function alCambiarSesion(s) {
   const id = s?.user?.id ?? null;
   if (id === sesionActual) return;
   sesionActual = id;
-  if (!id) return mostrar('v-login');
+  if (!id) { KubelAcceso.pintar($('#acceso'), { app: 'admin' }); return mostrar('v-login'); }
   const { data } = await sb.from('perfiles').select('rol, activo').eq('id', id).single();
-  if (!data || data.rol !== 'admin' || !data.activo) {
-    await sb.auth.signOut({ scope: 'local' });
-    $('#lg-error').textContent = 'Esta cuenta no es de administrador.';
-    return mostrar('v-login');
-  }
+  if (!data || !data.activo) { KubelAcceso.dejarMensaje(data ? 'Esta cuenta está desactivada.' : 'No se encontró tu perfil.'); return sb.auth.signOut({ scope: 'local' }); }
+  // Oficina y operario se van a su web
+  if (data.rol !== 'admin') return KubelAcceso.mover(sb, s, data.rol);
   yoId = id;
   mostrar('v-app');
   cargar();
 }
-async function entrar(ev) {
-  ev.preventDefault();
-  $('#lg-error').textContent = ''; $('#lg-btn').disabled = true;
-  const { error } = await sb.auth.signInWithPassword({ email: aCorreo($('#lg-usuario').value), password: $('#lg-clave').value });
-  $('#lg-btn').disabled = false;
-  if (error) $('#lg-error').textContent = /Invalid login/i.test(error.message) ? 'Usuario o contraseña incorrectos.' : mensaje(error);
-}
-
 async function llamar(cuerpo) {
   const { data, error } = await sb.functions.invoke('usuarios', { body: cuerpo });
   if (error) {
@@ -268,7 +248,7 @@ async function guardar(id) {
     }
     await cargar();
     if (clave || !id) {
-      const msg = `Hola ${nombre}, estos son tus datos de acceso a KUBEL:\n${rol === 'operario' ? 'App' : 'Web'}: ${new URL(rol === 'operario' ? '../operario/' : rol === 'admin' ? './' : '../oficina/', location.href).href}\nUsuario: ${verCorreo(correo)}\nContraseña: ${clave}`;
+      const msg = `Hola ${nombre}, estos son tus datos de acceso a KUBEL:\n${rol === 'operario' ? 'App' : 'Web'}: ${new URL(rol === 'operario' ? '../operario/' : '../', location.href).href}\nUsuario: ${verCorreo(correo)}\nContraseña: ${clave}`;
       abrirModal(`<h3>✅ ${id ? 'Cambios guardados' : 'Cuenta creada'}</h3>
         <p class="sub">Datos de acceso para enviar a ${esc(nombre)}:</p>
         <textarea id="m-msg">${esc(msg)}</textarea>

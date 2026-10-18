@@ -3,54 +3,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KUBEL</title>
+<title>KUBEL · Acceso</title>
 <meta name="theme-color" content="#1F4E5F">
 <link rel="icon" type="image/png" href="favicon.png">
+<script src="comun/config.js"></script>
+<script src="comun/cargar-supabase.js"></script>
+<script src="comun/acceso.js"></script>
 <style>
-  :root{--marca:#1F4E5F;--acento:#E07A1F;--suave:#5F6770;--borde:#E2DED6}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;background:var(--marca);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1E2328;display:flex;align-items:center;justify-content:center;padding:24px 16px}
-  .caja{width:100%;max-width:760px}
-  h1{color:#fff;text-align:center;letter-spacing:6px;font-size:40px;margin:0}
-  .sub{color:#C9DCE2;text-align:center;margin:4px 0 28px}
-  .dos{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .t{background:#fff;border-radius:16px;padding:22px;display:flex;flex-direction:column}
-  .t h2{margin:0 0 4px;color:var(--marca)}
-  .t p{color:var(--suave);margin:0 0 16px;flex:1}
-  a.b{display:block;text-align:center;background:var(--marca);color:#fff;text-decoration:none;font-weight:600;border-radius:10px;padding:13px;margin-top:8px}
-  a.b.ac{background:var(--acento)}
-  a.b.sec{background:#fff;color:var(--marca);border:1.5px solid var(--marca)}
-  details{margin-top:12px;color:var(--suave);font-size:14px}
-  summary{cursor:pointer;color:var(--marca);font-weight:600}
-  ol{padding-left:20px;margin:8px 0 0}
-  @media (max-width:640px){.dos{grid-template-columns:1fr}}
+  body{margin:0;min-height:100vh;background:#1F4E5F;font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1E2328;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+  .caja{width:100%;max-width:400px}
+  .carga{color:#fff;text-align:center;font-weight:700;letter-spacing:3px}
+  .app{margin-top:16px;background:rgba(255,255,255,.08);border-radius:14px;padding:14px 16px;color:#DCE8EC;font-size:14px}
+  .app b{color:#fff}
+  .app a{color:#fff}
+  .app a.apk{display:block;text-align:center;background:#E07A1F;color:#fff;text-decoration:none;font-weight:600;border-radius:10px;padding:11px;margin-top:10px}
+  details{margin-top:10px}
+  summary{cursor:pointer;color:#fff;font-weight:600}
+  ol{padding-left:20px;margin:6px 0 0}
 </style>
 </head>
 <body>
 <div class="caja">
-  <h1>KUBEL</h1>
-  <div class="sub">Gestión de servicios y reparaciones</div>
-  <div class="dos">
-    <div class="t">
-      <h2>Oficina</h2>
-      <p>Partes, planificación semanal, rutas de hoy, informes y fotos de los operarios.</p>
-      <a class="b" href="oficina/">Entrar a la oficina</a>
-    </div>
-    <div class="t">
-      <h2>Operarios</h2>
-      <p>Tus servicios del día, cómo llegar, llamar al cliente e informe con fotos.</p>
-      <a class="b ac" href="operario/">Abrir la app</a>
-      <a class="b sec" href="https://github.com/kubelapp/kubelapp.github.io/releases/latest/download/kubel-operario.apk">Descargar APK (Android)</a>
-      <details><summary>Instalar en iPhone</summary>
-        <ol><li>Abre <b>esta página en Safari</b> y pulsa “Abrir la app”.</li>
-          <li>Pulsa el botón <b>Compartir</b> (cuadrado con flecha).</li>
-          <li>Elige <b>“Añadir a pantalla de inicio”</b> → Añadir.</li></ol></details>
-      <details><summary>Instalar en Android</summary>
-        <ol><li>Pulsa <b>Descargar APK</b> y ábrela al terminar.</li>
-          <li>Si el móvil lo pide, permite “instalar apps de esta fuente”.</li>
-          <li>Abre <b>KUBEL</b> desde el menú de apps.</li></ol></details>
-    </div>
+  <div id="acceso"><div class="carga">KUBEL…</div></div>
+  <div class="app">
+    <b>Operarios:</b> instala la app en el móvil para recibir los avisos.
+    <a class="apk" href="https://github.com/kubelapp/kubelapp.github.io/releases/latest/download/kubel-operario.apk">Descargar APK (Android)</a>
+    <details><summary>Instalar en iPhone</summary>
+      <ol><li>Abre <a href="operario/">la app de operarios</a> en <b>Safari</b>.</li>
+        <li>Pulsa <b>Compartir</b> (cuadrado con flecha).</li>
+        <li>Elige <b>“Añadir a pantalla de inicio”</b> → Añadir.</li></ol></details>
+    <details><summary>Instalar en Android</summary>
+      <ol><li>Pulsa <b>Descargar APK</b> y ábrela al terminar.</li>
+        <li>Si el móvil lo pide, permite “instalar apps de esta fuente”.</li>
+        <li>Abre <b>KUBEL</b> desde el menú de apps.</li></ol></details>
   </div>
 </div>
+<script>
+  function listo() { KubelAcceso.pintar(document.getElementById('acceso'), { seguir: true }); }
+  function fallo() { document.getElementById('acceso').innerHTML = '<div class="carga">No se pudo conectar. Comprueba internet y recarga.</div>'; }
+  if (window.KUBEL_SB === 'listo') listo(); else if (window.KUBEL_SB === 'error') fallo();
+  document.addEventListener('supabase-listo', listo);
+  document.addEventListener('supabase-error', fallo);
+</script>
 </body>
 </html>
