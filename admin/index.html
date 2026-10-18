@@ -93,7 +93,7 @@
   <form class="caja" onsubmit="entrar(event)">
     <h1>KUBEL</h1>
     <p>Panel de administrador</p>
-    <label>Usuario o correo</label>
+    <label>Usuario</label>
     <input id="lg-usuario" autocomplete="username" autocapitalize="none" placeholder="ADMINISTRADOR" required>
     <label>Contraseña</label>
     <input id="lg-clave" type="password" autocomplete="current-password" required>
@@ -233,7 +233,7 @@ function modalCuenta(id) {
     <h3>${id ? 'Editar cuenta' : 'Nueva cuenta'}</h3>
     ${id ? `<div class="sub">${esc(c.nombre)} · ${ROL_TXT[c.rol]}</div>` : ''}
     <label>Nombre</label><input id="m-nombre" value="${esc(c.nombre)}">
-    <label>Correo (o nombre de usuario sin @)</label><input id="m-correo" value="${esc(verCorreo(c.email))}" autocapitalize="none" autocomplete="off">
+    <label>Usuario (sin @; un correo también vale)</label><input id="m-correo" value="${esc(verCorreo(c.email))}" autocapitalize="none" autocomplete="off">
     <label>${id ? 'Nueva contraseña (vacío = no cambiar)' : 'Contraseña (mín. 6)'}</label>
     <div class="fila-clave"><input id="m-clave" value="${id ? '' : claveAleatoria()}" autocomplete="new-password"><button class="sec" type="button" onclick="$('#m-clave').value=claveAleatoria()">Generar</button></div>
     <div class="dos">

@@ -206,7 +206,7 @@
 <div id="v-login" class="centro oculto">
   <form class="caja" onsubmit="entrar(event)">
     <h1>KUBEL</h1><p>Oficina</p>
-    <label>Correo</label><input id="lg-correo" type="email" autocomplete="username" required>
+    <label>Usuario</label><input id="lg-correo" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="NANCY" required>
     <label>Contraseña</label><input id="lg-clave" type="password" autocomplete="current-password" required>
     <div id="lg-error" class="error"></div>
     <button id="lg-btn">Entrar</button>
@@ -331,12 +331,15 @@ async function alCambiarSesion(sesion) {
   irA(location.hash.slice(1) || 'hoy');
 }
 
+// Usuario → correo interno (NANCY → nancy@kubel.app). Si lleva @ se usa tal cual (cuentas antiguas).
+const aCorreo = (s) => { s = String(s || '').trim().toLowerCase(); return s && !s.includes('@') ? s + '@kubel.app' : s; };
+const verUsuario = (e) => /@kubel\.app$/i.test(e || '') ? e.replace(/@kubel\.app$/i, '').toUpperCase() : (e || '—');
 async function entrar(ev) {
   ev.preventDefault();
   $('#lg-error').textContent = ''; $('#lg-btn').disabled = true;
-  const { error } = await sb.auth.signInWithPassword({ email: ((c) => c && !c.includes('@') ? c + '@kubel.app' : c)(val('lg-correo').toLowerCase()), password: $('#lg-clave').value });
+  const { error } = await sb.auth.signInWithPassword({ email: aCorreo(val('lg-correo')), password: $('#lg-clave').value });
   $('#lg-btn').disabled = false;
-  if (error) $('#lg-error').textContent = /Invalid login/i.test(error.message) ? 'Correo o contraseña incorrectos.' : mensaje(error);
+  if (error) $('#lg-error').textContent = /Invalid login/i.test(error.message) ? 'Usuario o contraseña incorrectos.' : mensaje(error);
 }
 async function pintarBotonAvisos() {
   const b = $('#btn-avisos'); if (!b) return;
@@ -1156,9 +1159,9 @@ async function vistaOperarios() {
   await cargarCatalogos();
   $('#contenido').innerHTML = `
     <div class="barra"><h2>Operarios y usuarios</h2><span class="esp"></span><button onclick="modalNuevoUsuario()">+ Nuevo operario</button></div>
-    <div class="nota" style="margin-bottom:14px">El operario entra en la app con su <b>correo y contraseña</b>. Enlace de la app para enviarle:
+    <div class="nota" style="margin-bottom:14px">El operario entra en la app con su <b>usuario y contraseña</b>. Enlace de la app para enviarle:
       <b><a href="../operario/" target="_blank" id="enlace-op"></a></b> <button class="mini sec" onclick="copiarEnlace()">Copiar</button></div>
-    <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nombre</th><th>Correo</th><th>Teléfono</th><th>Gremios</th><th>Rol</th><th>Activo</th><th></th></tr></thead>
+    <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nombre</th><th>Usuario</th><th>Teléfono</th><th>Gremios</th><th>Rol</th><th>Activo</th><th></th></tr></thead>
     <tbody>${cache.todosPerfiles.map((p) => `
       <tr>
         <td><input id="op-n-${p.id}" value="${esc(p.nombre)}"></td>
@@ -1186,7 +1189,7 @@ async function vistaOperarios() {
   $('#enlace-op').textContent = enlace;
   try {
     const r = await funcionUsuarios({ accion: 'correos' });
-    cache.todosPerfiles.forEach((p) => { const td = $('#op-e-' + p.id); if (td) td.textContent = r.correos[p.id] || '—'; });
+    cache.todosPerfiles.forEach((p) => { const td = $('#op-e-' + p.id); if (td) td.textContent = verUsuario(r.correos[p.id]); });
   } catch (e) { cache.todosPerfiles.forEach((p) => { const td = $('#op-e-' + p.id); if (td) td.textContent = '—'; }); }
 }
 // ---------- Copias de seguridad ----------
@@ -1248,12 +1251,12 @@ function claveAleatoria() {
 function modalNuevoUsuario() {
   abrirModal(`
     <h3>Nuevo operario</h3>
-    <p style="color:var(--suave);margin:0">Se crea la cuenta y ya puede entrar en la app con este correo y contraseña.</p>
+    <p style="color:var(--suave);margin:0">Se crea la cuenta y ya puede entrar en la app con este usuario y contraseña.</p>
     <div class="dos">
       <div><label>Nombre *</label><input id="nu-nombre" placeholder="Juan Pérez"></div>
       <div><label>Teléfono</label><input id="nu-tel" type="tel"></div>
     </div>
-    <label>Correo *</label><input id="nu-correo" type="email" autocomplete="off" placeholder="juan@ejemplo.com">
+    <label>Usuario * (sin espacios)</label><input id="nu-correo" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="JUAN">
     <div class="dos">
       <div><label>Contraseña * (mín. 6)</label><input id="nu-clave" value="${claveAleatoria()}" autocomplete="new-password"></div>
       <div><label>Rol</label><select id="nu-rol"><option value="operario">Operario</option><option value="oficina">Oficina</option></select></div>
@@ -1264,18 +1267,20 @@ function modalNuevoUsuario() {
 }
 async function crearUsuario() {
   const datos = {
-    accion: 'crear', nombre: val('nu-nombre'), telefono: val('nu-tel') || null, email: val('nu-correo'),
+    accion: 'crear', nombre: val('nu-nombre'), telefono: val('nu-tel') || null, email: aCorreo(val('nu-correo')),
     password: $('#nu-clave').value, rol: val('nu-rol'), gremios: val('nu-gremios').split(',').map((x) => x.trim()).filter(Boolean),
   };
-  $('#nu-error').textContent = ''; $('#nu-btn').disabled = true;
+  $('#nu-error').textContent = '';
+  if (!datos.email || /\s/.test(val('nu-correo'))) return ($('#nu-error').textContent = 'Escribe un usuario sin espacios.');
+  $('#nu-btn').disabled = true;
   try {
     await funcionUsuarios(datos);
     const enlace = new URL('../operario/', location.href).href;
     abrirModal(`<h3>✅ Cuenta creada</h3>
       <p>Envíale estos datos a <b>${esc(datos.nombre)}</b>:</p>
-      <textarea id="nu-msg" style="min-height:120px">Hola ${datos.nombre}, ya tienes acceso a la app de KUBEL.\nApp: ${enlace}\nCorreo: ${datos.email}\nContraseña: ${datos.password}</textarea>
+      <textarea id="nu-msg" style="min-height:120px">Hola ${datos.nombre}, ya tienes acceso a la app de KUBEL.\nApp: ${enlace}\nUsuario: ${verUsuario(datos.email)}\nContraseña: ${datos.password}</textarea>
       <div class="acciones"><button class="sec" onclick="navigator.clipboard?.writeText($('#nu-msg').value).then(()=>aviso('Copiado'))">Copiar mensaje</button>
-      <a class="sec" style="text-decoration:none" target="_blank" href="https://wa.me/?text=${encodeURIComponent(`Hola ${datos.nombre}, ya tienes acceso a la app de KUBEL.\nApp: ${enlace}\nCorreo: ${datos.email}\nContraseña: ${datos.password}`)}"><button class="sec">WhatsApp</button></a>
+      <a class="sec" style="text-decoration:none" target="_blank" href="https://wa.me/?text=${encodeURIComponent(`Hola ${datos.nombre}, ya tienes acceso a la app de KUBEL.\nApp: ${enlace}\nUsuario: ${verUsuario(datos.email)}\nContraseña: ${datos.password}`)}"><button class="sec">WhatsApp</button></a>
       <button onclick="cerrarModal();vistaOperarios()">Hecho</button></div>`);
   } catch (e) {
     $('#nu-error').textContent = mensaje(e); $('#nu-btn').disabled = false;

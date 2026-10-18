@@ -167,7 +167,7 @@ const URL_APK = 'https://github.com/kubelapp/kubelapp.github.io/releases/latest/
 
 function mensaje(e) {
   const m = e?.message || String(e);
-  if (/Invalid login credentials/i.test(m)) return 'Correo o contraseña incorrectos.';
+  if (/Invalid login credentials/i.test(m)) return 'Usuario o contraseña incorrectos.';
   if (/Failed to fetch|NetworkError|Load failed|network/i.test(m)) return 'Sin conexión a internet. Inténtalo de nuevo.';
   if (/exceeded the maximum allowed size|Payload too large/i.test(m)) return 'Una foto es demasiado grande (máx. 6 MB).';
   if (/JWT expired/i.test(m)) return 'La sesión ha caducado. Vuelve a entrar.';
@@ -262,7 +262,7 @@ function pintar() {
 function pintarLogin() {
   $('#raiz').innerHTML = `<div class="login"><form id="f-login">
     <h1>KUBEL</h1><p>Acceso operarios</p>
-    <label>Correo</label><input id="l-correo" type="email" autocomplete="username" autocapitalize="none" inputmode="email" placeholder="nombre@empresa.com">
+    <label>Usuario</label><input id="l-correo" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ALEJANDRO">
     <label>Contraseña</label><input id="l-clave" type="password" autocomplete="current-password">
     <div id="l-error" class="error"></div>
     <button class="boton" style="margin-top:20px" id="l-btn">Entrar</button>
@@ -270,8 +270,9 @@ function pintarLogin() {
   </form></div>`;
   $('#f-login').onsubmit = async (e) => {
     e.preventDefault();
-    const correo = $('#l-correo').value.trim().toLowerCase(), clave = $('#l-clave').value;
-    if (!correo || !clave) return ($('#l-error').textContent = 'Escribe tu correo y tu contraseña.');
+    let correo = $('#l-correo').value.trim().toLowerCase(); const clave = $('#l-clave').value;
+    if (correo && !correo.includes('@')) correo += '@kubel.app';
+    if (!correo || !clave) return ($('#l-error').textContent = 'Escribe tu usuario y tu contraseña.');
     $('#l-btn').disabled = true; $('#l-error').textContent = '';
     const { error } = await sb.auth.signInWithPassword({ email: correo, password: clave });
     $('#l-btn').disabled = false;
