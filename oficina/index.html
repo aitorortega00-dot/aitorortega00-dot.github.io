@@ -71,6 +71,10 @@
   .kpi .t{font-size:12px;color:var(--suave);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
   .kpi.alerta .n{color:var(--acento)}
   .kpi.mal .n{color:var(--peligro)}
+  .clasif{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .clasif button{background:#fff;color:inherit;border:1px solid var(--borde);font-weight:600}
+  .clasif button.activo{border-color:var(--marca);box-shadow:inset 0 0 0 1px var(--marca)}
+  .clasif button .badge{margin-left:6px}
   .hoy-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;align-items:start}
   .op-hoy{margin-bottom:12px}
   .op-hoy .cab{display:flex;align-items:center;gap:10px;margin-bottom:8px}
@@ -211,9 +215,8 @@
     <div class="logo">KUBEL<small>OFICINA</small></div>
     <nav>
       <a href="#inicio" data-v="inicio">Inicio</a>
-      <a href="#sincontacto" data-v="sincontacto">Sin primer contacto<span id="b-sc" class="badge oculto"></span></a>
+      <a href="#repasos" data-v="repasos">Repasos<span id="b-rep" class="badge oculto"></span></a>
       <a href="#plan" data-v="plan">Planificación</a>
-      <a href="#partes" data-v="partes">Partes</a>
       <a href="#informes" data-v="informes">Informes<span id="b-inf" class="badge oculto"></span></a>
       <a href="#envios" data-v="envios">Envíos a SIGMA<span id="b-env" class="badge oculto"></span></a>
       <a href="#operarios" data-v="operarios">Operarios</a>
@@ -229,7 +232,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.5 (Inicio + Sin primer contacto)
+   KUBEL Oficina — v2.6 (Inicio con partes + Repasos por clasificaciones)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -317,7 +320,7 @@ async function alCambiarSesion(sesion) {
   contarSinRevisar();
   contarEnvios();
   KubelAvisos.sincronizar(sb).then(pintarBotonAvisos);
-  contarSinContacto();
+  contarRepasos();
   irA(location.hash.slice(1) || 'inicio');
 }
 
@@ -375,7 +378,7 @@ function alCambio(tabla, p) {
     if (p.new.estado === 'no_realizado') aviso(`⚠️ ${nombreDe(p.new.operario_id)}: visita no realizada`);
   }
   if (tabla === 'informes') contarSinRevisar();
-  if (tabla === 'partes') { clearTimeout(alCambio.sc); alCambio.sc = setTimeout(contarSinContacto, 800); }
+  if (tabla === 'partes') { clearTimeout(alCambio.sc); alCambio.sc = setTimeout(contarRepasos, 800); }
   // No recargar si hay una ventana abierta (para no perder lo que se está escribiendo)
   clearTimeout(recargaT);
   recargaT = setTimeout(() => { if (!$('#modal').innerHTML) irA(vistaActual, true); }, 600);
@@ -638,13 +641,18 @@ async function guardarEnvio(id, aprobar) {
 // ---------- Navegación ----------
 window.addEventListener('hashchange', () => yo && irA(location.hash.slice(1)));
 function irA(v, silencioso) {
-  const vistas = { inicio: vistaHoy, sincontacto: vistaSinContacto, plan: vistaPlan, partes: vistaPartes, informes: vistaInformes, envios: vistaEnvios, operarios: vistaOperarios };
-  if (v === 'hoy') v = 'inicio'; // dirección antigua
+  const vistas = { inicio: vistaHoy, repasos: vistaRepasos, plan: vistaPlan, informes: vistaInformes, envios: vistaEnvios, operarios: vistaOperarios };
+  // Direcciones antiguas: #hoy y #partes → Inicio (que ya incluye los partes); #sincontacto → Repasos
+  let irAPartes = false;
+  if (v === 'hoy') v = 'inicio';
+  if (v === 'partes') { v = 'inicio'; irAPartes = !silencioso; }
+  if (v === 'sincontacto') { clasifRepaso = 'sincontacto'; v = 'repasos'; }
   if (!vistas[v]) v = 'inicio';
   vistaActual = v;
   document.querySelectorAll('header nav a').forEach((a) => a.classList.toggle('activo', a.dataset.v === v));
   if (silencioso && v === 'operarios') return; // no pisar lo que se está editando
-  vistas[v]();
+  const r = vistas[v]();
+  if (irAPartes) Promise.resolve(r).then(() => $('#inicio-partes')?.scrollIntoView({ behavior: 'smooth' }));
 }
 
 // =====================================================================
@@ -660,9 +668,11 @@ async function vistaHoy() {
       <div class="hoy-grid">
         <div><h3 style="margin:0 0 10px">Rutas de hoy</h3><div id="rutas-hoy">Cargando…</div></div>
         <div class="tarjeta feed"><h3 style="margin:0 0 6px">Últimos informes</h3><div id="feed">Cargando…</div></div>
-      </div></div>`;
-  }
-  const [asig, sinAsignar, urg, sinRev, ultimos, sinCont] = await Promise.all([
+      </div>
+      <div id="inicio-partes" style="margin-top:24px"></div></div>`;
+    await montarPartes($('#inicio-partes'));
+  } else cargarPartes(); // recarga en directo sin tocar los filtros
+  const [asig, sinAsignar, urg, sinRev, ultimos] = await Promise.all([
     sb.from('asignaciones').select('id, fecha, hora, orden, tipo, estado, operario_id, parte:partes!asignaciones_parte_id_fkey(id, numero_servicio, direccion, poblacion, codigo_postal, gremio, urgente, compania:companias(nombre))')
       .eq('fecha', hoy).order('orden').order('hora', { nullsFirst: false }),
     sb.from('partes').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente'),
@@ -670,18 +680,16 @@ async function vistaHoy() {
     sb.from('informes').select('id', { count: 'exact', head: true }).eq('revisado', false),
     sb.from('informes').select('id, creado_en, texto, revisado, trabajo_terminado, necesita_repaso, operario_id, parte:partes!informes_parte_id_fkey(id, numero_servicio, direccion)')
       .order('creado_en', { ascending: false }).limit(8),
-    sb.from('partes').select('id', { count: 'exact', head: true }).eq('sigma_sin_contacto', true).eq('sigma_en_curso', true),
   ]);
   if (asig.error) return fallo(asig.error);
   const lista = asig.data || [];
   const hechas = lista.filter((a) => a.estado === 'hecho').length;
   const noReal = lista.filter((a) => a.estado === 'no_realizado').length;
   $('#kpis').innerHTML = `
-    <a class="kpi ${sinCont.count ? 'mal' : ''}" href="#sincontacto"><div class="n">${sinCont.count ?? 0}</div><div class="t">Sin primer contacto</div></a>
     <a class="kpi ${sinAsignar.count ? 'alerta' : ''}" href="#plan"><div class="n">${sinAsignar.count ?? 0}</div><div class="t">Partes sin asignar</div></a>
     <a class="kpi" href="#plan"><div class="n">${hechas}/${lista.length}</div><div class="t">Visitas hechas hoy</div></a>
     <a class="kpi ${noReal ? 'mal' : ''}" href="#plan"><div class="n">${noReal}</div><div class="t">No realizadas hoy</div></a>
-    <a class="kpi ${urg.count ? 'mal' : ''}" href="#partes"><div class="n">${urg.count ?? 0}</div><div class="t">Urgentes abiertos</div></a>
+    <a class="kpi ${urg.count ? 'mal' : ''}" href="#inicio" onclick="filtroPartes.estado='abiertos';$('#inicio-partes')?.scrollIntoView({behavior:'smooth'});return false"><div class="n">${urg.count ?? 0}</div><div class="t">Urgentes abiertos</div></a>
     <a class="kpi ${sinRev.count ? 'alerta' : ''}" href="#informes"><div class="n">${sinRev.count ?? 0}</div><div class="t">Informes sin revisar</div></a>`;
 
   const porOp = {};
@@ -713,13 +721,42 @@ async function vistaHoy() {
 }
 
 // =====================================================================
-//  SIN PRIMER CONTACTO
-//  Partes SIGMA en los que aún no se ha hablado con el cliente. Los marca el robot
-//  con la lista "Pendiente de primer contacto" de Gestión repaso del portal y el estado 15.
+//  REPASOS — clasificaciones para gestionar los repasos rápido.
+//  Cada clasificador: id, nombre, ayuda, contar() → nº, pintar(destino).
+//  Para añadir uno nuevo basta con sumarlo a CLASIF_REPASOS.
 // =====================================================================
+let clasifRepaso = 'sincontacto';
+const CLASIF_REPASOS = [
+  { id: 'sincontacto', nombre: 'Sin primer contacto', contar: contarSinContacto, pintar: pintarSinContacto },
+];
+async function contarRepasos() {
+  const nums = await Promise.all(CLASIF_REPASOS.map((c) => c.contar().catch(() => 0)));
+  const total = nums.reduce((a, n) => a + (n || 0), 0);
+  const b = $('#b-rep'); if (b) { b.textContent = total || ''; b.classList.toggle('oculto', !total); }
+  CLASIF_REPASOS.forEach((c, i) => { const e = document.getElementById('cr-n-' + c.id); if (e) { e.textContent = nums[i] || ''; e.classList.toggle('oculto', !nums[i]); } });
+  return nums;
+}
+async function vistaRepasos() {
+  if (!CLASIF_REPASOS.some((c) => c.id === clasifRepaso)) clasifRepaso = CLASIF_REPASOS[0].id;
+  if (!$('#rep-raiz')) {
+    $('#contenido').innerHTML = `<div id="rep-raiz">
+      <div class="barra"><h2>Repasos</h2><span class="esp"></span>
+        <a href="https://web.multiasistencia.com/w3multi/gestRepaso.php" target="_blank" rel="noopener" style="font-size:13px">Gestión repaso en el portal ↗</a></div>
+      <div class="clasif">${CLASIF_REPASOS.map((c) => `<button data-c="${c.id}" onclick="clasifRepaso='${c.id}';vistaRepasos()">${esc(c.nombre)}<span id="cr-n-${c.id}" class="badge oculto"></span></button>`).join('')}</div>
+      <div id="rep-cont"></div></div>`;
+  }
+  document.querySelectorAll('.clasif button').forEach((x) => x.classList.toggle('activo', x.dataset.c === clasifRepaso));
+  contarRepasos();
+  await CLASIF_REPASOS.find((c) => c.id === clasifRepaso).pintar($('#rep-cont'));
+}
+
+// ---------- Clasificador: SIN PRIMER CONTACTO ----------
+// Partes SIGMA en los que aún no se ha hablado con el cliente. Los marca el robot
+// con la lista "Pendiente de primer contacto" de Gestión repaso del portal y el estado 15.
 async function contarSinContacto() {
-  const { count } = await sb.from('partes').select('id', { count: 'exact', head: true }).eq('sigma_sin_contacto', true).eq('sigma_en_curso', true);
-  const b = $('#b-sc'); if (!b) return; b.textContent = count || ''; b.classList.toggle('oculto', !count);
+  const { count, error } = await sb.from('partes').select('id', { count: 'exact', head: true }).eq('sigma_sin_contacto', true).eq('sigma_en_curso', true);
+  if (error) throw error;
+  return count || 0;
 }
 let filtroSinContacto = '';
 // "Primer contacto con cliente (16/10/2026 - 12:04)" → fecha límite que da SIGMA para el primer contacto
@@ -735,16 +772,15 @@ function textoPlazo(d) {
   if (min < 24 * 60) return `<span class="et pendiente" title="Plazo de SIGMA para el primer contacto">Vence ${cuando}</span>`;
   return `<span class="et" title="Plazo de SIGMA para el primer contacto">Plazo ${cuando}</span>`;
 }
-async function vistaSinContacto() {
+async function pintarSinContacto(destino) {
   if (!$('#sc-raiz')) {
-    $('#contenido').innerHTML = `<div id="sc-raiz">
-      <div class="barra"><h2>Sin primer contacto</h2>
-        <select id="sc-cuenta" style="max-width:190px"><option value="">Valladolid y Palencia</option>${Object.entries(CUENTAS_SIGMA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
-        <span class="esp"></span><a href="https://web.multiasistencia.com/w3multi/gestRepaso.php" target="_blank" rel="noopener" style="font-size:13px">Gestión repaso en el portal ↗</a></div>
+    destino.innerHTML = `<div id="sc-raiz">
+      <div class="barra" style="margin-bottom:8px">
+        <select id="sc-cuenta" style="max-width:190px"><option value="">Valladolid y Palencia</option>${Object.entries(CUENTAS_SIGMA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
       <p style="color:var(--suave);font-size:13px;margin-top:0">Servicios de SIGMA en los que todavía no se ha hablado con el cliente. Los clasifica el robot en cada pasada (cada 15 min) con la lista <b>Pendiente de primer contacto</b> de Gestión repaso del portal; salen de aquí solos cuando en SIGMA cambia el estado (p. ej. al enviar un Repaso).</p>
       <div id="sc-lista">Cargando…</div></div>`;
     $('#sc-cuenta').value = filtroSinContacto;
-    $('#sc-cuenta').onchange = (e) => { filtroSinContacto = e.target.value; vistaSinContacto(); };
+    $('#sc-cuenta').onchange = (e) => { filtroSinContacto = e.target.value; pintarSinContacto(destino); };
   }
   let q = sb.from('partes').select('id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, gremio, urgente, estado, sigma_cuenta, sigma_alerta, sigma_en_curso, sigma_estado, sigma_estado_texto, sigma_caducidad, sigma_llamadas, sigma_sin_contacto_desde, sigma_envios(estado), asignaciones!asignaciones_parte_id_fkey(fecha, operario_id)')
     .eq('sigma_sin_contacto', true).eq('sigma_en_curso', true);
@@ -1030,10 +1066,11 @@ function pintarFiltrosLugar() {
   $('#fp-pueblo').value = filtroPartes.pueblo;
 }
 
-async function vistaPartes() {
-  $('#contenido').innerHTML = `
+// Los partes se muestran dentro de Inicio (debajo de rutas e informes)
+async function montarPartes(destino) {
+  destino.innerHTML = `
     <div class="barra">
-      <h2>Partes</h2>
+      <h3 style="margin:0">Partes</h3>
       <input id="fp-texto" placeholder="Buscar nº, dirección, cliente…" style="max-width:280px" value="${esc(filtroPartes.texto)}">
       <select id="fp-estado" style="max-width:170px">
         <option value="abiertos">Abiertos</option>
@@ -1045,7 +1082,6 @@ async function vistaPartes() {
       <select id="fp-pueblo" style="max-width:230px"><option value="">Todos los pueblos</option></select>
       <span class="esp"></span>
       <button class="sec" onclick="exportarPartes()">Exportar CSV</button>
-      <button onclick="modalParte()">+ Nuevo parte</button>
     </div>
     <div id="tabla-partes">Cargando…</div>`;
   $('#fp-estado').value = filtroPartes.estado;
@@ -1057,7 +1093,7 @@ async function vistaPartes() {
   let t; $('#fp-texto').oninput = (e) => { clearTimeout(t); t = setTimeout(() => { filtroPartes.texto = e.target.value.trim(); cargarPartes(); }, 300); };
   $('#fp-estado').onchange = (e) => { filtroPartes.estado = e.target.value; cargarPartes(); };
   $('#fp-cia').onchange = (e) => { filtroPartes.cia = e.target.value; cargarPartes(); };
-  cargarPartes();
+  await cargarPartes();
 }
 
 let ultimosPartes = [];
