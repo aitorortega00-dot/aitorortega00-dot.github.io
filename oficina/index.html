@@ -312,6 +312,7 @@ async function alCambiarSesion(sesion) {
   if (!id) { yo = null; pararTiempoReal(); return mostrar('v-login'); }
   const { data, error } = await sb.from('perfiles').select('*').eq('id', id).single();
   if (error || !data) { alert('No se encontró tu perfil.'); return sb.auth.signOut(); }
+  if (data.rol === 'admin' && data.activo) { location.href = '../admin/'; return; }
   if (data.rol !== 'oficina' || !data.activo) {
     alert('Esta cuenta es de operario. Te llevo a la app de operarios.');
     location.href = '../operario/';
@@ -331,7 +332,7 @@ async function alCambiarSesion(sesion) {
 async function entrar(ev) {
   ev.preventDefault();
   $('#lg-error').textContent = ''; $('#lg-btn').disabled = true;
-  const { error } = await sb.auth.signInWithPassword({ email: val('lg-correo').toLowerCase(), password: $('#lg-clave').value });
+  const { error } = await sb.auth.signInWithPassword({ email: ((c) => c && !c.includes('@') ? c + '@kubel.app' : c)(val('lg-correo').toLowerCase()), password: $('#lg-clave').value });
   $('#lg-btn').disabled = false;
   if (error) $('#lg-error').textContent = /Invalid login/i.test(error.message) ? 'Correo o contraseña incorrectos.' : mensaje(error);
 }
@@ -360,7 +361,7 @@ async function cargarCatalogos() {
     sb.from('perfiles').select('*').order('nombre'),
     sb.from('companias').select('*').order('nombre'),
   ]);
-  cache.todosPerfiles = o.data || [];
+  cache.todosPerfiles = (o.data || []).filter((p) => p.rol !== 'admin'); // las cuentas admin solo se ven en /admin/
   cache.operarios = cache.todosPerfiles.filter((p) => p.rol === 'operario' && p.activo);
   cache.companias = c.data || [];
   const { data: cods } = await sb.from('sigma_codigos').select('tipo, codigo, texto');
@@ -1014,6 +1015,10 @@ async function modalParte(id) {
       <div><label>Gremio</label><input id="pt-gremio" list="gremios" value="${esc(p.gremio || '')}"><datalist id="gremios">${GREMIOS.map((g) => `<option value="${g}">`).join('')}</datalist></div>
     </div>
     <div class="dos">
+      <div><label>Aseguradora (la ve el operario)</label><input id="pt-aseguradora" value="${esc(p.aseguradora || '')}" placeholder="Allianz, Mapfre…"></div>
+      <div><label>Nº de póliza</label><input id="pt-poliza" value="${esc(p.poliza || '')}"></div>
+    </div>
+    <div class="dos">
       <div><label>Teléfono</label><input id="pt-tel" type="tel" value="${esc(p.telefono || '')}"></div>
       <div><label>Teléfono 2</label><input id="pt-tel2" type="tel" value="${esc(p.telefono2 || '')}"></div>
     </div>
@@ -1044,6 +1049,7 @@ async function guardarParte(id) {
     gremio: val('pt-gremio') || null, telefono: val('pt-tel') || null, telefono2: val('pt-tel2') || null,
     direccion: val('pt-dir'), poblacion: val('pt-pob') || null, codigo_postal: val('pt-cp') || null,
     descripcion: val('pt-desc') || null, notas_oficina: val('pt-notas') || null,
+    aseguradora: val('pt-aseguradora') || null, poliza: val('pt-poliza') || null,
     urgente: $('#pt-urg').checked, estado: val('pt-estado'),
   };
   if (!fila.numero_servicio || !fila.direccion) return alert('El nº de servicio y la dirección son obligatorios.');

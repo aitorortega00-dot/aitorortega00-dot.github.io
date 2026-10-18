@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KUBEL Administrador</title>
+<meta name="theme-color" content="#2B2F36">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="../favicon.png">
+<script src="../comun/config.js"></script>
+<script src="../comun/cargar-supabase.js"></script>
+<style>
+  :root{
+    --fondo:#F3F1EC; --tarjeta:#fff; --texto:#1E2328; --suave:#5F6770; --borde:#E2DED6;
+    --marca:#2B2F36; --marca-suave:#E7E8EA; --acento:#E07A1F; --peligro:#C0392B; --ok:#2E7D4F;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--fondo);color:var(--texto)}
+  button,input,select{font:inherit}
+  button{cursor:pointer;border-radius:8px;border:1.5px solid var(--marca);background:var(--marca);color:#fff;padding:7px 14px;font-weight:600}
+  button.sec{background:#fff;color:var(--marca)}
+  button.mini{padding:3px 10px;font-size:12px}
+  button:disabled{opacity:.5;cursor:default}
+  input,select{border:1px solid var(--borde);border-radius:8px;padding:8px 10px;background:#FAFAF8;color:var(--texto);width:100%}
+  label{display:block;font-weight:600;font-size:12px;color:var(--suave);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.4px}
+  .oculto{display:none!important}
+  .error{color:var(--peligro);margin-top:10px;font-size:13px}
+  .nota{background:#FFF4E5;color:#8A4B00;border-radius:8px;padding:10px 12px;font-size:13px}
+
+  .centro{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--marca);padding:20px}
+  .caja{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:400px}
+  .caja h1{margin:0;color:var(--marca);letter-spacing:4px;text-align:center}
+  .caja p{color:var(--suave);text-align:center;margin:4px 0 12px}
+  .caja button{width:100%;margin-top:18px;padding:11px}
+
+  header{background:var(--marca);color:#fff;display:flex;align-items:center;gap:16px;padding:0 20px;padding-top:env(safe-area-inset-top);min-height:56px;position:sticky;top:0;z-index:5}
+  header .logo{font-weight:800;letter-spacing:3px;font-size:18px;white-space:nowrap}
+  header .logo small{font-weight:600;letter-spacing:1px;font-size:11px;color:#C8CBD0;margin-left:6px}
+  header .esp{flex:1}
+  header a{color:#C8CBD0;font-size:13px}
+  header button{background:transparent;border-color:#C8CBD0;color:#fff}
+
+  main{padding:20px;max-width:1200px;margin:0 auto}
+  .barra{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .barra h2{margin:0;font-size:20px}
+  .barra .esp{flex:1}
+  .barra input{max-width:260px}
+
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--borde);border-radius:12px;overflow:hidden}
+  th,td{padding:10px;border-bottom:1px solid var(--borde);text-align:left;vertical-align:middle}
+  th{background:#FAFAF8;font-size:12px;color:var(--suave);text-transform:uppercase}
+  tr:last-child td{border-bottom:0}
+  td.suave{color:var(--suave);font-size:13px}
+  .et{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap}
+  .et.admin{background:#2B2F36;color:#fff}
+  .et.oficina{background:#E3ECEF;color:#1F4E5F}
+  .et.operario{background:#FDEBD8;color:#9A4E0B}
+  .et.off{background:#F8DEDA;color:var(--peligro)}
+  .yo{font-size:11px;color:var(--suave);margin-left:4px}
+
+  .tarjetas{display:none}
+  @media (max-width:760px){
+    table{display:none}
+    .tarjetas{display:block}
+    .tj{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+    .tj .f1{display:flex;align-items:center;gap:8px}
+    .tj .f1 b{flex:1;font-size:15px}
+    .tj .c{color:var(--suave);font-size:13px;margin:4px 0 8px;word-break:break-all}
+    main{padding:16px}
+  }
+
+  .velo{position:fixed;inset:0;background:rgba(20,24,28,.45);display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;z-index:20;overflow:auto}
+  .modal{background:#fff;border-radius:14px;padding:22px;width:100%;max-width:460px}
+  .modal h3{margin:0 0 4px}
+  .modal .sub{color:var(--suave);font-size:13px}
+  .fila-clave{display:flex;gap:8px}
+  .fila-clave input{flex:1}
+  .fila-clave button{white-space:nowrap}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .check{display:flex;align-items:center;gap:8px;margin-top:14px}
+  .check input{width:auto}
+  .acciones{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+  textarea{width:100%;min-height:110px;border:1px solid var(--borde);border-radius:8px;padding:8px 10px;font:inherit;background:#FAFAF8}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2B2F36;color:#fff;padding:10px 16px;border-radius:10px;z-index:30;max-width:90vw}
+</style>
+</head>
+<body>
+
+<div id="v-carga" class="centro"><div class="caja"><h1>KUBEL</h1><p>Cargando…</p></div></div>
+
+<div id="v-login" class="centro oculto">
+  <form class="caja" onsubmit="entrar(event)">
+    <h1>KUBEL</h1>
+    <p>Panel de administrador</p>
+    <label>Usuario o correo</label>
+    <input id="lg-usuario" autocomplete="username" autocapitalize="none" placeholder="ADMINISTRADOR" required>
+    <label>Contraseña</label>
+    <input id="lg-clave" type="password" autocomplete="current-password" required>
+    <button id="lg-btn">Entrar</button>
+    <div id="lg-error" class="error"></div>
+  </form>
+</div>
+
+<div id="v-app" class="oculto">
+  <header>
+    <div class="logo">KUBEL<small>ADMINISTRADOR</small></div>
+    <span class="esp"></span>
+    <a href="../oficina/">Web oficina</a>
+    <button class="mini" onclick="salir()">Salir</button>
+  </header>
+  <main>
+    <div class="barra">
+      <h2>Cuentas de usuario</h2>
+      <span class="esp"></span>
+      <input id="buscar" placeholder="Buscar nombre o correo" oninput="pintar()">
+      <button onclick="modalCuenta()">+ Nueva cuenta</button>
+    </div>
+    <div id="lista"><p class="suave">Cargando cuentas…</p></div>
+    <p class="nota" style="margin-top:16px">Los cambios de correo y contraseña son inmediatos: la persona entra con los datos nuevos desde ya.
+      Si cambias la contraseña de alguien que tiene la sesión abierta en el móvil, sigue dentro hasta que salga.</p>
+  </main>
+</div>
+
+<div id="modal"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ROL_TXT = { admin: 'Administrador', oficina: 'Oficina', operario: 'Operario' };
+const aCorreo = (s) => { s = String(s || '').trim().toLowerCase(); return s && !s.includes('@') ? s + '@kubel.app' : s; };
+const verCorreo = (e) => /@kubel\.app$/.test(e) ? e.replace(/@kubel\.app$/, '').toUpperCase() : e;
+function fecha(t) {
+  if (!t) return 'Nunca';
+  const d = new Date(t);
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }) + ' ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
+function aviso(t) {
+  const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d);
+  setTimeout(() => d.remove(), 3500);
+}
+function mensaje(e) { return e?.message || e?.error || String(e); }
+function claveAleatoria() {
+  const c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = '';
+  crypto.getRandomValues(new Uint32Array(10)).forEach((n) => (s += c[n % c.length])); return s;
+}
+function mostrar(id) { ['v-carga', 'v-login', 'v-app'].forEach((v) => $('#' + v).classList.toggle('oculto', v !== id)); }
+function abrirModal(html) { $('#modal').innerHTML = `<div class="velo" onclick="if(event.target===this)cerrarModal()"><div class="modal">${html}</div></div>`; }
+function cerrarModal() { $('#modal').innerHTML = ''; }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarModal(); });
+
+// ---------- Conexión ----------
+let sb = null, yoId = null, cuentas = [];
+function alCargar() {
+  if (sb) return;
+  const c = window.KUBEL_CONFIG;
+  sb = window.supabase.createClient(c.url, c.key);
+  sb.auth.onAuthStateChange((_e, s) => setTimeout(() => alCambiarSesion(s), 0));
+}
+function alFallar() { $('#v-carga').innerHTML = '<div class="caja"><h1>KUBEL</h1><p>No se pudo conectar. Comprueba internet y recarga.</p><button onclick="location.reload()">Recargar</button></div>'; }
+if (window.KUBEL_SB === 'listo') alCargar(); else if (window.KUBEL_SB === 'error') alFallar();
+document.addEventListener('supabase-listo', alCargar);
+document.addEventListener('supabase-error', alFallar);
+
+let sesionActual;
+async function alCambiarSesion(s) {
+  const id = s?.user?.id ?? null;
+  if (id === sesionActual) return;
+  sesionActual = id;
+  if (!id) return mostrar('v-login');
+  const { data } = await sb.from('perfiles').select('rol, activo').eq('id', id).single();
+  if (!data || data.rol !== 'admin' || !data.activo) {
+    await sb.auth.signOut();
+    $('#lg-error').textContent = 'Esta cuenta no es de administrador.';
+    return mostrar('v-login');
+  }
+  yoId = id;
+  mostrar('v-app');
+  cargar();
+}
+async function entrar(ev) {
+  ev.preventDefault();
+  $('#lg-error').textContent = ''; $('#lg-btn').disabled = true;
+  const { error } = await sb.auth.signInWithPassword({ email: aCorreo($('#lg-usuario').value), password: $('#lg-clave').value });
+  $('#lg-btn').disabled = false;
+  if (error) $('#lg-error').textContent = /Invalid login/i.test(error.message) ? 'Usuario o contraseña incorrectos.' : mensaje(error);
+}
+async function salir() { await sb.auth.signOut(); location.reload(); }
+
+async function llamar(cuerpo) {
+  const { data, error } = await sb.functions.invoke('usuarios', { body: cuerpo });
+  if (error) {
+    let m = error.message;
+    try { const j = await error.context.json(); if (j?.error) m = j.error; } catch (_) {}
+    throw new Error(m);
+  }
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+// ---------- Lista ----------
+async function cargar() {
+  try {
+    const r = await llamar({ accion: 'listar' });
+    cuentas = r.cuentas; yoId = r.yo || yoId;
+    pintar();
+  } catch (e) { $('#lista').innerHTML = `<p class="error">No se pudieron cargar las cuentas: ${esc(mensaje(e))}</p>`; }
+}
+function pintar() {
+  const q = $('#buscar').value.trim().toLowerCase();
+  const ver = cuentas.filter((c) => !q || c.nombre.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
+  if (!ver.length) { $('#lista').innerHTML = '<p class="suave">Ninguna cuenta.</p>'; return; }
+  const et = (c) => `<span class="et ${c.rol}">${ROL_TXT[c.rol] || c.rol}</span>${c.activo ? '' : ' <span class="et off">Desactivada</span>'}`;
+  const yo = (c) => c.id === yoId ? '<span class="yo">(tú)</span>' : '';
+  $('#lista').innerHTML = `
+    <table><thead><tr><th>Nombre</th><th>Usuario / correo</th><th>Tipo</th><th>Último acceso</th><th></th></tr></thead><tbody>
+    ${ver.map((c) => `<tr>
+      <td><b>${esc(c.nombre)}</b>${yo(c)}</td>
+      <td>${esc(verCorreo(c.email))}</td>
+      <td>${et(c)}</td>
+      <td class="suave">${fecha(c.ultimo_acceso)}</td>
+      <td style="text-align:right"><button class="mini" onclick="modalCuenta('${c.id}')">Editar</button></td>
+    </tr>`).join('')}</tbody></table>
+    <div class="tarjetas">${ver.map((c) => `<div class="tj">
+      <div class="f1"><b>${esc(c.nombre)}${yo(c)}</b>${et(c)}</div>
+      <div class="c">${esc(verCorreo(c.email))} · último acceso ${fecha(c.ultimo_acceso)}</div>
+      <button class="mini" onclick="modalCuenta('${c.id}')">Editar</button></div>`).join('')}</div>`;
+}
+
+// ---------- Editar / crear ----------
+function modalCuenta(id) {
+  const c = id ? cuentas.find((x) => x.id === id) : { nombre: '', email: '', rol: 'operario', activo: true };
+  const soyYo = id === yoId;
+  abrirModal(`
+    <h3>${id ? 'Editar cuenta' : 'Nueva cuenta'}</h3>
+    ${id ? `<div class="sub">${esc(c.nombre)} · ${ROL_TXT[c.rol]}</div>` : ''}
+    <label>Nombre</label><input id="m-nombre" value="${esc(c.nombre)}">
+    <label>Correo (o nombre de usuario sin @)</label><input id="m-correo" value="${esc(verCorreo(c.email))}" autocapitalize="none" autocomplete="off">
+    <label>${id ? 'Nueva contraseña (vacío = no cambiar)' : 'Contraseña (mín. 6)'}</label>
+    <div class="fila-clave"><input id="m-clave" value="${id ? '' : claveAleatoria()}" autocomplete="new-password"><button class="sec" type="button" onclick="$('#m-clave').value=claveAleatoria()">Generar</button></div>
+    <div class="dos">
+      <div><label>Tipo de cuenta</label><select id="m-rol" ${soyYo ? 'disabled' : ''}>
+        ${['operario', 'oficina', 'admin'].map((r) => `<option value="${r}" ${r === c.rol ? 'selected' : ''}>${ROL_TXT[r]}</option>`).join('')}</select></div>
+      <div class="check" style="margin-top:34px"><input type="checkbox" id="m-activo" ${c.activo ? 'checked' : ''} ${soyYo ? 'disabled' : ''}><span>Cuenta activa</span></div>
+    </div>
+    <div id="m-error" class="error"></div>
+    <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button id="m-btn" onclick="guardar(${id ? `'${id}'` : ''})">${id ? 'Guardar cambios' : 'Crear cuenta'}</button></div>`);
+}
+async function guardar(id) {
+  const c = id ? cuentas.find((x) => x.id === id) : null;
+  const nombre = $('#m-nombre').value.trim();
+  const correo = aCorreo($('#m-correo').value);
+  const clave = $('#m-clave').value;
+  const rol = $('#m-rol').value, activo = $('#m-activo').checked;
+  if (!nombre) return ($('#m-error').textContent = 'Falta el nombre.');
+  if (!correo) return ($('#m-error').textContent = 'Falta el correo o usuario.');
+  if ((clave || !id) && clave.length < 6) return ($('#m-error').textContent = 'La contraseña debe tener al menos 6 caracteres.');
+  $('#m-error').textContent = ''; $('#m-btn').disabled = true;
+  try {
+    if (id) {
+      const cambios = { accion: 'editar', id };
+      if (nombre !== c.nombre) cambios.nombre = nombre;
+      if (correo !== c.email) cambios.email = correo;
+      if (clave) cambios.password = clave;
+      if (id !== yoId) { if (rol !== c.rol) cambios.rol = rol; if (activo !== c.activo) cambios.activo = activo; }
+      if (Object.keys(cambios).length === 2) { cerrarModal(); return; }
+      await llamar(cambios);
+    } else {
+      await llamar({ accion: 'crear', nombre, email: correo, password: clave, rol });
+    }
+    await cargar();
+    if (clave || !id) {
+      const msg = `Hola ${nombre}, estos son tus datos de acceso a KUBEL:\n${rol === 'operario' ? 'App' : 'Web'}: ${new URL(rol === 'operario' ? '../operario/' : rol === 'admin' ? './' : '../oficina/', location.href).href}\nUsuario: ${verCorreo(correo)}\nContraseña: ${clave}`;
+      abrirModal(`<h3>✅ ${id ? 'Cambios guardados' : 'Cuenta creada'}</h3>
+        <p class="sub">Datos de acceso para enviar a ${esc(nombre)}:</p>
+        <textarea id="m-msg">${esc(msg)}</textarea>
+        <div class="acciones"><button class="sec" onclick="navigator.clipboard?.writeText($('#m-msg').value).then(()=>aviso('Copiado'))">Copiar</button>
+        <button class="sec" onclick="window.open('https://wa.me/?text='+encodeURIComponent($('#m-msg').value),'_blank')">WhatsApp</button>
+        <button onclick="cerrarModal()">Hecho</button></div>`);
+    } else { cerrarModal(); aviso('Cambios guardados'); }
+  } catch (e) { $('#m-error').textContent = mensaje(e); $('#m-btn').disabled = false; }
+}
+</script>
+</body>
+</html>

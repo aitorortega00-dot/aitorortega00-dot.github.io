@@ -159,7 +159,7 @@ const fHora = (ts) => { const d = new Date(ts); return `${dos(d.getDate())}/${do
 const dirCompleta = (p) => [p?.direccion, p?.codigo_postal, p?.poblacion].filter(Boolean).join(', ');
 const EST = { pendiente: 'Pendiente', en_camino: 'En camino', hecho: 'Hecho', no_realizado: 'No realizado' };
 const SELECT_ASIG = `id, fecha, hora, orden, tipo, estado, notas,
-  parte:partes!asignaciones_parte_id_fkey(id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, codigo_postal, gremio, descripcion, urgente, estado, notas_oficina, compania:companias(nombre))`;
+  parte:partes!asignaciones_parte_id_fkey(id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, codigo_postal, gremio, descripcion, urgente, estado, notas_oficina, aseguradora, poliza)`;
 const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const esAndroid = /Android/i.test(navigator.userAgent);
 const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || document.referrer.startsWith('android-app://');
@@ -227,6 +227,7 @@ async function alCambiarSesion(s) {
     return;
   }
   if (!data.activo) { await informar('Cuenta desactivada', 'Habla con la oficina.'); return sb.auth.signOut(); }
+  if (data.rol === 'admin') { location.href = '../admin/'; return; }
   yo = data;
   arrancarTiempoReal();
   KubelAvisos.sincronizar(sb).then(() => pintarBandas());
@@ -392,7 +393,7 @@ async function cargarDia(lunes) {
         <div class="der">
           <div class="etiquetas"><span class="et ${a.estado}">${EST[a.estado]}</span>${p.urgente ? '<span class="et urg">URGENTE</span>' : ''}${a.tipo === 'repaso' ? '<span class="et repaso">Repaso</span>' : ''}</div>
           <div class="dir">${esc(dirCompleta(p))}</div>
-          <div class="meta">${esc([p.compania?.nombre, p.numero_servicio, p.gremio].filter(Boolean).join(' · '))}</div>
+          <div class="meta">${esc([p.numero_servicio, p.gremio, p.aseguradora].filter(Boolean).join(' · '))}</div>
           ${p.descripcion ? `<div class="desc">${esc(p.descripcion)}</div>` : ''}
         </div></div>`;
     }).join('')}`;
@@ -417,7 +418,7 @@ async function pintarParte() {
   const dir = dirCompleta(p);
   $('#raiz').innerHTML = `
     <div class="cab"><div class="lado"><button onclick="volver()">‹ Volver</button></div>
-      <div class="centro"><div class="t">${esc(p.numero_servicio)}</div><div class="s">${esc([p.compania?.nombre, p.gremio].filter(Boolean).join(' · '))}</div></div>
+      <div class="centro"><div class="t">${esc(p.numero_servicio)}</div><div class="s">${esc(p.gremio || '')}</div></div>
       <div class="lado der"></div></div>
     <div class="contenido ancho">
       <div class="etiquetas"><span class="et ${a.estado}">${EST[a.estado]}</span>${p.urgente ? '<span class="et urg">URGENTE</span>' : ''}${a.tipo === 'repaso' ? '<span class="et repaso">Repaso</span>' : ''}</div>
@@ -426,6 +427,7 @@ async function pintarParte() {
         <button class="boton" style="margin-top:12px" onclick="abrirMapa('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(${esc(JSON.stringify(dir))})+'&travelmode=driving')">🧭&nbsp; Cómo llegar</button></div>
       <div class="seccion"><h4>Cliente</h4><div class="grande">${esc(p.asegurado || 'Sin nombre')}</div>
         ${tels.length ? tels.map((t) => `<a class="tel" href="tel:${esc(t.replace(/\s/g, ''))}"><span>📞&nbsp; ${esc(t)}</span><span>Llamar</span></a>`).join('') : '<div class="suave">Sin teléfono</div>'}</div>
+      ${p.aseguradora || p.poliza ? `<div class="seccion"><h4>Seguro</h4>${p.aseguradora ? `<div class="grande">${esc(p.aseguradora)}</div>` : ''}${p.poliza ? `<div class="suave">Póliza: ${esc(p.poliza)}</div>` : ''}</div>` : ''}
       ${p.descripcion ? `<div class="seccion"><h4>Descripción del trabajo</h4><div class="pre">${esc(p.descripcion)}</div></div>` : ''}
       ${a.notas || p.notas_oficina ? `<div class="seccion"><h4>Notas de la oficina</h4>${a.notas ? `<div class="pre">${esc(a.notas)}</div>` : ''}${p.notas_oficina ? `<div class="pre" style="${a.notas ? 'margin-top:8px' : ''}">${esc(p.notas_oficina)}</div>` : ''}</div>` : ''}
       <div class="pila" style="margin-top:4px">
