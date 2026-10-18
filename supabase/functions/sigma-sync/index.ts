@@ -416,6 +416,12 @@ function traducirCodigos(codes: { code?: string }[] | undefined) {
   } as Record<string, string>)[x] || x).join(' · ');
 }
 const hoyMadrid = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date());
+// Minuto actual en Madrid con el mismo formato que la bitácora ("aaaa-mm-dd hh:mm"), un minuto antes por margen
+const minutoMadrid = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+  .format(new Date(Date.now() - 60000)).replace('T', ' ');
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Fallo del portal en el que no se sabe si el cambio se guardó
+class Dudoso extends Error {}
 
 async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
   const n = e.parte.numero_servicio;
@@ -425,15 +431,31 @@ async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
   const html = await s.pedir(`fechaccion.php?reparacion=${n}&modo=0`);
   const ut = (html.match(/<multiasistencia-repaso[^>]*\sut="([^"]+)"/i) || [])[1];
   if (!ut) throw new Error('No se pudo abrir la pestaña Repaso de este servicio');
+  // Un 50x, un corte o un tiempo agotado en review-update es DUDOSO: el portal pudo guardar el cambio
+  // aunque no contestara. Se marca como Dudoso para comprobarlo en la ficha antes de repetir nada.
   const api = async (ruta: string, cuerpo: unknown) => {
-    const r = await fetch(`${API_REPASO}/${ruta}`, {
-      method: 'POST', signal: AbortSignal.timeout(30000), body: JSON.stringify(cuerpo),
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ut}`, Version: '3.0.0', 'User-Agent': UA, Origin: 'https://web.multiasistencia.com', Referer: BASE + 'fechaccion.php' },
-    });
-    if (r.status >= 500 || r.status === 401 || r.status === 404) throw new Error(`El servicio de Repaso respondió ${r.status}`);
+    let r: Response;
+    try {
+      r = await fetch(`${API_REPASO}/${ruta}`, {
+        method: 'POST', signal: AbortSignal.timeout(30000), body: JSON.stringify(cuerpo),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ut}`, Version: '3.0.0', 'User-Agent': UA, Origin: 'https://web.multiasistencia.com', Referer: BASE + 'fechaccion.php' },
+      });
+    } catch (err) {
+      throw new Dudoso(`sin respuesta del servicio de Repaso (${(err as Error).name === 'TimeoutError' ? 'tiempo agotado' : 'conexión cortada'})`);
+    }
+    if (r.status >= 500) { await r.body?.cancel(); throw new Dudoso(`el servicio de Repaso respondió ${r.status}`); }
+    if (r.status === 401 || r.status === 404) throw new Error(`El servicio de Repaso respondió ${r.status}`);
     return await r.json();
   };
-  const ini = await api('review-initial-data', { reparation: n });
+  // review-initial-data solo lee: si el portal está saturado se repite una vez sin riesgo
+  let ini;
+  try { ini = await api('review-initial-data', { reparation: n }); }
+  catch (err) {
+    if (!(err instanceof Dudoso)) throw err;
+    await esperar(5000);
+    try { ini = await api('review-initial-data', { reparation: n }); }
+    catch (err2) { throw new Error(`Portal SIGMA saturado: ${(err2 as Error).message}. No se envió nada; reintenta en un rato`); }
+  }
   if (!ini?.success) throw new Error(traducirCodigos(ini?.metadata?.errorCodes));
   const d = ini.data;
   if (!d.availabilityPermission) throw new Error('El portal pide elegir hueco de agenda para este servicio: hazlo a mano en el portal');
@@ -466,14 +488,37 @@ async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
   //     → siempre a) "No importa, quiero mantener la fecha / hora introducida" (hourRadioButton = la hora elegida)
   //  3) vuelve a pedir el aviso de SMS → siempre "Sí"
   //  4) APLAZAMOK = guardado.
-  let sms = false, mantenida = false;
+  const nombreMotivo = String(motivo.label).replace(/\s*\[\d+\]/, '').trim();
+  const resumen = (extra = '') => `Repaso guardado: ${nombreMotivo} ${dia}/${mes}/${a}${e.hora ? ' ' + e.hora.slice(0, 5) : ''}${extra}`;
+  const inicio = minutoMadrid(); // para reconocer en la bitácora la anotación de este envío
+  // ¿Ya está en SIGMA? Busca en la bitácora de la ficha una anotación de este motivo y fecha/hora hecha desde el inicio del envío
+  const yaGuardado = async () => {
+    const f = leerFicha(await s.pedir(`repasos1.php?reparacion=${n}`));
+    const marca = `(${dia}/${mes}/${a}${e.hora ? ' - ' + e.hora.slice(0, 5) : ''}`;
+    return f.bitacora.some((b) => b.fecha && b.fecha >= inicio && b.texto.startsWith(nombreMotivo) && b.texto.includes(marca));
+  };
+  let sms = false, mantenida = false, dudas = 0;
   let enviar: Record<string, unknown> = cmd;
-  for (let paso = 0; paso < 6; paso++) {
-    const res = await api('review-update', enviar);
+  for (let paso = 0; paso < 8; paso++) {
+    let res;
+    try {
+      res = await api('review-update', enviar);
+    } catch (err) {
+      if (!(err instanceof Dudoso)) throw err;
+      // Respuesta dudosa: comprobar en la ficha del portal antes de repetir (evita citas y SMS duplicados)
+      dudas++;
+      await esperar(8000);
+      let guardado: boolean;
+      try { guardado = await yaGuardado(); }
+      catch { throw new Error(`Portal SIGMA saturado (${err.message}) y no se pudo comprobar si se guardó: mira la ficha en el portal antes de reintentar`); }
+      if (guardado) return resumen(' (comprobado en la ficha tras un fallo del portal)');
+      if (dudas > 1) throw new Error(`Portal SIGMA saturado dos veces (${err.message}). Comprobado: no se guardó nada; reintenta en un rato`);
+      sms = false; mantenida = false; enviar = cmd; // no se guardó: se repite desde el principio una vez
+      continue;
+    }
     const code = res?.metadata?.errorCodes?.[0]?.code;
     if (code === 'APLAZAMOK') {
-      return `Repaso guardado: ${motivo.label.replace(/\s*\[\d+\]/, '')} ${dia}/${mes}/${a}${e.hora ? ' ' + e.hora.slice(0, 5) : ''}`
-        + `${mantenida ? ' (fecha/hora mantenida aunque la agenda no tenía hueco)' : ''}${sms ? ' (SMS al cliente confirmado)' : ''}`;
+      return resumen(`${mantenida ? ' (fecha/hora mantenida aunque la agenda no tenía hueco)' : ''}${sms ? ' (SMS al cliente confirmado)' : ''}${dudas ? ' (reintentado tras un fallo del portal)' : ''}`);
     }
     if (code === 'AVISO_SMS') { // aviso genérico de SMS al cliente: siempre "Sí"
       if (enviar.smsResponse) throw new Error('El portal repitió el aviso de SMS tras contestar "Sí"');
