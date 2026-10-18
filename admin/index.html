@@ -106,8 +106,6 @@
   <header>
     <div class="logo">KUBEL<small>ADMINISTRADOR</small></div>
     <span class="esp"></span>
-    <a href="../oficina/">Web oficina</a>
-    <button class="mini" onclick="salir()">Salir</button>
   </header>
   <main>
     <div class="barra">
@@ -154,7 +152,8 @@ let sb = null, yoId = null, cuentas = [];
 function alCargar() {
   if (sb) return;
   const c = window.KUBEL_CONFIG;
-  sb = window.supabase.createClient(c.url, c.key);
+  // Sesión propia del panel: no se mezcla con la de la web de oficina en el mismo navegador
+  sb = window.supabase.createClient(c.url, c.key, { auth: { storageKey: 'kubel-admin-sesion' } });
   sb.auth.onAuthStateChange((_e, s) => setTimeout(() => alCambiarSesion(s), 0));
 }
 function alFallar() { $('#v-carga').innerHTML = '<div class="caja"><h1>KUBEL</h1><p>No se pudo conectar. Comprueba internet y recarga.</p><button onclick="location.reload()">Recargar</button></div>'; }
@@ -170,7 +169,7 @@ async function alCambiarSesion(s) {
   if (!id) return mostrar('v-login');
   const { data } = await sb.from('perfiles').select('rol, activo').eq('id', id).single();
   if (!data || data.rol !== 'admin' || !data.activo) {
-    await sb.auth.signOut();
+    await sb.auth.signOut({ scope: 'local' });
     $('#lg-error').textContent = 'Esta cuenta no es de administrador.';
     return mostrar('v-login');
   }
@@ -185,7 +184,6 @@ async function entrar(ev) {
   $('#lg-btn').disabled = false;
   if (error) $('#lg-error').textContent = /Invalid login/i.test(error.message) ? 'Usuario o contraseña incorrectos.' : mensaje(error);
 }
-async function salir() { await sb.auth.signOut(); location.reload(); }
 
 async function llamar(cuerpo) {
   const { data, error } = await sb.functions.invoke('usuarios', { body: cuerpo });

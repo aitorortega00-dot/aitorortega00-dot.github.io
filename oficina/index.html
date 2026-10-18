@@ -225,7 +225,7 @@
       <a href="#envios" data-v="envios">Envíos a SIGMA<span id="b-env" class="badge oculto"></span></a>
       <a href="#operarios" data-v="operarios">Operarios</a>
     </nav>
-    <div class="usuario"><span id="sigma-ind" class="sigma-ind oculto" onclick="modalSigma()" title="Robot SIGMA: última lectura del portal"></span><span id="vivo" class="vivo off" title="Actualización en directo"></span><button class="mini" id="btn-avisos" onclick="alternarAvisos()" title="Avisos en este dispositivo">🔕</button><span id="yo"></span><button class="mini" onclick="salir()">Salir</button></div>
+    <div class="usuario"><span id="sigma-ind" class="sigma-ind oculto" onclick="modalSigma()" title="Robot SIGMA: última lectura del portal"></span><span id="vivo" class="vivo off" title="Actualización en directo"></span><button class="mini" id="btn-avisos" onclick="alternarAvisos()" title="Avisos en este dispositivo">🔕</button><span id="yo"></span></div>
   </header>
   <main id="contenido"></main>
 </div>
@@ -311,11 +311,13 @@ async function alCambiarSesion(sesion) {
   sesionActual = id;
   if (!id) { yo = null; pararTiempoReal(); return mostrar('v-login'); }
   const { data, error } = await sb.from('perfiles').select('*').eq('id', id).single();
-  if (error || !data) { alert('No se encontró tu perfil.'); return sb.auth.signOut(); }
-  if (data.rol === 'admin' && data.activo) { location.href = '../admin/'; return; }
+  if (error || !data) { alert('No se encontró tu perfil.'); return sb.auth.signOut({ scope: 'local' }); }
   if (data.rol !== 'oficina' || !data.activo) {
-    alert('Esta cuenta es de operario. Te llevo a la app de operarios.');
-    location.href = '../operario/';
+    // Solo cierra la sesión en este navegador; no afecta a otros dispositivos
+    await sb.auth.signOut({ scope: 'local' });
+    $('#lg-error').innerHTML = !data.activo ? 'Esta cuenta está desactivada.'
+      : data.rol === 'admin' ? 'Esta cuenta es de administrador: entra por <a href="../admin/">el panel de administrador</a>.'
+      : 'Esta cuenta es de operario: entra por <a href="../operario/">la app de operarios</a>.';
     return;
   }
   yo = data;
@@ -335,11 +337,6 @@ async function entrar(ev) {
   const { error } = await sb.auth.signInWithPassword({ email: ((c) => c && !c.includes('@') ? c + '@kubel.app' : c)(val('lg-correo').toLowerCase()), password: $('#lg-clave').value });
   $('#lg-btn').disabled = false;
   if (error) $('#lg-error').textContent = /Invalid login/i.test(error.message) ? 'Correo o contraseña incorrectos.' : mensaje(error);
-}
-async function salir() {
-  if (!confirm('¿Cerrar sesión? Este dispositivo dejará de recibir avisos.')) return;
-  await KubelAvisos.desactivar(sb);
-  sb.auth.signOut();
 }
 async function pintarBotonAvisos() {
   const b = $('#btn-avisos'); if (!b) return;

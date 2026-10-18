@@ -227,7 +227,7 @@ async function alCambiarSesion(s) {
     return;
   }
   if (!data.activo) { await informar('Cuenta desactivada', 'Habla con la oficina.'); return sb.auth.signOut(); }
-  if (data.rol === 'admin') { location.href = '../admin/'; return; }
+  if (data.rol === 'admin') { await informar('Cuenta de administrador', 'Esta cuenta se usa en el panel de administrador, no en la app.'); return sb.auth.signOut({ scope: 'local' }); }
   yo = data;
   arrancarTiempoReal();
   KubelAvisos.sincronizar(sb).then(() => pintarBandas());
