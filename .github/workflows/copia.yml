@@ -1,6 +1,6 @@
 # Copia de seguridad semanal de los datos de KUBEL (cifrada) + mantener Supabase activo.
 # Las copias se guardan 90 días en la pestaña Actions → "Copia de seguridad" → Artifacts.
-# Para abrirlas: web de oficina → Operarios → Copias de seguridad.
+# Para abrirlas: panel de administrador (/admin/) → Copias de seguridad.
 name: Copia de seguridad
 
 on:

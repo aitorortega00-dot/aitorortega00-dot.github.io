@@ -1,5 +1,5 @@
 // KUBEL — copia de seguridad de los datos (sin las fotos), cifrada con AES-256-GCM.
-// La pide GitHub cada semana y se guarda allí cifrada. Solo la oficina puede descifrarla (web de oficina → Operarios → Copias).
+// La pide GitHub cada semana y se guarda allí cifrada. Solo la oficina puede descifrarla (panel de administrador → Copias de seguridad).
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 import postgres from 'npm:postgres@3.4.4';
 import { encodeBase64, decodeBase64 } from 'jsr:@std/encoding@1/base64';

@@ -31,6 +31,7 @@
   button.peligro{background:#fff;color:var(--peligro);border-color:var(--peligro)}
   button.mini{padding:3px 9px;font-size:12px}
   button:disabled{opacity:.5;cursor:default}
+  select:disabled{background:#ECEAE4;color:#9AA0A6;cursor:not-allowed}
   input,select,textarea{border:1px solid var(--borde);border-radius:8px;padding:7px 10px;background:#FAFAF8;color:var(--texto);width:100%}
   textarea{min-height:80px;resize:vertical}
   label{display:block;font-weight:600;font-size:12px;color:var(--suave);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px}
@@ -256,7 +257,6 @@
       <a href="#plan" data-v="plan">Planificación</a>
       <a href="#informes" data-v="informes">Informes<span id="b-inf" class="badge oculto"></span></a>
       <a href="#envios" data-v="envios">Envíos a SIGMA<span id="b-env" class="badge oculto"></span></a>
-      <a href="#operarios" data-v="operarios">Operarios</a>
     </nav>
     <div class="usuario"><span id="sigma-ind" class="sigma-ind oculto" onclick="modalSigma()" title="Robot SIGMA: última lectura del portal"></span><span id="vivo" class="vivo off" title="Actualización en directo"></span><button class="mini" id="btn-avisos" onclick="alternarAvisos()" title="Avisos en este dispositivo">🔕</button><span id="yo"></span></div>
   </header>
@@ -269,7 +269,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.7 (Repasos: Caducadas REDES / RESTO / CLIENTE con carriles de estado)
+   KUBEL Oficina — v2.8 (sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -471,7 +471,7 @@ function modalSigma() {
 }
 function etiquetaSigma(p) {
   if (!p.sigma_cuenta) return '';
-  return `<span class="et sigma" title="SIGMA ${esc(CUENTAS_SIGMA[p.sigma_cuenta] || '')}">${p.sigma_alerta ? `<span class="punto ${p.sigma_alerta}"></span>` : ''}SIGMA ${p.sigma_cuenta === 'PAL' ? 'PA' : 'VA'}</span>`
+  return `<span class="et sigma" title="SIGMA ${esc(CUENTAS_SIGMA[p.sigma_cuenta] || '')}">${p.sigma_alerta ? `<span class="punto ${p.sigma_alerta}"></span>` : ''}SIGMA ${p.sigma_cuenta === 'PAL' ? 'PALENCIA' : 'VALLADOLID'}</span>`
     + (p.sigma_en_curso === false ? ' <span class="et anulado" title="Ya no aparece en Servicios en curso del portal">Fuera de SIGMA</span>' : '');
 }
 function bloqueSigma(p) {
@@ -645,7 +645,7 @@ async function modalEnvio(id) {
     <div class="acciones">
       ${editable ? `<button class="peligro" onclick="cambiarEnvio('${e.id}','descartado')">Descartar</button>` : ''}
       <span class="esp"></span>
-      <button class="sec" onclick="cerrarModal();modalParte('${e.parte.id}')">Ver parte</button>
+      <button class="sec" onclick="cerrarModal();modalParte('${e.parte.id}')">Ver servicio</button>
       ${editable ? `<button class="sec" onclick="guardarEnvio('${e.id}',false)">Guardar</button><button onclick="guardarEnvio('${e.id}',true)">${e.estado === 'error' ? 'Guardar y reintentar' : 'Aprobar y enviar'}</button>` : '<button onclick="cerrarModal()">Cerrar</button>'}
     </div>`, true);
   if (e.tipo !== 'repaso') rellenarMotivosCita();
@@ -679,7 +679,7 @@ async function guardarEnvio(id, aprobar) {
 // ---------- Navegación ----------
 window.addEventListener('hashchange', () => yo && irA(location.hash.slice(1)));
 function irA(v, silencioso) {
-  const vistas = { inicio: vistaHoy, repasos: vistaRepasos, plan: vistaPlan, informes: vistaInformes, envios: vistaEnvios, operarios: vistaOperarios };
+  const vistas = { inicio: vistaHoy, repasos: vistaRepasos, plan: vistaPlan, informes: vistaInformes, envios: vistaEnvios };
   // Direcciones antiguas: #hoy y #partes → Inicio (que ya incluye los partes); #sincontacto → Repasos
   let irAPartes = false;
   if (v === 'hoy') v = 'inicio';
@@ -688,7 +688,6 @@ function irA(v, silencioso) {
   if (!vistas[v]) v = 'inicio';
   vistaActual = v;
   document.querySelectorAll('header nav a').forEach((a) => a.classList.toggle('activo', a.dataset.v === v));
-  if (silencioso && v === 'operarios') return; // no pisar lo que se está editando
   const r = vistas[v]();
   if (irAPartes) Promise.resolve(r).then(() => $('#inicio-partes')?.scrollIntoView({ behavior: 'smooth' }));
 }
@@ -701,7 +700,7 @@ async function vistaHoy() {
   if (!$('#hoy-raiz')) {
     $('#contenido').innerHTML = `<div id="hoy-raiz">
       <div class="barra"><h2 style="text-transform:capitalize">${fLarga(hoy)}</h2><span class="esp"></span>
-        <button class="sec" onclick="modalParte()">+ Nuevo parte</button><button onclick="location.hash='plan'">Planificar semana</button></div>
+        <button class="sec" onclick="modalParte()">+ Nuevo servicio</button><button onclick="location.hash='plan'">Planificar semana</button></div>
       <div class="kpis" id="kpis"></div>
       <div class="hoy-grid">
         <div><h3 style="margin:0 0 10px">Rutas de hoy</h3><div id="rutas-hoy">Cargando…</div></div>
@@ -710,10 +709,10 @@ async function vistaHoy() {
       <div id="inicio-partes" style="margin-top:24px"></div></div>`;
     await montarPartes($('#inicio-partes'));
   } else cargarPartes(); // recarga en directo sin tocar los filtros
-  const [asig, sinAsignar, urg, sinRev, ultimos] = await Promise.all([
+  const [asig, totalServ, urg, sinRev, ultimos] = await Promise.all([
     sb.from('asignaciones').select('id, fecha, hora, orden, tipo, estado, operario_id, parte:partes!asignaciones_parte_id_fkey(id, numero_servicio, direccion, poblacion, codigo_postal, gremio, urgente, compania:companias(nombre))')
       .eq('fecha', hoy).order('orden').order('hora', { nullsFirst: false }),
-    sb.from('partes').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente'),
+    sb.from('partes').select('id', { count: 'exact', head: true }).in('estado', ABIERTOS),
     sb.from('partes').select('id', { count: 'exact', head: true }).eq('urgente', true).in('estado', ['pendiente', 'asignado', 'en_curso']),
     sb.from('informes').select('id', { count: 'exact', head: true }).eq('revisado', false),
     sb.from('informes').select('id, creado_en, texto, revisado, trabajo_terminado, necesita_repaso, operario_id, parte:partes!informes_parte_id_fkey(id, numero_servicio, direccion)')
@@ -724,7 +723,7 @@ async function vistaHoy() {
   const hechas = lista.filter((a) => a.estado === 'hecho').length;
   const noReal = lista.filter((a) => a.estado === 'no_realizado').length;
   $('#kpis').innerHTML = `
-    <a class="kpi ${sinAsignar.count ? 'alerta' : ''}" href="#plan"><div class="n">${sinAsignar.count ?? 0}</div><div class="t">Partes sin asignar</div></a>
+    <a class="kpi" href="#inicio" title="Servicios abiertos (pendientes, asignados, en curso y terminados)" onclick="filtroPartes.estado='abiertos';if($('#fp-estado')){$('#fp-estado').value='abiertos';cargarPartes()}$('#inicio-partes')?.scrollIntoView({behavior:'smooth'});return false"><div class="n">${totalServ.count ?? 0}</div><div class="t">Total servicios</div></a>
     <a class="kpi" href="#plan"><div class="n">${hechas}/${lista.length}</div><div class="t">Visitas hechas hoy</div></a>
     <a class="kpi ${noReal ? 'mal' : ''}" href="#plan"><div class="n">${noReal}</div><div class="t">No realizadas hoy</div></a>
     <a class="kpi ${urg.count ? 'mal' : ''}" href="#inicio" onclick="filtroPartes.estado='abiertos';$('#inicio-partes')?.scrollIntoView({behavior:'smooth'});return false"><div class="n">${urg.count ?? 0}</div><div class="t">Urgentes abiertos</div></a>
@@ -748,7 +747,7 @@ async function vistaHoy() {
           <div style="color:var(--suave)">${esc(dirCompleta(a.parte))}</div></div>
           <span class="et ${a.estado}">${TXT_ESTADO[a.estado]}</span></div>`).join('') || '<div style="color:var(--suave)">Sin visitas hoy.</div>'}
     </div>`;
-  }).join('') : '<div class="tarjeta vacio">No hay operarios. Créalos en la pestaña Operarios.</div>';
+  }).join('') : '<div class="tarjeta vacio">No hay operarios. Créalos en el panel de administrador.</div>';
 
   const u = ultimos.data || [];
   $('#feed').innerHTML = u.length ? u.map((i) => `
@@ -844,7 +843,7 @@ function tarjetaCad(p, carril) {
   return `<div class="cad ${salto ? 'salto' : ''}" onclick="modalParte('${p.id}')">
     <div class="l1">${p.sigma_alerta ? `<span class="punto ${p.sigma_alerta}" title="Alerta ${p.sigma_alerta}"></span>` : ''}<b>${esc(p.numero_servicio)}</b>
       ${p.urgente ? '<span class="et urg">URG</span>' : ''}<span class="esp"></span>
-      ${g ? `<span class="et gr g-${p.sigma_cad_grupo}">${g.nombre}</span>` : ''}<span class="et sigma">${p.sigma_cuenta === 'PAL' ? 'PA' : 'VA'}</span></div>
+      ${g ? `<span class="et gr g-${p.sigma_cad_grupo}">${g.nombre}</span>` : ''}<span class="et sigma">SIGMA ${p.sigma_cuenta === 'PAL' ? 'PALENCIA' : 'VALLADOLID'}</span></div>
     ${estado}
     <div class="met">${esc(p.asegurado || '—')}${tels.length ? ' · ' + tels.map((t) => `<a href="tel:${esc(t)}" onclick="event.stopPropagation()">${esc(t)}</a>`).join(' · ') : ''}</div>
     <div class="met">${esc([p.direccion, p.poblacion].filter(Boolean).join(', '))}</div>
@@ -994,8 +993,8 @@ async function vistaPlan() {
       <strong>${fCorta(dias[0])} – ${fCorta(dias[6])}</strong>
     </div>
     <div class="plan">
-      <div class="tarjeta sin-plan"><h3>Partes sin asignar</h3><div id="sin-plan">Cargando…</div>
-        <p style="font-size:12px;color:var(--suave);margin-bottom:0">Arrastra un parte a la casilla del operario y día, o pulsa el parte / el “+” de la casilla.</p></div>
+      <div class="tarjeta sin-plan"><h3>Servicios sin asignar</h3><div id="sin-plan">Cargando…</div>
+        <p style="font-size:12px;color:var(--suave);margin-bottom:0">Arrastra un servicio a la casilla del operario y día, o pulsa el servicio / el “+” de la casilla.</p></div>
       <div>
         <div class="rejilla"><table>
           <thead><tr><th style="width:130px">Operario</th>${dias.map((d) => `<th class="${d === hoy ? 'hoy' : ''}">${fCorta(d)}</th>`).join('')}</tr></thead>
@@ -1024,10 +1023,10 @@ async function vistaPlan() {
       <b>${p.sigma_alerta ? `<span class="punto ${p.sigma_alerta}" title="Alerta SIGMA"></span>` : ''}${esc(p.numero_servicio)} ${p.urgente ? '· URGENTE' : ''}</b>
       <div class="dir">${esc(p.direccion)}${p.poblacion ? ', ' + esc(p.poblacion) : ''}</div>
       <div class="dir">${esc([p.compania?.nombre, p.gremio].filter(Boolean).join(' · '))}</div>
-    </div>`).join('') || '<div class="vacio">No hay partes pendientes 🎉</div>';
+    </div>`).join('') || '<div class="vacio">No hay servicios pendientes 🎉</div>';
 
   if (!cache.operarios.length) {
-    $('#filas').innerHTML = `<tr><td colspan="8" class="vacio">No hay operarios todavía. Créalos en la pestaña Operarios.</td></tr>`;
+    $('#filas').innerHTML = `<tr><td colspan="8" class="vacio">No hay operarios todavía. Créalos en el panel de administrador.</td></tr>`;
     return;
   }
   const porCelda = {};
@@ -1062,17 +1061,17 @@ async function soltar(ev, td) {
     ? await sb.from('asignaciones').insert({ parte_id: a.id, operario_id, fecha, orden })
     : await sb.from('asignaciones').update({ operario_id, fecha, orden }).eq('id', a.id);
   if (r.error) return fallo(r.error);
-  aviso(a.tipo === 'parte' ? 'Parte asignado' : 'Visita movida');
+  aviso(a.tipo === 'parte' ? 'Servicio asignado' : 'Visita movida');
   vistaPlan();
 }
 
 async function modalAsignar({ parteId = '', operarioId = '', fecha = '' } = {}) {
   const { data: partes } = await sb.from('partes').select('id, numero_servicio, direccion, estado')
     .in('estado', ['pendiente', 'asignado', 'en_curso', 'terminado']).order('numero_servicio');
-  if (!cache.operarios.length) return alert('Primero crea al menos un operario (pestaña Operarios).');
+  if (!cache.operarios.length) return alert('Primero crea al menos un operario (panel de administrador).');
   abrirModal(`
     <h3>Asignar visita</h3>
-    <label>Parte</label>
+    <label>Servicio</label>
     <select id="as-parte">${(partes || []).map((p) => `<option value="${p.id}" ${p.id === parteId ? 'selected' : ''}>${esc(p.numero_servicio)} — ${esc(p.direccion)} (${TXT_ESTADO[p.estado]})</option>`).join('')}</select>
     <div class="dos">
       <div><label>Operario</label><select id="as-op">${cache.operarios.map((o) => `<option value="${o.id}" ${o.id === operarioId ? 'selected' : ''}>${esc(o.nombre)}</option>`).join('')}</select></div>
@@ -1085,7 +1084,7 @@ async function modalAsignar({ parteId = '', operarioId = '', fecha = '' } = {}) 
     </div>
     <label>Notas para el operario</label><textarea id="as-notas" placeholder="Llevar escalera, llaves en portería…"></textarea>
     <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button onclick="guardarAsignar()">Asignar</button></div>`);
-  if (!partes?.length) $('#as-parte').outerHTML = '<div class="nota">No hay partes abiertos. Crea uno en la pestaña Partes.</div>';
+  if (!partes?.length) $('#as-parte').outerHTML = '<div class="nota">No hay servicios abiertos. Crea uno con «+ Nuevo servicio» en Inicio.</div>';
 }
 async function guardarAsignar() {
   if (!$('#as-parte')) return;
@@ -1122,7 +1121,7 @@ async function modalAsignacion(id) {
     <div class="acciones">
       <button class="peligro" onclick="quitarAsignacion('${a.id}')">Quitar de la planificación</button>
       <span class="esp"></span>
-      <button class="sec" onclick="cerrarModal();modalParte('${a.parte.id}')">Ver parte</button>
+      <button class="sec" onclick="cerrarModal();modalParte('${a.parte.id}')">Ver servicio</button>
       <button onclick="guardarAsignacion('${a.id}')">Guardar</button>
     </div>`);
 }
@@ -1135,7 +1134,7 @@ async function guardarAsignacion(id) {
   cerrarModal(); aviso('Guardado'); irA(vistaActual);
 }
 async function quitarAsignacion(id) {
-  if (!confirm('¿Quitar esta visita de la planificación? (El parte no se borra)')) return;
+  if (!confirm('¿Quitar esta visita de la planificación? (El servicio no se borra)')) return;
   const { data: a } = await sb.from('asignaciones').select('parte_id').eq('id', id).single();
   // Si la visita tiene informes, borrarla los borraría también: no se permite.
   const { count: nInf } = await sb.from('informes').select('id', { count: 'exact', head: true }).eq('asignacion_id', id);
@@ -1150,7 +1149,7 @@ async function quitarAsignacion(id) {
 // =====================================================================
 //  PARTES
 // =====================================================================
-let filtroPartes = { texto: '', estado: 'abiertos', cia: '', ciudad: '', pueblo: '' };
+let filtroPartes = { texto: '', estado: 'abiertos', cia: '', ciudad: '', pueblo: '', gremio: '' };
 
 // ---------- Ciudad y pueblo (se calculan de la dirección; SIGMA da la población con formatos distintos) ----------
 const ABIERTOS = ['pendiente', 'asignado', 'en_curso', 'terminado'];
@@ -1203,29 +1202,55 @@ function catalogoPueblos(lista) {
 }
 let cachePueblos = null;
 async function cargarPueblos() {
-  const { data, error } = await sb.from('partes').select('id, codigo_postal, poblacion, sigma_cuenta').in('estado', ABIERTOS);
+  const { data, error } = await sb.from('partes').select('id, codigo_postal, poblacion, sigma_cuenta, sigma_gremio, gremio').in('estado', ABIERTOS);
   if (error) throw error;
   const cat = catalogoPueblos(data || []);
-  cachePueblos = { cat, ciudadDeId: new Map((data || []).map((p) => [p.id, ciudadDe(p)])) };
+  cachePueblos = { cat, abiertos: (data || []).map((p) => ({ ...p, ciudad: ciudadDe(p), gremioClave: claveGremio(p) })) };
+}
+// ---------- Gremio: código SIGMA + nombre ("02A ELECTRICISTA"); los partes manuales, por su texto ----------
+function claveGremio(p) {
+  const c = String(p.sigma_gremio || '').trim().toUpperCase();
+  if (c) return 'S:' + c;
+  const t = String(p.gremio || '').trim().toUpperCase();
+  return t ? 'T:' + t : 'SIN';
+}
+function textoGremio(k) {
+  if (k === 'SIN') return 'SIN GREMIO';
+  if (k.startsWith('S:')) { const c = k.slice(2); return (c + ' ' + (codigo('gremio', c) || '')).trim().toUpperCase(); }
+  return k.slice(2);
 }
 function pintarFiltrosLugar() {
   const cat = cachePueblos?.cat || new Map();
   const ciudades = [...new Set([...cat.values()].map((v) => v.ciudad))].sort((a, b) => (a === 'Otras') - (b === 'Otras') || a.localeCompare(b));
   if (filtroPartes.ciudad && !ciudades.includes(filtroPartes.ciudad)) filtroPartes.ciudad = '';
-  $('#fp-ciudad').innerHTML = '<option value="">Todas las ciudades</option>' + ciudades.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  $('#fp-ciudad').innerHTML = '<option value="">Todas las provincias</option>' + ciudades.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
   $('#fp-ciudad').value = filtroPartes.ciudad;
   const pueblos = [...cat.entries()].filter(([, v]) => !filtroPartes.ciudad || v.ciudad === filtroPartes.ciudad)
     .sort(([, a], [, b]) => b.etiqueta.endsWith('(capital)') - a.etiqueta.endsWith('(capital)') || a.ciudad.localeCompare(b.ciudad) || a.etiqueta.localeCompare(b.etiqueta, 'es'));
   if (filtroPartes.pueblo && !pueblos.some(([k]) => k === filtroPartes.pueblo)) filtroPartes.pueblo = '';
-  $('#fp-pueblo').innerHTML = '<option value="">Todos los pueblos</option>' + pueblos.map(([k, v]) => `<option value="${esc(k)}">${esc(v.etiqueta)}${filtroPartes.ciudad ? '' : ' · ' + esc(v.ciudad)} (${v.ids.length})</option>`).join('');
+  // El pueblo solo se puede elegir después de elegir una provincia
+  const sinProv = !filtroPartes.ciudad;
+  if (sinProv) filtroPartes.pueblo = '';
+  $('#fp-pueblo').innerHTML = (sinProv ? '<option value="">Todos los pueblos (elige provincia)</option>' : '<option value="">Todos los pueblos</option>')
+    + (sinProv ? '' : pueblos.map(([k, v]) => `<option value="${esc(k)}">${esc(v.etiqueta)} (${v.ids.length})</option>`).join(''));
   $('#fp-pueblo').value = filtroPartes.pueblo;
+  $('#fp-pueblo').disabled = sinProv;
+  $('#fp-pueblo').title = sinProv ? 'Elige primero una provincia' : '';
+  // Gremio: código y nombre con nº de servicios abiertos (de la provincia elegida)
+  const cuenta = new Map();
+  (cachePueblos?.abiertos || []).filter((p) => !filtroPartes.ciudad || p.ciudad === filtroPartes.ciudad)
+    .forEach((p) => cuenta.set(p.gremioClave, (cuenta.get(p.gremioClave) || 0) + 1));
+  if (filtroPartes.gremio && !cuenta.has(filtroPartes.gremio)) cuenta.set(filtroPartes.gremio, 0);
+  const gremios = [...cuenta.entries()].sort(([a], [b]) => (a === 'SIN') - (b === 'SIN') || a.startsWith('T:') - b.startsWith('T:') || a.localeCompare(b, 'es'));
+  $('#fp-gremio').innerHTML = '<option value="">Todos los gremios</option>' + gremios.map(([k, n]) => `<option value="${esc(k)}">${esc(textoGremio(k))} (${n})</option>`).join('');
+  $('#fp-gremio').value = filtroPartes.gremio;
 }
 
 // Los partes se muestran dentro de Inicio (debajo de rutas e informes)
 async function montarPartes(destino) {
   destino.innerHTML = `
     <div class="barra">
-      <h3 style="margin:0">Partes</h3>
+      <h3 style="margin:0">Servicios</h3>
       <input id="fp-texto" placeholder="Buscar nº, dirección, cliente…" style="max-width:280px" value="${esc(filtroPartes.texto)}">
       <select id="fp-estado" style="max-width:170px">
         <option value="abiertos">Abiertos</option>
@@ -1233,8 +1258,9 @@ async function montarPartes(destino) {
         <option value="todos">Todos</option>
       </select>
       <select id="fp-cia" style="max-width:160px"><option value="">Todas las compañías</option>${cache.companias.map((c) => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('')}</select>
-      <select id="fp-ciudad" style="max-width:170px"><option value="">Todas las ciudades</option></select>
-      <select id="fp-pueblo" style="max-width:230px"><option value="">Todos los pueblos</option></select>
+      <select id="fp-ciudad" style="max-width:170px"><option value="">Todas las provincias</option></select>
+      <select id="fp-pueblo" style="max-width:230px" disabled><option value="">Todos los pueblos</option></select>
+      <select id="fp-gremio" style="max-width:260px"><option value="">Todos los gremios</option></select>
       <span class="esp"></span>
       <button class="sec" onclick="exportarPartes()">Exportar CSV</button>
     </div>
@@ -1243,6 +1269,7 @@ async function montarPartes(destino) {
   $('#fp-cia').value = filtroPartes.cia;
   $('#fp-ciudad').onchange = (e) => { filtroPartes.ciudad = e.target.value; filtroPartes.pueblo = ''; pintarFiltrosLugar(); cargarPartes(); };
   $('#fp-pueblo').onchange = (e) => { filtroPartes.pueblo = e.target.value; cargarPartes(); };
+  $('#fp-gremio').onchange = (e) => { filtroPartes.gremio = e.target.value; cargarPartes(); };
   try { await cargarPueblos(); } catch (e) { cachePueblos = null; }
   pintarFiltrosLugar();
   let t; $('#fp-texto').oninput = (e) => { clearTimeout(t); t = setTimeout(() => { filtroPartes.texto = e.target.value.trim(); cargarPartes(); }, 300); };
@@ -1264,6 +1291,10 @@ async function consultaPartes(limite) {
     const cuenta = filtroPartes.ciudad === 'Valladolid' ? 'VLL' : filtroPartes.ciudad === 'Palencia' ? 'PAL' : null;
     if (pr) q = q.or(`codigo_postal.like.${pr}%` + (cuenta ? `,and(codigo_postal.is.null,sigma_cuenta.eq.${cuenta})` : ''));
   }
+  const g = filtroPartes.gremio;
+  if (g === 'SIN') q = q.is('sigma_gremio', null).is('gremio', null);
+  else if (g.startsWith('S:')) q = q.ilike('sigma_gremio', g.slice(2));
+  else if (g.startsWith('T:')) q = q.is('sigma_gremio', null).ilike('gremio', g.slice(2));
   if (filtroPartes.texto) {
     const t = filtroPartes.texto.replace(/[,()%*]/g, ' ');
     q = q.or(`numero_servicio.ilike.%${t}%,direccion.ilike.%${t}%,asegurado.ilike.%${t}%,poblacion.ilike.%${t}%,telefono.ilike.%${t}%`);
@@ -1289,14 +1320,14 @@ async function cargarPartes() {
         <td>${prox ? fCorta(prox.fecha) + '<br><small style="color:var(--suave)">' + esc(nombreDe(prox.operario_id)) + '</small>' : '—'}</td>
       </tr>`;
     }).join('')}</tbody></table></div>
-    <p style="color:var(--suave);font-size:12px">${data.length} parte(s)${data.length === 300 ? ' (máximo 300; afina la búsqueda)' : ''}</p>` : '<div class="tarjeta vacio">No hay partes con ese filtro.</div>';
+    <p style="color:var(--suave);font-size:12px">${data.length} servicio(s)${data.length === 300 ? ' (máximo 300; afina la búsqueda)' : ''}</p>` : '<div class="tarjeta vacio">No hay servicios con ese filtro.</div>';
 }
 function exportarPartes() {
   const cols = ['compania', 'numero_servicio', 'estado', 'urgente', 'gremio', 'asegurado', 'telefono', 'telefono2', 'direccion', 'codigo_postal', 'poblacion', 'descripcion', 'creado_en'];
   const csvCelda = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const filas = ultimosPartes.map((p) => cols.map((c) => csvCelda(c === 'compania' ? p.compania?.nombre : c === 'estado' ? TXT_ESTADO[p.estado] : c === 'urgente' ? (p.urgente ? 'Sí' : 'No') : p[c])).join(';'));
   const blob = new Blob(['﻿' + [cols.join(';'), ...filas].join('\r\n')], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `partes-kubel-${hoyISO()}.csv`; a.click();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `servicios-kubel-${hoyISO()}.csv`; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
@@ -1320,7 +1351,7 @@ async function modalParte(id) {
         <a href="#" onclick="cerrarModal();nuevoEnvio('${p.id}');return false">+ Nuevo envío a SIGMA (Repaso)</a>` : ''}`;
   }
   abrirModal(`
-    <h3>${id ? 'Parte ' + esc(p.numero_servicio) : 'Nuevo parte'}</h3>
+    <h3>${id ? 'Servicio ' + esc(p.numero_servicio) : 'Nuevo servicio'}</h3>
     ${id ? `<div style="color:var(--suave);font-size:12px">Creado ${fHora(p.creado_en)} · modificado ${fHora(p.actualizado_en)}${p.origen === 'sigma' ? ' · importado de SIGMA' : ''}</div>` : ''}
     ${id ? bloqueSigma(p) : ''}
     <div class="dos">
@@ -1356,7 +1387,7 @@ async function modalParte(id) {
               <button class="sec" onclick="window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent('${esc(dirCompleta(p)).replace(/'/g, '')}'),'_blank')">Mapa</button>` : ''}
       <span class="esp"></span>
       <button class="sec" onclick="cerrarModal()">Cancelar</button>
-      <button onclick="guardarParte(${id ? `'${id}'` : ''})">${id ? 'Guardar' : 'Crear parte'}</button>
+      <button onclick="guardarParte(${id ? `'${id}'` : ''})">${id ? 'Guardar' : 'Crear servicio'}</button>
     </div>`);
 }
 
@@ -1371,8 +1402,8 @@ async function guardarParte(id) {
   };
   if (!fila.numero_servicio || !fila.direccion) return alert('El nº de servicio y la dirección son obligatorios.');
   const { error } = id ? await sb.from('partes').update(fila).eq('id', id) : await sb.from('partes').insert(fila);
-  if (error) return fallo(/duplicate key/.test(error.message) ? 'Ya existe un parte con ese número en esa compañía.' : error);
-  cerrarModal(); aviso(id ? 'Parte guardado' : 'Parte creado');
+  if (error) return fallo(/duplicate key/.test(error.message) ? 'Ya existe un servicio con ese número en esa compañía.' : error);
+  cerrarModal(); aviso(id ? 'Servicio guardado' : 'Servicio creado');
   irA(vistaActual);
 }
 
@@ -1457,166 +1488,6 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight') abrirVisor((idxVisor + 1) % fotosVisor.length);
   if (e.key === 'ArrowLeft') abrirVisor((idxVisor - 1 + fotosVisor.length) % fotosVisor.length);
 });
-
-// =====================================================================
-//  OPERARIOS Y CUENTAS
-// =====================================================================
-async function funcionUsuarios(cuerpo) {
-  const { data, error } = await sb.functions.invoke('usuarios', { body: cuerpo });
-  if (error) {
-    let m = error.message;
-    try { const j = await error.context.json(); if (j?.error) m = j.error; } catch {}
-    throw new Error(m);
-  }
-  if (data?.error) throw new Error(data.error);
-  return data;
-}
-
-async function vistaOperarios() {
-  await cargarCatalogos();
-  $('#contenido').innerHTML = `
-    <div class="barra"><h2>Operarios y usuarios</h2><span class="esp"></span><button onclick="modalNuevoUsuario()">+ Nuevo operario</button></div>
-    <div class="nota" style="margin-bottom:14px">El operario entra en la app con su <b>usuario y contraseña</b>. Enlace de la app para enviarle:
-      <b><a href="../operario/" target="_blank" id="enlace-op"></a></b> <button class="mini sec" onclick="copiarEnlace()">Copiar</button></div>
-    <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nombre</th><th>Usuario</th><th>Teléfono</th><th>Gremios</th><th>Rol</th><th>Activo</th><th></th></tr></thead>
-    <tbody>${cache.todosPerfiles.map((p) => `
-      <tr>
-        <td><input id="op-n-${p.id}" value="${esc(p.nombre)}"></td>
-        <td id="op-e-${p.id}" style="color:var(--suave);font-size:13px">…</td>
-        <td><input id="op-t-${p.id}" type="tel" value="${esc(p.telefono || '')}"></td>
-        <td><input id="op-g-${p.id}" value="${esc((p.gremios || []).join(', '))}" placeholder="Fontanería, Pintura"></td>
-        <td><select id="op-r-${p.id}" ${p.id === yo.id ? 'disabled' : ''}><option value="operario" ${p.rol === 'operario' ? 'selected' : ''}>Operario</option><option value="oficina" ${p.rol === 'oficina' ? 'selected' : ''}>Oficina</option></select></td>
-        <td style="text-align:center"><input type="checkbox" id="op-a-${p.id}" ${p.activo ? 'checked' : ''} ${p.id === yo.id ? 'disabled' : ''} style="width:auto"></td>
-        <td style="white-space:nowrap"><button class="mini" onclick="guardarOperario('${p.id}')">Guardar</button>
-            <button class="mini sec" onclick="modalClave('${p.id}')">Contraseña</button></td>
-      </tr>`).join('')}</tbody></table></div>
-    <div class="tarjeta" style="margin-top:20px">
-      <h3 style="margin:0 0 6px">Copias de seguridad</h3>
-      <p style="color:var(--suave);margin:0 0 12px">Cada lunes se guarda automáticamente una copia cifrada de todos los datos (sin las fotos) durante 90 días en
-        <a href="https://github.com/kubelapp/kubelapp.github.io/actions/workflows/copia.yml" target="_blank" rel="noopener">GitHub → Copia de seguridad</a>.
-        Aquí puedes descargar una ahora o abrir una guardada.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button onclick="copiaAhora()" id="btn-copia">Descargar copia ahora</button>
-        <button class="sec" onclick="$('#f-copia').click()">Abrir copia guardada…</button>
-        <input type="file" id="f-copia" accept=".json,.zip,application/json" class="oculto" onchange="abrirCopia(this)">
-      </div>
-      <div id="copia-res" style="margin-top:10px;color:var(--suave)"></div>
-    </div>`;
-  const enlace = new URL('../operario/', location.href).href;
-  $('#enlace-op').textContent = enlace;
-  try {
-    const r = await funcionUsuarios({ accion: 'correos' });
-    cache.todosPerfiles.forEach((p) => { const td = $('#op-e-' + p.id); if (td) td.textContent = verUsuario(r.correos[p.id]); });
-  } catch (e) { cache.todosPerfiles.forEach((p) => { const td = $('#op-e-' + p.id); if (td) td.textContent = '—'; }); }
-}
-// ---------- Copias de seguridad ----------
-const b64aBytes = (b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
-async function descifrarCopia(c) {
-  if (c?.formato !== 'kubel-copia-v1') throw new Error('Este archivo no es una copia de KUBEL.');
-  const { data: clave, error } = await sb.rpc('clave_copias');
-  if (error) throw error;
-  const key = await crypto.subtle.importKey('raw', b64aBytes(clave), 'AES-GCM', false, ['decrypt']);
-  const plano = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64aBytes(c.iv) }, key, b64aBytes(c.datos));
-  return JSON.parse(new TextDecoder().decode(plano));
-}
-function descargarJSON(obj, nombre) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));
-  a.download = nombre; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-}
-const resumenCopia = (d) => Object.entries(d.datos).map(([t, f]) => `${t}: ${f.length}`).join(' · ');
-async function copiaAhora() {
-  $('#btn-copia').disabled = true; $('#copia-res').textContent = 'Preparando copia…';
-  try {
-    const { data, error } = await sb.functions.invoke('copia', { body: {} });
-    if (error) throw error;
-    const d = await descifrarCopia(data);
-    descargarJSON(d, `kubel-copia-${hoyISO()}.json`);
-    $('#copia-res').textContent = '✅ Copia descargada (' + resumenCopia(d) + ')';
-  } catch (e) { $('#copia-res').textContent = 'Error: ' + mensaje(e); }
-  $('#btn-copia').disabled = false;
-}
-async function abrirCopia(inp) {
-  const f = inp.files?.[0]; inp.value = ''; if (!f) return;
-  $('#copia-res').textContent = 'Abriendo…';
-  try {
-    if (/\.zip$/i.test(f.name)) throw new Error('GitHub la descarga comprimida: haz clic derecho en el .zip → "Extraer todo" y abre el .json de dentro.');
-    const d = await descifrarCopia(JSON.parse(await f.text()));
-    descargarJSON(d, f.name.replace(/\.json$/i, '') + '-abierta.json');
-    $('#copia-res').textContent = `✅ Copia del ${fHora(d.fecha)} abierta y descargada (${resumenCopia(d)})`;
-  } catch (e) { $('#copia-res').textContent = 'Error: ' + mensaje(e); }
-}
-
-function copiarEnlace() {
-  navigator.clipboard?.writeText($('#enlace-op').textContent).then(() => aviso('Enlace copiado'), () => {});
-}
-async function guardarOperario(id) {
-  const fila = {
-    nombre: $('#op-n-' + id).value.trim(), telefono: $('#op-t-' + id).value.trim() || null,
-    gremios: $('#op-g-' + id).value.split(',').map((x) => x.trim()).filter(Boolean),
-  };
-  if (id !== yo.id) { fila.rol = $('#op-r-' + id).value; fila.activo = $('#op-a-' + id).checked; }
-  if (!fila.nombre) return alert('El nombre no puede quedar vacío.');
-  const { error } = await sb.from('perfiles').update(fila).eq('id', id);
-  if (error) return fallo(error);
-  await cargarCatalogos(); aviso('Guardado');
-}
-function claveAleatoria() {
-  const c = 'abcdefghjkmnpqrstuvwxyz23456789'; let s = '';
-  const r = crypto.getRandomValues(new Uint32Array(8)); r.forEach((n) => (s += c[n % c.length])); return s;
-}
-function modalNuevoUsuario() {
-  abrirModal(`
-    <h3>Nuevo operario</h3>
-    <p style="color:var(--suave);margin:0">Se crea la cuenta y ya puede entrar en la app con este usuario y contraseña.</p>
-    <div class="dos">
-      <div><label>Nombre *</label><input id="nu-nombre" placeholder="Juan Pérez"></div>
-      <div><label>Teléfono</label><input id="nu-tel" type="tel"></div>
-    </div>
-    <label>Usuario * (sin espacios)</label><input id="nu-correo" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="JUAN">
-    <div class="dos">
-      <div><label>Contraseña * (mín. 6)</label><input id="nu-clave" value="${claveAleatoria()}" autocomplete="new-password"></div>
-      <div><label>Rol</label><select id="nu-rol"><option value="operario">Operario</option><option value="oficina">Oficina</option></select></div>
-    </div>
-    <label>Gremios</label><input id="nu-gremios" placeholder="Fontanería, Pintura">
-    <div id="nu-error" class="error"></div>
-    <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button id="nu-btn" onclick="crearUsuario()">Crear cuenta</button></div>`);
-}
-async function crearUsuario() {
-  const datos = {
-    accion: 'crear', nombre: val('nu-nombre'), telefono: val('nu-tel') || null, email: aCorreo(val('nu-correo')),
-    password: $('#nu-clave').value, rol: val('nu-rol'), gremios: val('nu-gremios').split(',').map((x) => x.trim()).filter(Boolean),
-  };
-  $('#nu-error').textContent = '';
-  if (!datos.email || /\s/.test(val('nu-correo'))) return ($('#nu-error').textContent = 'Escribe un usuario sin espacios.');
-  $('#nu-btn').disabled = true;
-  try {
-    await funcionUsuarios(datos);
-    const enlace = new URL('../operario/', location.href).href;
-    abrirModal(`<h3>✅ Cuenta creada</h3>
-      <p>Envíale estos datos a <b>${esc(datos.nombre)}</b>:</p>
-      <textarea id="nu-msg" style="min-height:120px">Hola ${datos.nombre}, ya tienes acceso a la app de KUBEL.\nApp: ${enlace}\nUsuario: ${verUsuario(datos.email)}\nContraseña: ${datos.password}</textarea>
-      <div class="acciones"><button class="sec" onclick="navigator.clipboard?.writeText($('#nu-msg').value).then(()=>aviso('Copiado'))">Copiar mensaje</button>
-      <a class="sec" style="text-decoration:none" target="_blank" href="https://wa.me/?text=${encodeURIComponent(`Hola ${datos.nombre}, ya tienes acceso a la app de KUBEL.\nApp: ${enlace}\nUsuario: ${verUsuario(datos.email)}\nContraseña: ${datos.password}`)}"><button class="sec">WhatsApp</button></a>
-      <button onclick="cerrarModal();vistaOperarios()">Hecho</button></div>`);
-  } catch (e) {
-    $('#nu-error').textContent = mensaje(e); $('#nu-btn').disabled = false;
-  }
-}
-function modalClave(id) {
-  abrirModal(`<h3>Nueva contraseña para ${esc(nombreDe(id))}</h3>
-    <label>Contraseña (mín. 6)</label><input id="cl-clave" value="${claveAleatoria()}" autocomplete="new-password">
-    <div id="cl-error" class="error"></div>
-    <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button id="cl-btn" onclick="cambiarClave('${id}')">Cambiar</button></div>`);
-}
-async function cambiarClave(id) {
-  $('#cl-error').textContent = ''; $('#cl-btn').disabled = true;
-  try {
-    const clave = $('#cl-clave').value;
-    await funcionUsuarios({ accion: 'clave', id, password: clave });
-    cerrarModal(); aviso('Contraseña cambiada: ' + clave);
-  } catch (e) { $('#cl-error').textContent = mensaje(e); $('#cl-btn').disabled = false; }
-}
 
 // Instalable como app
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

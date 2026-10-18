@@ -107,6 +107,17 @@
     <div id="lista"><p class="suave">Cargando cuentas…</p></div>
     <p class="nota" style="margin-top:16px">Los cambios de correo y contraseña son inmediatos: la persona entra con los datos nuevos desde ya.
       Si cambias la contraseña de alguien que tiene la sesión abierta en el móvil, sigue dentro hasta que salga.</p>
+
+    <div class="barra" style="margin-top:28px"><h2>Copias de seguridad</h2></div>
+    <p style="margin-top:0;color:var(--suave)">Cada lunes se guarda automáticamente una copia cifrada de todos los datos (sin las fotos) durante 90 días en
+      <a href="https://github.com/kubelapp/kubelapp.github.io/actions/workflows/copia.yml" target="_blank" rel="noopener">GitHub → Copia de seguridad</a>.
+      Aquí puedes descargar una ahora o abrir una guardada.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="copiaAhora()" id="btn-copia">Descargar copia ahora</button>
+      <button class="sec" onclick="$('#f-copia').click()">Abrir copia guardada…</button>
+      <input type="file" id="f-copia" accept=".json,.zip,application/json" style="display:none" onchange="abrirCopia(this)">
+    </div>
+    <div id="copia-res" style="margin-top:10px;color:var(--suave)"></div>
   </main>
 </div>
 
@@ -257,6 +268,46 @@ async function guardar(id) {
         <button onclick="cerrarModal()">Hecho</button></div>`);
     } else { cerrarModal(); aviso('Cambios guardados'); }
   } catch (e) { $('#m-error').textContent = mensaje(e); $('#m-btn').disabled = false; }
+}
+
+// ---------- Copias de seguridad (antes en Oficina → Operarios) ----------
+const dosD = (n) => String(n).padStart(2, '0');
+const hoyISO = () => { const d = new Date(); return `${d.getFullYear()}-${dosD(d.getMonth() + 1)}-${dosD(d.getDate())}`; };
+const b64aBytes = (b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
+async function descifrarCopia(c) {
+  if (c?.formato !== 'kubel-copia-v1') throw new Error('Este archivo no es una copia de KUBEL.');
+  const { data: clave, error } = await sb.rpc('clave_copias');
+  if (error) throw error;
+  const key = await crypto.subtle.importKey('raw', b64aBytes(clave), 'AES-GCM', false, ['decrypt']);
+  const plano = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64aBytes(c.iv) }, key, b64aBytes(c.datos));
+  return JSON.parse(new TextDecoder().decode(plano));
+}
+function descargarJSON(obj, nombre) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));
+  a.download = nombre; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+const resumenCopia = (d) => Object.entries(d.datos).map(([t, f]) => `${t}: ${f.length}`).join(' · ');
+async function copiaAhora() {
+  $('#btn-copia').disabled = true; $('#copia-res').textContent = 'Preparando copia…';
+  try {
+    const { data, error } = await sb.functions.invoke('copia', { body: {} });
+    if (error) throw error;
+    const d = await descifrarCopia(data);
+    descargarJSON(d, `kubel-copia-${hoyISO()}.json`);
+    $('#copia-res').textContent = '✅ Copia descargada (' + resumenCopia(d) + ')';
+  } catch (e) { $('#copia-res').textContent = 'Error: ' + mensaje(e); }
+  $('#btn-copia').disabled = false;
+}
+async function abrirCopia(inp) {
+  const f = inp.files?.[0]; inp.value = ''; if (!f) return;
+  $('#copia-res').textContent = 'Abriendo…';
+  try {
+    if (/\.zip$/i.test(f.name)) throw new Error('GitHub la descarga comprimida: haz clic derecho en el .zip → "Extraer todo" y abre el .json de dentro.');
+    const d = await descifrarCopia(JSON.parse(await f.text()));
+    descargarJSON(d, f.name.replace(/\.json$/i, '') + '-abierta.json');
+    $('#copia-res').textContent = `✅ Copia del ${fecha(d.fecha)} abierta y descargada (${resumenCopia(d)})`;
+  } catch (e) { $('#copia-res').textContent = 'Error: ' + mensaje(e); }
 }
 </script>
 </body>
