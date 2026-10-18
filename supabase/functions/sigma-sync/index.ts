@@ -428,17 +428,45 @@ async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
     dates: { actionDate: { day: String(Number(dia)), month: String(Number(mes)), year: a, hourRaw }, exceededDate: d.dates?.exceededDate ?? null },
   };
   if (d.heater?.enabled && d.heater.ageHeater) cmd.heater = { ageHeater: d.heater.ageHeater };
-  let res = await api('review-update', cmd);
-  let code = res?.metadata?.errorCodes?.[0]?.code;
-  let sms = false;
-  if (code === 'AVISO_SMS') { // aviso genérico de SMS al cliente: siempre "Sí"
-    sms = true;
-    res = await api('review-update', { ...cmd, smsResponse: 'si' });
-    code = res?.metadata?.errorCodes?.[0]?.code;
+  // Secuencia del portal (probada a mano el 18/10/2026, servicio 29385460):
+  //  1) review-update → AVISO_SMS ("va a generar un SMS al cliente")         → siempre "Sí" (smsResponse:"si")
+  //  2) si la agenda no tiene hueco para esa fecha/hora, responde success:true SIN código y con la lista
+  //     de huecos (dateGapSelectList): "No existe disponibilidad…" con a) mantener / b) siguiente hueco libre
+  //     → siempre a) "No importa, quiero mantener la fecha / hora introducida" (hourRadioButton = la hora elegida)
+  //  3) vuelve a pedir el aviso de SMS → siempre "Sí"
+  //  4) APLAZAMOK = guardado.
+  let sms = false, mantenida = false;
+  let enviar: Record<string, unknown> = cmd;
+  for (let paso = 0; paso < 6; paso++) {
+    const res = await api('review-update', enviar);
+    const code = res?.metadata?.errorCodes?.[0]?.code;
+    if (code === 'APLAZAMOK') {
+      return `Repaso guardado: ${motivo.label.replace(/\s*\[\d+\]/, '')} ${dia}/${mes}/${a}${e.hora ? ' ' + e.hora.slice(0, 5) : ''}`
+        + `${mantenida ? ' (fecha/hora mantenida aunque la agenda no tenía hueco)' : ''}${sms ? ' (SMS al cliente confirmado)' : ''}`;
+    }
+    if (code === 'AVISO_SMS') { // aviso genérico de SMS al cliente: siempre "Sí"
+      if (enviar.smsResponse) throw new Error('El portal repitió el aviso de SMS tras contestar "Sí"');
+      sms = true;
+      enviar = { ...enviar, smsResponse: 'si' };
+      continue;
+    }
+    if (res?.success && !code && res.data?.dates) { // pantalla de huecos de agenda
+      const nd = res.data;
+      if (nd.requestMultiGap) throw new Error('El portal pide confirmar una cita de varios huecos (multihueco): hazlo a mano en el portal');
+      if (mantenida) throw new Error('El portal volvió a pedir hueco de agenda tras elegir "mantener la fecha/hora"');
+      if (!nd.allowMaintainAppointmentGap) throw new Error('No hay hueco en la agenda para esa fecha/hora y el portal no deja mantenerla: elige otro hueco en el portal');
+      if (!hourRaw) throw new Error('El portal pide hora para mantener la cita y el envío no tiene hora');
+      mantenida = true;
+      // Igual que la opción a) del portal; el formulario se rehace, así que el aviso de SMS se pregunta otra vez
+      enviar = {
+        ...cmd, hourRadioButton: hourRaw,
+        dates: { actionDate: { day: String(Number(dia)), month: String(Number(mes)), year: a, hourRaw, date: `${dia}/${mes}/${a}` }, exceededDate: nd.dates.exceededDate ?? null },
+      };
+      continue;
+    }
+    throw new Error(traducirCodigos(res?.metadata?.errorCodes));
   }
-  if (code === 'APLAZAMOK') return `Repaso guardado: ${motivo.label.replace(/\s*\[\d+\]/, '')} ${dia}/${mes}/${a}${e.hora ? ' ' + e.hora.slice(0, 5) : ''}${sms ? ' (SMS al cliente confirmado)' : ''}`;
-  if (res?.success && !code) throw new Error('El portal pidió un paso adicional (huecos de agenda): revisa el servicio en el portal');
-  throw new Error(traducirCodigos(res?.metadata?.errorCodes));
+  throw new Error('El portal pidió demasiados pasos seguidos: revisa el servicio en el portal');
 }
 
 async function enviarInformarCita(s: Sesion, e: Envio): Promise<string> {
