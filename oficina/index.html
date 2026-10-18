@@ -908,7 +908,76 @@ async function quitarAsignacion(id) {
 // =====================================================================
 //  PARTES
 // =====================================================================
-let filtroPartes = { texto: '', estado: 'abiertos', cia: '', sigma: '' };
+let filtroPartes = { texto: '', estado: 'abiertos', cia: '', ciudad: '', pueblo: '' };
+
+// ---------- Ciudad y pueblo (se calculan de la dirección; SIGMA da la población con formatos distintos) ----------
+const ABIERTOS = ['pendiente', 'asignado', 'en_curso', 'terminado'];
+const PROVINCIAS_CP = { '47': 'Valladolid', '34': 'Palencia' };
+const CAPITALES_CP = { '47': [47001, 47017], '34': [34001, 34005] };
+const sinTildes = (x) => x.normalize('NFD').replace(/[̀-ͯ]/g, '');
+const titulo = (x) => x.toLowerCase().replace(/(^|[\s-])(\S)/g, (m, a, b) => a + b.toUpperCase()).replace(/ (De|Del|La|Las|Los|El|Y)(?= )/g, (m) => m.toLowerCase());
+function ciudadDe(p) {
+  const pr = String(p.codigo_postal || '').slice(0, 2);
+  return PROVINCIAS_CP[pr] || (p.sigma_cuenta === 'VLL' ? 'Valladolid' : p.sigma_cuenta === 'PAL' ? 'Palencia' : 'Otras');
+}
+function puebloBruto(p) {
+  const cp = String(p.codigo_postal || (String(p.poblacion || '').match(/^\d{5}/) || [])[0] || '');
+  let n = String(p.poblacion || '').replace(/^\s*\d{5}\s*/, '').trim().toUpperCase();
+  const rango = CAPITALES_CP[cp.slice(0, 2)];
+  if (!n && rango && +cp >= rango[0] && +cp <= rango[1]) n = PROVINCIAS_CP[cp.slice(0, 2)].toUpperCase();
+  return { cp, nombre: n || (cp ? 'CP ' + cp : 'SIN POBLACIÓN') };
+}
+// Une variantes del mismo pueblo: mayúsculas/tildes, nombres cortados ("ARROYO DE LA ENCOMIE") y abreviados con el mismo CP ("ARROYO ENCOM").
+function catalogoPueblos(lista) {
+  const grupos = new Map(); // clave → { nombre, cps:Set, n }
+  const filas = lista.map((p) => ({ p, ...puebloBruto(p), ciudad: ciudadDe(p) }));
+  filas.forEach((f) => {
+    const k = f.ciudad + '|' + sinTildes(f.nombre);
+    const g = grupos.get(k) || { ciudad: f.ciudad, nombre: f.nombre, cps: new Set(), n: 0 };
+    if (/Ñ|[ÁÉÍÓÚ]/.test(f.nombre)) g.nombre = f.nombre;
+    if (f.cp) g.cps.add(f.cp); g.n++; grupos.set(k, g); f.clave = k;
+  });
+  const claves = [...grupos.keys()].sort((a, b) => b.length - a.length);
+  const destino = new Map();
+  for (const k of claves) {
+    const g = grupos.get(k), base = k.split('|')[1];
+    const mejor = claves.find((o) => {
+      if (o === k || destino.has(o) || o.length <= k.length) return false;
+      const og = grupos.get(o), ob = o.split('|')[1];
+      if (og.ciudad !== g.ciudad) return false;
+      if (base.length >= 8 && ob.startsWith(base)) return true;
+      return base.split(' ')[0] === ob.split(' ')[0] && [...g.cps].some((c) => og.cps.has(c));
+    });
+    if (mejor) destino.set(k, mejor);
+  }
+  const final = (k) => (destino.has(k) ? final(destino.get(k)) : k);
+  const resultado = new Map(); // clave final → { ciudad, etiqueta, ids:[] }
+  filas.forEach((f) => {
+    const k = final(f.clave), g = grupos.get(k);
+    const r = resultado.get(k) || { ciudad: g.ciudad, etiqueta: titulo(g.nombre) + (sinTildes(g.nombre) === sinTildes(g.ciudad.toUpperCase()) ? ' (capital)' : ''), ids: [] };
+    r.ids.push(f.p.id); resultado.set(k, r);
+  });
+  return resultado;
+}
+let cachePueblos = null;
+async function cargarPueblos() {
+  const { data, error } = await sb.from('partes').select('id, codigo_postal, poblacion, sigma_cuenta').in('estado', ABIERTOS);
+  if (error) throw error;
+  const cat = catalogoPueblos(data || []);
+  cachePueblos = { cat, ciudadDeId: new Map((data || []).map((p) => [p.id, ciudadDe(p)])) };
+}
+function pintarFiltrosLugar() {
+  const cat = cachePueblos?.cat || new Map();
+  const ciudades = [...new Set([...cat.values()].map((v) => v.ciudad))].sort((a, b) => (a === 'Otras') - (b === 'Otras') || a.localeCompare(b));
+  if (filtroPartes.ciudad && !ciudades.includes(filtroPartes.ciudad)) filtroPartes.ciudad = '';
+  $('#fp-ciudad').innerHTML = '<option value="">Todas las ciudades</option>' + ciudades.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  $('#fp-ciudad').value = filtroPartes.ciudad;
+  const pueblos = [...cat.entries()].filter(([, v]) => !filtroPartes.ciudad || v.ciudad === filtroPartes.ciudad)
+    .sort(([, a], [, b]) => b.etiqueta.endsWith('(capital)') - a.etiqueta.endsWith('(capital)') || a.ciudad.localeCompare(b.ciudad) || a.etiqueta.localeCompare(b.etiqueta, 'es'));
+  if (filtroPartes.pueblo && !pueblos.some(([k]) => k === filtroPartes.pueblo)) filtroPartes.pueblo = '';
+  $('#fp-pueblo').innerHTML = '<option value="">Todos los pueblos</option>' + pueblos.map(([k, v]) => `<option value="${esc(k)}">${esc(v.etiqueta)}${filtroPartes.ciudad ? '' : ' · ' + esc(v.ciudad)} (${v.ids.length})</option>`).join('');
+  $('#fp-pueblo').value = filtroPartes.pueblo;
+}
 
 async function vistaPartes() {
   $('#contenido').innerHTML = `
@@ -921,7 +990,8 @@ async function vistaPartes() {
         <option value="todos">Todos</option>
       </select>
       <select id="fp-cia" style="max-width:160px"><option value="">Todas las compañías</option>${cache.companias.map((c) => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('')}</select>
-      <select id="fp-sigma" style="max-width:190px"><option value="">SIGMA: todas las cuentas</option><option value="VLL">SIGMA Valladolid</option><option value="PAL">SIGMA Palencia</option><option value="rojo">SIGMA alerta roja</option><option value="fuera">Fuera de SIGMA</option></select>
+      <select id="fp-ciudad" style="max-width:170px"><option value="">Todas las ciudades</option></select>
+      <select id="fp-pueblo" style="max-width:230px"><option value="">Todos los pueblos</option></select>
       <span class="esp"></span>
       <button class="sec" onclick="exportarPartes()">Exportar CSV</button>
       <button onclick="modalParte()">+ Nuevo parte</button>
@@ -929,8 +999,10 @@ async function vistaPartes() {
     <div id="tabla-partes">Cargando…</div>`;
   $('#fp-estado').value = filtroPartes.estado;
   $('#fp-cia').value = filtroPartes.cia;
-  $('#fp-sigma').value = filtroPartes.sigma;
-  $('#fp-sigma').onchange = (e) => { filtroPartes.sigma = e.target.value; cargarPartes(); };
+  $('#fp-ciudad').onchange = (e) => { filtroPartes.ciudad = e.target.value; filtroPartes.pueblo = ''; pintarFiltrosLugar(); cargarPartes(); };
+  $('#fp-pueblo').onchange = (e) => { filtroPartes.pueblo = e.target.value; cargarPartes(); };
+  try { await cargarPueblos(); } catch (e) { cachePueblos = null; }
+  pintarFiltrosLugar();
   let t; $('#fp-texto').oninput = (e) => { clearTimeout(t); t = setTimeout(() => { filtroPartes.texto = e.target.value.trim(); cargarPartes(); }, 300); };
   $('#fp-estado').onchange = (e) => { filtroPartes.estado = e.target.value; cargarPartes(); };
   $('#fp-cia').onchange = (e) => { filtroPartes.cia = e.target.value; cargarPartes(); };
@@ -941,12 +1013,15 @@ let ultimosPartes = [];
 async function consultaPartes(limite) {
   let q = sb.from('partes').select('*, compania:companias(nombre), asignaciones!asignaciones_parte_id_fkey(fecha, operario_id)')
     .order('urgente', { ascending: false }).order('creado_en', { ascending: false }).limit(limite);
-  if (filtroPartes.estado === 'abiertos') q = q.in('estado', ['pendiente', 'asignado', 'en_curso', 'terminado']);
+  if (filtroPartes.estado === 'abiertos') q = q.in('estado', ABIERTOS);
   else if (filtroPartes.estado !== 'todos') q = q.eq('estado', filtroPartes.estado);
   if (filtroPartes.cia) q = q.eq('compania_id', Number(filtroPartes.cia));
-  if (filtroPartes.sigma === 'VLL' || filtroPartes.sigma === 'PAL') q = q.eq('sigma_cuenta', filtroPartes.sigma);
-  else if (filtroPartes.sigma === 'rojo') q = q.eq('sigma_alerta', 'rojo').eq('sigma_en_curso', true);
-  else if (filtroPartes.sigma === 'fuera') q = q.eq('sigma_en_curso', false);
+  if (filtroPartes.pueblo && cachePueblos?.cat.get(filtroPartes.pueblo)) q = q.in('id', cachePueblos.cat.get(filtroPartes.pueblo).ids);
+  else if (filtroPartes.ciudad) {
+    const pr = Object.keys(PROVINCIAS_CP).find((k) => PROVINCIAS_CP[k] === filtroPartes.ciudad);
+    const cuenta = filtroPartes.ciudad === 'Valladolid' ? 'VLL' : filtroPartes.ciudad === 'Palencia' ? 'PAL' : null;
+    if (pr) q = q.or(`codigo_postal.like.${pr}%` + (cuenta ? `,and(codigo_postal.is.null,sigma_cuenta.eq.${cuenta})` : ''));
+  }
   if (filtroPartes.texto) {
     const t = filtroPartes.texto.replace(/[,()%*]/g, ' ');
     q = q.or(`numero_servicio.ilike.%${t}%,direccion.ilike.%${t}%,asegurado.ilike.%${t}%,poblacion.ilike.%${t}%,telefono.ilike.%${t}%`);
