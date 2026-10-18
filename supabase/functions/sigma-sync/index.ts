@@ -2,6 +2,7 @@
 // Entra con cada cuenta (Valladolid, Palencia), lee "Servicios en curso" y las fichas,
 // y vuelca en Supabase: partes nuevos, cambios y servicios que dejan de estar en curso.
 // Si el portal tiene servicios ofrecidos pendientes de confirmación, los ACEPTA TODOS y avisa a la oficina.
+// Marca los partes SIN PRIMER CONTACTO (Gestión repaso del portal + estado 15).
 // También manda a SIGMA lo que la oficina ha aprobado en "Envíos a SIGMA" (Repaso e Informar citas).
 // Lo llama pg_cron cada 15 minutos con la cabecera secreta x-kubel-secreto.
 // ?prueba=1  → lee el portal pero NO escribe ni acepta nada y devuelve un resumen.
@@ -198,6 +199,36 @@ async function leerTodoElListado(s: Sesion) {
   }
   const unicos = [...new Map(filas.map((f) => [f.numero, f])).values()];
   return { total: p1.total, paginas: p1.paginas, filas: unicos, leidas: filas.length, codigos: p1.codigos, aviso: p1.aviso };
+}
+
+// ---------------------------------------------------------------- Gestión repaso → "Pendiente de primer contacto"
+// gestRepaso.php es el cuadro de mando del portal; su enlace "Pendiente de primer contacto" lleva a
+// muestraservRepaso.php?posicion=servPteContacto&cmbOPER=<profesional> con la lista de servicios.
+// Devuelve null si no se pudo leer (entonces no se tocan las marcas que vienen del portal).
+async function leerSinContacto(s: Sesion): Promise<Set<string> | null> {
+  try {
+    const cuadro = await s.pedir('gestRepaso.php');
+    if (pideClave(cuadro)) return null;
+    const enlace = (cuadro.match(/href="(muestraservRepaso\.php\?posicion=servPteContacto[^"]*)"/i) || [])[1];
+    if (!enlace) {
+      // Sin enlace: o no hay ninguno (el número sale sin enlace) o el portal cambió
+      return /Pendiente de primer contacto/i.test(cuadro) ? new Set() : null;
+    }
+    const nums = new Set<string>();
+    let ruta: string | null = enlace.replace(/&amp;/g, '&');
+    for (let p = 0; ruta && p < 10; p++) {
+      const html = await s.pedir(ruta);
+      if (pideClave(html)) return null;
+      for (const m of html.matchAll(/repasos1\.php\?reparacion=(\d+)/g)) nums.add(m[1]);
+      const sig = html.match(/<a[^>]+href="([^"]*muestraservRepaso\.php[^"]*)"[^>]*>(?:(?!<\/a>)[\s\S])*siguiente/i);
+      const nueva = sig ? sig[1].replace(/&amp;/g, '&') : null;
+      ruta = nueva && nueva !== ruta ? nueva : null;
+    }
+    return nums;
+  } catch (err) {
+    console.error('gestRepaso', (err as Error).message);
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------- servicios ofrecidos (confirmserv.php)
@@ -562,7 +593,7 @@ type Resumen = {
   cuenta: string; ok: boolean; en_listado: number; total_portal: number | null; paginas: number;
   nuevos: { numero: string; direccion: string; gremio: string; urgente: boolean }[];
   cambiados: number; fichas: number; desaparecidos: string[]; pendientes: number; error?: string; diagnostico?: unknown;
-  aceptados?: Ofrecido[];
+  aceptados?: Ofrecido[]; sin_contacto?: number;
 };
 
 function partirDireccion(d: string) {
@@ -592,6 +623,7 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
     r.aceptados = await aceptarOfrecidos(s);
     lis = await leerTodoElListado(s);
   }
+  const sinContactoPortal = await leerSinContacto(s);
   r.en_listado = lis.filas.length; r.total_portal = lis.total; r.paginas = lis.paginas;
   const completo = lis.total !== null && lis.filas.length === lis.total;
 
@@ -695,6 +727,7 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
       marcas: [...new Set(lis.filas.flatMap((f) => f.marcas))],
       filas_sin_direccion: lis.filas.filter((f) => !f.direccion).length,
       errores_ficha: erroresFicha.slice(0, 5),
+      sin_primer_contacto: { portal: sinContactoPortal ? [...sinContactoPortal] : 'no leído', estado_15: lis.filas.filter((f) => f.estado === '15').map((f) => f.numero) },
       procedencias: [...new Map(nuevosCodigos.filter((c) => c.tipo === 'procedencia' && c.texto).map((c) => [c.codigo, c.texto])).entries()],
       ficha_ejemplo: una && {
         tiene_cliente: !!una.cliente, tiene_direccion: !!una.direccion, cp: !!una.cp, procedencia: !!una.procedenciaTexto,
@@ -728,6 +761,31 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
       .eq('compania_id', ciaId).eq('sigma_cuenta', cuenta).in('numero_servicio', desaparecidos);
     if (error) throw new Error('Marcar desaparecidos: ' + error.message);
     r.desaparecidos = desaparecidos;
+  }
+  // SIN PRIMER CONTACTO: lista de Gestión repaso del portal + estado 15 "Primer contacto con cliente"
+  {
+    const { data: marcados } = await admin.from('partes').select('id, numero_servicio, sigma_estado, sigma_en_curso')
+      .eq('compania_id', ciaId).eq('sigma_cuenta', cuenta).eq('sigma_sin_contacto', true);
+    const estadoDe = new Map(lis.filas.map((f) => [f.numero, f.estado]));
+    const sinContacto = new Set<string>(lis.filas.filter((f) => f.estado === '15').map((f) => f.numero));
+    if (sinContactoPortal) sinContactoPortal.forEach((n) => estadoDe.has(n) && sinContacto.add(n));
+    else for (const m of marcados || []) { // portal no leído: se conservan las marcas que siguen en curso y sin cambio claro
+      const est = estadoDe.get(m.numero_servicio);
+      if (est !== undefined && (est === m.sigma_estado || est === '15')) sinContacto.add(m.numero_servicio);
+    }
+    const quitar = (marcados || []).filter((m) => !sinContacto.has(m.numero_servicio)).map((m) => m.id);
+    const ya = new Set((marcados || []).map((m) => m.numero_servicio));
+    const poner = [...sinContacto].filter((n) => !ya.has(n));
+    if (quitar.length) {
+      const { error } = await admin.from('partes').update({ sigma_sin_contacto: false, sigma_sin_contacto_desde: null }).in('id', quitar);
+      if (error) console.error('sin contacto (quitar)', error.message);
+    }
+    if (poner.length) {
+      const { error } = await admin.from('partes').update({ sigma_sin_contacto: true, sigma_sin_contacto_desde: ahora })
+        .eq('compania_id', ciaId).in('numero_servicio', poner);
+      if (error) console.error('sin contacto (poner)', error.message);
+    }
+    r.sin_contacto = sinContacto.size;
   }
   // Datos de las fichas: los campos SIGMA siempre; los generales solo si están vacíos (no pisar a la oficina)
   if (fichas.size) {

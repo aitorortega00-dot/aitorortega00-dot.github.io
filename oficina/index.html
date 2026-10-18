@@ -210,7 +210,8 @@
   <header>
     <div class="logo">KUBEL<small>OFICINA</small></div>
     <nav>
-      <a href="#hoy" data-v="hoy">Hoy</a>
+      <a href="#inicio" data-v="inicio">Inicio</a>
+      <a href="#sincontacto" data-v="sincontacto">Sin primer contacto<span id="b-sc" class="badge oculto"></span></a>
       <a href="#plan" data-v="plan">Planificación</a>
       <a href="#partes" data-v="partes">Partes</a>
       <a href="#informes" data-v="informes">Informes<span id="b-inf" class="badge oculto"></span></a>
@@ -228,7 +229,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.3 (robot SIGMA + envíos a SIGMA)
+   KUBEL Oficina — v2.5 (Inicio + Sin primer contacto)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -279,7 +280,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if ($('#
 let sb = null;
 let yo = null;
 let cache = { operarios: [], companias: [], todosPerfiles: [], codigos: {}, sinc: [] };
-let vistaActual = 'hoy';
+let vistaActual = 'inicio';
 
 function mostrar(id) { ['v-carga', 'v-login', 'v-app'].forEach((v) => $('#' + v).classList.toggle('oculto', v !== id)); }
 
@@ -316,7 +317,8 @@ async function alCambiarSesion(sesion) {
   contarSinRevisar();
   contarEnvios();
   KubelAvisos.sincronizar(sb).then(pintarBotonAvisos);
-  irA(location.hash.slice(1) || 'hoy');
+  contarSinContacto();
+  irA(location.hash.slice(1) || 'inicio');
 }
 
 // Usuario → correo interno (NANCY → nancy@kubel.app). Si lleva @ se usa tal cual (cuentas antiguas).
@@ -373,6 +375,7 @@ function alCambio(tabla, p) {
     if (p.new.estado === 'no_realizado') aviso(`⚠️ ${nombreDe(p.new.operario_id)}: visita no realizada`);
   }
   if (tabla === 'informes') contarSinRevisar();
+  if (tabla === 'partes') { clearTimeout(alCambio.sc); alCambio.sc = setTimeout(contarSinContacto, 800); }
   // No recargar si hay una ventana abierta (para no perder lo que se está escribiendo)
   clearTimeout(recargaT);
   recargaT = setTimeout(() => { if (!$('#modal').innerHTML) irA(vistaActual, true); }, 600);
@@ -635,8 +638,9 @@ async function guardarEnvio(id, aprobar) {
 // ---------- Navegación ----------
 window.addEventListener('hashchange', () => yo && irA(location.hash.slice(1)));
 function irA(v, silencioso) {
-  const vistas = { hoy: vistaHoy, plan: vistaPlan, partes: vistaPartes, informes: vistaInformes, envios: vistaEnvios, operarios: vistaOperarios };
-  if (!vistas[v]) v = 'hoy';
+  const vistas = { inicio: vistaHoy, sincontacto: vistaSinContacto, plan: vistaPlan, partes: vistaPartes, informes: vistaInformes, envios: vistaEnvios, operarios: vistaOperarios };
+  if (v === 'hoy') v = 'inicio'; // dirección antigua
+  if (!vistas[v]) v = 'inicio';
   vistaActual = v;
   document.querySelectorAll('header nav a').forEach((a) => a.classList.toggle('activo', a.dataset.v === v));
   if (silencioso && v === 'operarios') return; // no pisar lo que se está editando
@@ -644,7 +648,7 @@ function irA(v, silencioso) {
 }
 
 // =====================================================================
-//  HOY
+//  INICIO (antes "Hoy")
 // =====================================================================
 async function vistaHoy() {
   const hoy = hoyISO();
@@ -658,7 +662,7 @@ async function vistaHoy() {
         <div class="tarjeta feed"><h3 style="margin:0 0 6px">Últimos informes</h3><div id="feed">Cargando…</div></div>
       </div></div>`;
   }
-  const [asig, sinAsignar, urg, sinRev, ultimos] = await Promise.all([
+  const [asig, sinAsignar, urg, sinRev, ultimos, sinCont] = await Promise.all([
     sb.from('asignaciones').select('id, fecha, hora, orden, tipo, estado, operario_id, parte:partes!asignaciones_parte_id_fkey(id, numero_servicio, direccion, poblacion, codigo_postal, gremio, urgente, compania:companias(nombre))')
       .eq('fecha', hoy).order('orden').order('hora', { nullsFirst: false }),
     sb.from('partes').select('id', { count: 'exact', head: true }).eq('estado', 'pendiente'),
@@ -666,12 +670,14 @@ async function vistaHoy() {
     sb.from('informes').select('id', { count: 'exact', head: true }).eq('revisado', false),
     sb.from('informes').select('id, creado_en, texto, revisado, trabajo_terminado, necesita_repaso, operario_id, parte:partes!informes_parte_id_fkey(id, numero_servicio, direccion)')
       .order('creado_en', { ascending: false }).limit(8),
+    sb.from('partes').select('id', { count: 'exact', head: true }).eq('sigma_sin_contacto', true).eq('sigma_en_curso', true),
   ]);
   if (asig.error) return fallo(asig.error);
   const lista = asig.data || [];
   const hechas = lista.filter((a) => a.estado === 'hecho').length;
   const noReal = lista.filter((a) => a.estado === 'no_realizado').length;
   $('#kpis').innerHTML = `
+    <a class="kpi ${sinCont.count ? 'mal' : ''}" href="#sincontacto"><div class="n">${sinCont.count ?? 0}</div><div class="t">Sin primer contacto</div></a>
     <a class="kpi ${sinAsignar.count ? 'alerta' : ''}" href="#plan"><div class="n">${sinAsignar.count ?? 0}</div><div class="t">Partes sin asignar</div></a>
     <a class="kpi" href="#plan"><div class="n">${hechas}/${lista.length}</div><div class="t">Visitas hechas hoy</div></a>
     <a class="kpi ${noReal ? 'mal' : ''}" href="#plan"><div class="n">${noReal}</div><div class="t">No realizadas hoy</div></a>
@@ -704,6 +710,70 @@ async function vistaHoy() {
       <div><b>${esc(i.parte?.numero_servicio)}</b> · ${esc(nombreDe(i.operario_id))} <span style="color:var(--suave)">· ${hace(i.creado_en)}</span>
         ${i.revisado ? '' : '<span class="et nuevo">Nuevo</span>'} ${i.necesita_repaso ? '<span class="et pendiente">Repaso</span>' : ''}</div>
       <div class="txt">${esc(i.texto)}</div></div>`).join('') : '<div class="vacio">Todavía no hay informes.</div>';
+}
+
+// =====================================================================
+//  SIN PRIMER CONTACTO
+//  Partes SIGMA en los que aún no se ha hablado con el cliente. Los marca el robot
+//  con la lista "Pendiente de primer contacto" de Gestión repaso del portal y el estado 15.
+// =====================================================================
+async function contarSinContacto() {
+  const { count } = await sb.from('partes').select('id', { count: 'exact', head: true }).eq('sigma_sin_contacto', true).eq('sigma_en_curso', true);
+  const b = $('#b-sc'); if (!b) return; b.textContent = count || ''; b.classList.toggle('oculto', !count);
+}
+let filtroSinContacto = '';
+// "Primer contacto con cliente (16/10/2026 - 12:04)" → fecha límite que da SIGMA para el primer contacto
+function plazoContacto(p) {
+  const m = String(p.sigma_estado === '15' ? p.sigma_estado_texto || '' : '').match(/\((\d{2})\/(\d{2})\/(\d{4})\s*-\s*(\d{2}):(\d{2})\)/);
+  return m ? new Date(+m[3], m[2] - 1, +m[1], +m[4], +m[5]) : null;
+}
+function textoPlazo(d) {
+  if (!d) return '';
+  const min = Math.round((d - Date.now()) / 60000);
+  const cuando = `${dos(d.getDate())}/${dos(d.getMonth() + 1)} ${dos(d.getHours())}:${dos(d.getMinutes())}`;
+  if (min < 0) return `<span class="et urg" title="Plazo de SIGMA para el primer contacto">Vencido ${cuando}</span>`;
+  if (min < 24 * 60) return `<span class="et pendiente" title="Plazo de SIGMA para el primer contacto">Vence ${cuando}</span>`;
+  return `<span class="et" title="Plazo de SIGMA para el primer contacto">Plazo ${cuando}</span>`;
+}
+async function vistaSinContacto() {
+  if (!$('#sc-raiz')) {
+    $('#contenido').innerHTML = `<div id="sc-raiz">
+      <div class="barra"><h2>Sin primer contacto</h2>
+        <select id="sc-cuenta" style="max-width:190px"><option value="">Valladolid y Palencia</option>${Object.entries(CUENTAS_SIGMA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+        <span class="esp"></span><a href="https://web.multiasistencia.com/w3multi/gestRepaso.php" target="_blank" rel="noopener" style="font-size:13px">Gestión repaso en el portal ↗</a></div>
+      <p style="color:var(--suave);font-size:13px;margin-top:0">Servicios de SIGMA en los que todavía no se ha hablado con el cliente. Los clasifica el robot en cada pasada (cada 15 min) con la lista <b>Pendiente de primer contacto</b> de Gestión repaso del portal; salen de aquí solos cuando en SIGMA cambia el estado (p. ej. al enviar un Repaso).</p>
+      <div id="sc-lista">Cargando…</div></div>`;
+    $('#sc-cuenta').value = filtroSinContacto;
+    $('#sc-cuenta').onchange = (e) => { filtroSinContacto = e.target.value; vistaSinContacto(); };
+  }
+  let q = sb.from('partes').select('id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, gremio, urgente, estado, sigma_cuenta, sigma_alerta, sigma_en_curso, sigma_estado, sigma_estado_texto, sigma_caducidad, sigma_llamadas, sigma_sin_contacto_desde, sigma_envios(estado), asignaciones!asignaciones_parte_id_fkey(fecha, operario_id)')
+    .eq('sigma_sin_contacto', true).eq('sigma_en_curso', true);
+  if (filtroSinContacto) q = q.eq('sigma_cuenta', filtroSinContacto);
+  const { data, error } = await q;
+  if (error) return fallo(error);
+  const lista = (data || []).map((p) => ({ ...p, plazo: plazoContacto(p) }))
+    .sort((a, b) => (b.urgente - a.urgente) || ((a.plazo?.getTime() ?? 9e15) - (b.plazo?.getTime() ?? 9e15)) || ((a.sigma_caducidad ?? 999) - (b.sigma_caducidad ?? 999)));
+  const hoy = hoyISO();
+  $('#sc-lista').innerHTML = lista.length ? `
+    <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nº servicio</th><th>Cliente y teléfono</th><th>Dirección</th><th class="opc">Gremio</th><th>Plazo SIGMA</th><th>En la lista desde</th><th></th></tr></thead>
+    <tbody>${lista.map((p) => {
+      const tels = [p.telefono, p.telefono2].filter(Boolean);
+      const pendEnvio = (p.sigma_envios || []).some((e) => ['borrador', 'aprobado', 'enviando'].includes(e.estado));
+      const prox = (p.asignaciones || []).filter((a) => a.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+      return `<tr class="clic" onclick="modalParte('${p.id}')">
+        <td><b>${esc(p.numero_servicio)}</b> ${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
+        <td>${esc(p.asegurado || '—')}${tels.map((t) => `<br><a href="tel:${esc(t)}" onclick="event.stopPropagation()">${esc(t)}</a>`).join('')}</td>
+        <td>${esc(p.direccion)}${p.poblacion ? '<br><small style="color:var(--suave)">' + esc(p.poblacion) + '</small>' : ''}</td>
+        <td class="opc">${esc(p.gremio || '')}</td>
+        <td>${textoPlazo(p.plazo) || '—'}${p.sigma_caducidad !== null && p.sigma_caducidad !== undefined ? `<br><small style="color:var(--suave)">cad. ${p.sigma_caducidad} d${p.sigma_llamadas ? ' · ' + p.sigma_llamadas + ' llamadas' : ''}</small>` : ''}</td>
+        <td>${p.sigma_sin_contacto_desde ? hace(p.sigma_sin_contacto_desde) : '—'}${prox ? `<br><small style="color:var(--suave)">Visita ${fCorta(prox.fecha)} · ${esc(nombreDe(prox.operario_id))}</small>` : ''}</td>
+        <td style="white-space:nowrap" onclick="event.stopPropagation()">
+          ${pendEnvio ? '<span class="et en_camino" title="Hay un Repaso preparado en Envíos a SIGMA">Repaso en bandeja</span>' : `<button class="mini" onclick="nuevoEnvio('${p.id}')">Repaso</button>`}
+          <a class="mini" href="https://web.multiasistencia.com/w3multi/repasos1.php?reparacion=${encodeURIComponent(p.numero_servicio)}" target="_blank" rel="noopener" title="Abrir en el portal" style="margin-left:6px">↗</a></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>
+    <p style="color:var(--suave);font-size:12px">${lista.length} servicio(s) sin primer contacto</p>`
+    : '<div class="tarjeta vacio">No hay servicios pendientes de primer contacto. 👍</div>';
 }
 
 function verRuta(dirs) {
