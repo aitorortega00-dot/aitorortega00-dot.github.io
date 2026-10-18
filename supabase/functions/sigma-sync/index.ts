@@ -66,6 +66,26 @@ class Sesion {
       if (i > 0) this.cookies.set(kv.slice(0, i).trim(), kv.slice(i + 1).trim());
     }
   }
+  // Si el portal está saturado un momento (502/503/504) se reintenta hasta 2 veces (a los 4 s y a los 12 s).
+  // Un 50x significa que el portal no atendió la petición, así que repetirla no duplica nada.
+  // Si se corta la conexión o tarda demasiado, solo se reintentan lecturas (GET) y el login/listado,
+  // nunca un envío (aceptar ofrecidos, informar citas): podría haberse guardado ya.
+  private async conReintento(url: string, method: string, body: string | undefined, headers: Record<string, string>) {
+    const esperas = [4000, 12000];
+    const repetible = method === 'GET' || /\/(acceso|frepasos_new)\.php/.test(url);
+    for (let intento = 0; ; intento++) {
+      let res: Response | null = null;
+      try {
+        res = await fetch(url, { method, body, headers, redirect: 'manual', signal: AbortSignal.timeout(25000) });
+      } catch (err) {
+        if (!repetible || intento >= esperas.length) throw err;
+      }
+      if (res && (![502, 503, 504].includes(res.status) || intento >= esperas.length)) return res;
+      if (res) await res.body?.cancel();
+      console.warn(`Portal ${res ? res.status : 'sin respuesta'} en ${url.split('?')[0]}: reintento ${intento + 1}`);
+      await new Promise((r) => setTimeout(r, esperas[intento]));
+    }
+  }
   async pedir(ruta: string, form?: Record<string, string>): Promise<string> {
     let url = BASE + ruta;
     let method = form ? 'POST' : 'GET';
@@ -73,7 +93,7 @@ class Sesion {
     for (let i = 0; i < 6; i++) {
       const headers: Record<string, string> = { 'User-Agent': UA, Referer: BASE, Cookie: [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; ') };
       if (body) headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      const res = await fetch(url, { method, body, headers, redirect: 'manual', signal: AbortSignal.timeout(25000) });
+      const res = await this.conReintento(url, method, body, headers);
       this.guardar(res);
       if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
         url = new URL(res.headers.get('location')!, url).href;
