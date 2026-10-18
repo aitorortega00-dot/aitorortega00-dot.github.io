@@ -2,9 +2,10 @@
 // Entra con cada cuenta (Valladolid, Palencia), lee "Servicios en curso" y las fichas,
 // y vuelca en Supabase: partes nuevos, cambios y servicios que dejan de estar en curso.
 // Si el portal tiene servicios ofrecidos pendientes de confirmación, los ACEPTA TODOS y avisa a la oficina.
+// También manda a SIGMA lo que la oficina ha aprobado en "Envíos a SIGMA" (Repaso e Informar citas).
 // Lo llama pg_cron cada 15 minutos con la cabecera secreta x-kubel-secreto.
 // ?prueba=1  → lee el portal pero NO escribe ni acepta nada y devuelve un resumen.
-// ?cuenta=VLL → solo esa cuenta.
+// ?cuenta=VLL → solo esa cuenta.  ?enviar=1 → solo manda a SIGMA los envíos aprobados (sin leer el listado).
 import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4';
 import postgres from 'npm:postgres@3.4.4';
 import { DOMParser, Element } from 'https://deno.land/x/deno_dom@v0.1.45/deno-dom-wasm.ts';
@@ -340,6 +341,174 @@ function leerFicha(html: string) {
   };
 }
 
+// ---------------------------------------------------------------- ENVÍOS A SIGMA (lo que la oficina ha aprobado)
+// Repaso: componente moderno del portal que habla con su servicio JSON (review-initial-data / review-update).
+// Informar citas: formulario clásico citasPendientes.php.
+// Reglas de la oficina (18/10/2026):
+//  - En "Informar citas" la fecha/hora de la visita es SIEMPRE la citada, nunca la del informe.
+//  - El aviso "este aplazamiento va a generar un SMS al cliente" se confirma SIEMPRE con "Sí".
+const API_REPASO = 'https://mawmods.plataforma-smart.com/me';
+const HORAS_REPASO = Array.from({ length: 28 }, (_, i) => String(28800 + i * 1800)); // 08:00 … 21:30
+const MOTIVOS_CITA: Record<string, string[]> = { V: ['609', '611', '604', '601'], I: ['706', '707', '708'], C: ['213', '215', '212', '214'] };
+type Envio = {
+  id: string; parte_id: string; tipo: 'repaso' | 'informar_cita'; motivo_codigo: string | null; motivo_texto: string | null;
+  fecha: string | null; hora: string | null; resolucion: string | null; resolucion_motivo: string | null;
+  cita_fecha: string | null; cita_hora: string | null; comentario: string; parte: { numero_servicio: string; sigma_cuenta: string };
+};
+
+function traducirCodigos(codes: { code?: string }[] | undefined) {
+  const c = (codes || []).map((x) => x.code || '').filter(Boolean);
+  if (!c.length) return 'El portal no aceptó el cambio (sin detalle)';
+  return c.map((x) => ({
+    APPEND_PENDING_APPOINTMENTS: 'Hay una cita anterior sin informar: primero hay que enviar "Informar citas"',
+    TXT_GENERICERROR: 'Error genérico del portal',
+  } as Record<string, string>)[x] || x).join(' · ');
+}
+const hoyMadrid = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date());
+
+async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
+  const n = e.parte.numero_servicio;
+  if (!e.motivo_codigo) throw new Error('Falta el motivo');
+  if (!e.fecha) throw new Error('Falta la fecha siguiente acción');
+  if (!e.comentario.trim()) throw new Error('Falta el comentario');
+  const html = await s.pedir(`fechaccion.php?reparacion=${n}&modo=0`);
+  const ut = (html.match(/<multiasistencia-repaso[^>]*\sut="([^"]+)"/i) || [])[1];
+  if (!ut) throw new Error('No se pudo abrir la pestaña Repaso de este servicio');
+  const api = async (ruta: string, cuerpo: unknown) => {
+    const r = await fetch(`${API_REPASO}/${ruta}`, {
+      method: 'POST', signal: AbortSignal.timeout(30000), body: JSON.stringify(cuerpo),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ut}`, Version: '3.0.0', 'User-Agent': UA, Origin: 'https://web.multiasistencia.com', Referer: BASE + 'fechaccion.php' },
+    });
+    if (r.status >= 500 || r.status === 401 || r.status === 404) throw new Error(`El servicio de Repaso respondió ${r.status}`);
+    return await r.json();
+  };
+  const ini = await api('review-initial-data', { reparation: n });
+  if (!ini?.success) throw new Error(traducirCodigos(ini?.metadata?.errorCodes));
+  const d = ini.data;
+  if (!d.availabilityPermission) throw new Error('El portal pide elegir hueco de agenda para este servicio: hazlo a mano en el portal');
+  if (d.swConforme) throw new Error('El portal pide una conformidad adicional: hazlo a mano en el portal');
+  const motivo = (d.reasonInfo?.reasonComboList || []).find((m: { value: string }) => String(m.value) === String(e.motivo_codigo));
+  if (!motivo) throw new Error(`El motivo "${e.motivo_texto || e.motivo_codigo}" no está disponible ahora para este servicio`);
+  if (motivo.sub?.length) throw new Error(`El motivo "${motivo.label}" pide un submotivo: hazlo a mano en el portal`);
+  const max = Number((String(motivo.label).match(/\[(\d+)\]/) || [])[1] ?? NaN);
+  const hoy = hoyMadrid();
+  const dias = Math.round((Date.parse(e.fecha) - Date.parse(hoy)) / 86400000);
+  if (dias < 0) throw new Error('La fecha ya ha pasado');
+  if (Number.isFinite(max) && dias > max) throw new Error(`Para "${motivo.label}" la fecha no puede pasar de ${max} días desde hoy`);
+  let hourRaw = '';
+  if (e.hora) {
+    const [h, m] = e.hora.split(':').map(Number);
+    hourRaw = String(h * 3600 + m * 60);
+    if (!HORAS_REPASO.includes(hourRaw)) throw new Error('La hora del Repaso debe ser en punto o y media, entre 08:00 y 21:30');
+  }
+  const [a, mes, dia] = e.fecha.split('-');
+  const cmd: Record<string, unknown> = {
+    reparation: n, controlAvailability: 1, controlDuration: 1,
+    reviewReason: String(e.motivo_codigo), comment: e.comentario.trim(),
+    dates: { actionDate: { day: String(Number(dia)), month: String(Number(mes)), year: a, hourRaw }, exceededDate: d.dates?.exceededDate ?? null },
+  };
+  if (d.heater?.enabled && d.heater.ageHeater) cmd.heater = { ageHeater: d.heater.ageHeater };
+  let res = await api('review-update', cmd);
+  let code = res?.metadata?.errorCodes?.[0]?.code;
+  let sms = false;
+  if (code === 'AVISO_SMS') { // aviso genérico de SMS al cliente: siempre "Sí"
+    sms = true;
+    res = await api('review-update', { ...cmd, smsResponse: 'si' });
+    code = res?.metadata?.errorCodes?.[0]?.code;
+  }
+  if (code === 'APLAZAMOK') return `Repaso guardado: ${motivo.label.replace(/\s*\[\d+\]/, '')} ${dia}/${mes}/${a}${e.hora ? ' ' + e.hora.slice(0, 5) : ''}${sms ? ' (SMS al cliente confirmado)' : ''}`;
+  if (res?.success && !code) throw new Error('El portal pidió un paso adicional (huecos de agenda): revisa el servicio en el portal');
+  throw new Error(traducirCodigos(res?.metadata?.errorCodes));
+}
+
+async function enviarInformarCita(s: Sesion, e: Envio): Promise<string> {
+  const n = e.parte.numero_servicio;
+  if (!e.resolucion || !e.resolucion_motivo) throw new Error('Falta la resolución o el motivo');
+  if (!MOTIVOS_CITA[e.resolucion]?.includes(e.resolucion_motivo)) throw new Error('El motivo no corresponde a la resolución elegida');
+  if (!e.comentario.trim()) throw new Error('Falta el comentario');
+  const leer = async () => {
+    const html = await s.pedir(`citasPendientes.php?reparacion=${n}&modo=0`);
+    const doc = parse(html);
+    const filas = ([...doc.querySelectorAll('tr[onclick*="seleccionarCita"]')] as Element[]).map((tr) => {
+      const t = txt(tr);
+      const m = t.match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s*-\s*(\d{2}):(\d{2}))?/);
+      return { id: tr.getAttribute('id') || '', primera: tr.getAttribute('primeravisita') === '1', fecha: m ? `${m[3]}-${m[2]}-${m[1]}` : null, hora: m && m[4] ? `${m[4]}:${m[5]}` : null };
+    }).filter((f) => f.id);
+    return { doc, filas };
+  };
+  const { doc, filas } = await leer();
+  if (!filas.length) throw new Error('El portal no tiene ninguna cita pendiente de informar en este servicio');
+  const fila = filas.find((f) => f.fecha && f.fecha === e.cita_fecha) ?? filas[0];
+  const form = doc.querySelector('form[name="datos_cita"]') as Element | null;
+  if (!form) throw new Error('No se encontró el formulario de Informar citas');
+  const oculto = (nombre: string) => (form.querySelector(`input[name="${nombre}"]`) as Element | null)?.getAttribute('value') ?? '';
+  const campos: Record<string, string> = {
+    idCita: fila.id, reparacion: oculto('reparacion') || n, desde: oculto('desde'), UpdateFrm: '1',
+    resolucion: e.resolucion, motivo: e.resolucion_motivo, comentario: e.comentario.trim(),
+  };
+  let cuando = '';
+  if ((e.resolucion === 'V') && fila.primera) {
+    // Hora de llegada = la CITADA (la del portal; si no se ve, la que planificamos)
+    const fecha = fila.fecha ?? e.cita_fecha;
+    const hora = fila.hora ?? e.cita_hora?.slice(0, 5) ?? null;
+    if (!fecha || !hora) throw new Error('No se sabe la fecha y hora citadas de la visita');
+    const [a, mes, dia] = fecha.split('-');
+    const [hh, mm] = hora.split(':');
+    if (Number(hh) < 7 || Number(hh) > 22) throw new Error('La hora citada está fuera del rango que admite el portal (07–22 h)');
+    Object.assign(campos, { dia: String(Number(dia)), mes: String(Number(mes)), ano: a, hora: hh.padStart(2, '0'), minutos: mm.padStart(2, '0') });
+    cuando = ` · visita ${dia}/${mes}/${a} ${hh}:${mm}`;
+  }
+  await s.pedir(form.getAttribute('action') || 'citasPendientes.php', campos);
+  const despues = await leer();
+  if (despues.filas.some((f) => f.id === fila.id)) throw new Error('El portal no dio por informada la cita (sigue pendiente)');
+  const RES: Record<string, string> = { V: 'Visita realizada', I: 'Visita cancelada', C: 'Cita cancelada' };
+  return `Cita informada: ${RES[e.resolucion]}${cuando}`;
+}
+
+async function procesarEnvios(admin: SupabaseClient, cuenta: string, nombre: string, usuario: string, clave: string, secretoAvisos: string) {
+  // Envíos que se quedaron a medias hace más de 10 min: no se reintentan solos (podría duplicarse en el portal)
+  await admin.from('sigma_envios').update({ estado: 'error', resultado: 'Envío interrumpido: comprueba en el portal si se guardó antes de reintentar' })
+    .eq('estado', 'enviando').lt('actualizado_en', new Date(Date.now() - 10 * 60000).toISOString());
+  const { data: cola } = await admin.from('sigma_envios')
+    .select('*, parte:partes!inner(numero_servicio, sigma_cuenta)').eq('estado', 'aprobado').eq('parte.sigma_cuenta', cuenta)
+    .order('creado_en');
+  if (!cola?.length) return { enviados: 0, errores: 0 };
+  // Reservar (evita que dos pasadas manden lo mismo)
+  const { data: mios } = await admin.from('sigma_envios').update({ estado: 'enviando' })
+    .in('id', cola.map((x) => x.id)).eq('estado', 'aprobado').select('id');
+  const ids = new Set((mios || []).map((x) => x.id));
+  const lista = (cola as Envio[]).filter((x) => ids.has(x.id))
+    .sort((a, b) => (a.tipo === b.tipo ? 0 : a.tipo === 'informar_cita' ? -1 : 1)); // primero Informar citas
+  if (!lista.length) return { enviados: 0, errores: 0 };
+  const s = new Sesion();
+  await entrar(s, usuario, clave);
+  const fallidos = new Set<string>();
+  let enviados = 0; const errores: string[] = [];
+  for (const e of lista) {
+    try {
+      if (fallidos.has(e.parte_id)) throw new Error('No se envió porque falló el envío anterior de este servicio');
+      const r = e.tipo === 'repaso' ? await enviarRepaso(s, e) : await enviarInformarCita(s, e);
+      await admin.from('sigma_envios').update({ estado: 'enviado', resultado: r, enviado_en: new Date().toISOString(), intentos: 1 }).eq('id', e.id);
+      await admin.from('partes').update({ sigma_ficha_en: null }).eq('id', e.parte_id); // releer la ficha en la próxima pasada
+      enviados++;
+    } catch (err) {
+      fallidos.add(e.parte_id);
+      const msg = (err as Error).message;
+      await admin.from('sigma_envios').update({ estado: 'error', resultado: msg }).eq('id', e.id);
+      errores.push(`${e.parte.numero_servicio}: ${msg}`);
+    }
+  }
+  if (errores.length) {
+    try {
+      await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/notificar`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-kubel-secreto': secretoAvisos },
+        body: JSON.stringify({ tabla: 'sigma', evento: 'resumen', nuevo: { cuenta, nombre, error: `Envío a SIGMA fallido · ${errores.slice(0, 2).join(' · ')}${errores.length > 2 ? ' …' : ''}` } }),
+      });
+    } catch (err) { console.error('aviso envíos', (err as Error).message); }
+  }
+  return { enviados, errores: errores.length };
+}
+
 // ---------------------------------------------------------------- sincronización de una cuenta
 type Resumen = {
   cuenta: string; ok: boolean; en_listado: number; total_portal: number | null; paginas: number;
@@ -559,6 +728,7 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const prueba = url.searchParams.get('prueba') === '1';
   const solo = url.searchParams.get('cuenta');
+  const soloEnviar = url.searchParams.get('enviar') === '1';
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
   const { data: cia } = await admin.from('companias').select('id').eq('nombre', 'SIGMA').single();
   const resultados: Resumen[] = [];
@@ -571,6 +741,11 @@ Deno.serve(async (req) => {
       resultados.push({ cuenta: c.id, ok: false, en_listado: 0, total_portal: null, paginas: 0, nuevos: [], cambiados: 0, fichas: 0, desaparecidos: [], pendientes: 0, error: 'Faltan las credenciales en los secretos' });
       continue;
     }
+    if (soloEnviar) { // llamada inmediata al aprobar un envío en la oficina
+      try { resultados.push({ cuenta: c.id, ...(await procesarEnvios(admin, c.id, c.nombre, usuario, clave, s)) } as unknown as Resumen); }
+      catch (err) { console.error('envíos', c.id, err); }
+      continue;
+    }
     const { data: reg } = await admin.from('sigma_sincronizaciones').insert({ cuenta: c.id, prueba }).select('id').single();
     const r: Resumen = { cuenta: c.id, ok: false, en_listado: 0, total_portal: null, paginas: 0, nuevos: [], cambiados: 0, fichas: 0, desaparecidos: [], pendientes: 0 };
     try {
@@ -578,6 +753,9 @@ Deno.serve(async (req) => {
     } catch (err) {
       console.error(c.id, err);
       r.ok = false; r.error = (err as Error).message;
+    }
+    if (!prueba) {
+      try { await procesarEnvios(admin, c.id, c.nombre, usuario, clave, s); } catch (err) { console.error('envíos', c.id, err); }
     }
     resultados.push(r);
     if (reg) {

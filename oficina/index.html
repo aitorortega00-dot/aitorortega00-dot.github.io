@@ -173,6 +173,19 @@
   .bitacora div:first-child{border-top:0}
   .bitacora b{color:#4B3B8F;font-variant-numeric:tabular-nums}
   details summary{cursor:pointer;font-weight:600;font-size:13px;margin-top:10px}
+  .envio{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;cursor:pointer}
+  .envio:hover{border-color:var(--marca)}
+  .envio .d{flex:1;min-width:0}
+  .envio .t{font-weight:700}
+  .envio .c{color:var(--suave);white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .envio .r{font-size:12px;margin-top:4px}
+  .envio .r.ok{color:var(--ok)}.envio .r.mal{color:var(--peligro)}
+  .envio .acc{display:flex;flex-direction:column;gap:6px}
+  .pest{display:flex;gap:6px;flex-wrap:wrap}
+  .pest button{background:#fff;color:var(--marca)}
+  .pest button.activo{background:var(--marca);color:#fff}
+  .et.borrador{background:#FDEBD8;color:#9A4E0B}.et.aprobado,.et.enviando{background:#DCEBF7;color:var(--azul)}
+  .et.enviado{background:#DDF0E3;color:var(--ok)}.et.error{background:#F8DEDA;color:#A33224}.et.descartado{background:#ECEAE4;color:#6B7178}
 
   @media (max-width:1000px){.hoy-grid{grid-template-columns:1fr}}
   @media (max-width:900px){
@@ -209,6 +222,7 @@
       <a href="#plan" data-v="plan">Planificación</a>
       <a href="#partes" data-v="partes">Partes</a>
       <a href="#informes" data-v="informes">Informes<span id="b-inf" class="badge oculto"></span></a>
+      <a href="#envios" data-v="envios">Envíos a SIGMA<span id="b-env" class="badge oculto"></span></a>
       <a href="#operarios" data-v="operarios">Operarios</a>
     </nav>
     <div class="usuario"><span id="sigma-ind" class="sigma-ind oculto" onclick="modalSigma()" title="Robot SIGMA: última lectura del portal"></span><span id="vivo" class="vivo off" title="Actualización en directo"></span><button class="mini" id="btn-avisos" onclick="alternarAvisos()" title="Avisos en este dispositivo">🔕</button><span id="yo"></span><button class="mini" onclick="salir()">Salir</button></div>
@@ -222,7 +236,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.2 (robot SIGMA)
+   KUBEL Oficina — v2.3 (robot SIGMA + envíos a SIGMA)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -309,6 +323,7 @@ async function alCambiarSesion(sesion) {
   await cargarCatalogos();
   arrancarTiempoReal();
   contarSinRevisar();
+  contarEnvios();
   KubelAvisos.sincronizar(sb).then(pintarBotonAvisos);
   irA(location.hash.slice(1) || 'hoy');
 }
@@ -364,6 +379,7 @@ function arrancarTiempoReal() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'informes' }, (p) => alCambio('informes', p))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'partes' }, (p) => alCambio('partes', p))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sigma_sincronizaciones' }, () => cargarSigma())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sigma_envios' }, (p) => alCambioEnvio(p))
     .subscribe((estado) => $('#vivo').classList.toggle('off', estado !== 'SUBSCRIBED'));
 }
 function pararTiempoReal() { if (canal) { sb.removeChannel(canal); canal = null; } }
@@ -467,10 +483,177 @@ function bloqueSigma(p) {
   </div>`;
 }
 
+// ---------- Envíos a SIGMA (bandeja con aprobación) ----------
+// Nada sale al portal hasta que la oficina pulsa "Aprobar y enviar".
+const MOTIVOS_REPASO = [
+  ['1', 'Contacto con Cliente', 1], ['2', 'Visita al Cliente', 15], ['3', 'Entrega presupuesto', 99], ['4', 'Aplazamiento por material', 99],
+  ['7', 'Aplazamiento pte. otra reparación MA', 30], ['8', 'Aplazamiento por Humedad', 30], ['9', 'Aplazamiento pte. mejora tiempo', 15],
+  ['11', 'Aplazamiento pte. de cobro', 15], ['12', 'Aplazamiento pte. aceptar Presupuesto', 99], ['13', 'Fin previsto', 15],
+  ['26', 'Cliente ilocalizable', 7], ['34', 'Servicio Rechazado', 0], ['37', 'Pendiente de instrucciones de cliente', 60],
+  ['43', 'Visita aplazada por cliente', 99], ['74', 'Fecha de cierre', 20], ['80', 'Gestión irreparable', 0],
+  ['82', 'Perjudicado ilocalizable', 99], ['83', 'Pendiente aprobación facturación', 3], ['86', 'Visita de instalación', 5],
+  ['95', 'Reparación en observación', 15], ['99', 'Aplazamiento por búsqueda de material', 5], ['101', 'Intento contacto cliente', 1],
+];
+const RESOLUCIONES = {
+  V: ['Visita realizada', [['609', 'Finalizado, no requiere nueva cita'], ['601', 'Reparado parcialmente, requiere nueva cita'], ['604', 'No reparado, requiere nueva cita'], ['611', 'No hay que reparar, no requiere nueva cita']]],
+  I: ['Visita cancelada', [['706', 'Causa asegurado/perjudicado'], ['707', 'Causa profesional'], ['708', 'No hay que reparar, no requiere nueva cita']]],
+  C: ['Cita cancelada', [['213', 'Causa asegurado/perjudicado'], ['214', 'Causa profesional'], ['212', 'Perito confirme coberturas'], ['215', 'No hay que reparar, no requiere nueva cita']]],
+};
+const TXT_ENVIO = { borrador: 'Por revisar', aprobado: 'Aprobado', enviando: 'Enviando…', enviado: 'Enviado', error: 'Error', descartado: 'Descartado' };
+const HORAS_SIGMA = [...Array(28)].map((_, i) => `${dos(8 + Math.floor(i / 2))}:${i % 2 ? '30' : '00'}`);
+const fDMA = (iso) => (iso ? iso.split('-').reverse().join('/') : '');
+function tituloEnvio(e) {
+  if (e.tipo === 'repaso') return `Repaso · ${e.motivo_texto || 'motivo'}${e.fecha ? ' · ' + fDMA(e.fecha) : ''}${e.hora ? ' ' + hCorta(e.hora) : ''}`;
+  return `Informar cita · ${RESOLUCIONES[e.resolucion]?.[0] || ''}${e.cita_fecha ? ' · citada ' + fDMA(e.cita_fecha) : ''}${e.cita_hora ? ' ' + hCorta(e.cita_hora) : ''}`;
+}
+let filtroEnvios = 'revisar';
+async function contarEnvios() {
+  const { count } = await sb.from('sigma_envios').select('id', { count: 'exact', head: true }).in('estado', ['borrador', 'error']);
+  const b = $('#b-env'); if (!b) return; b.textContent = count || ''; b.classList.toggle('oculto', !count);
+}
+function alCambioEnvio(p) {
+  contarEnvios();
+  if (p.eventType === 'UPDATE' && p.new?.estado !== p.old?.estado) {
+    if (p.new.estado === 'enviado') aviso('✅ Enviado a SIGMA');
+    if (p.new.estado === 'error') aviso('⚠️ Un envío a SIGMA ha fallado: revisa la bandeja');
+  }
+  if (vistaActual === 'envios' && !$('#modal').innerHTML) { clearTimeout(alCambioEnvio.t); alCambioEnvio.t = setTimeout(vistaEnvios, 400); }
+}
+async function vistaEnvios() {
+  const grupos = { revisar: ['borrador', 'error'], cola: ['aprobado', 'enviando'], enviados: ['enviado'], descartados: ['descartado'] };
+  const nombres = { revisar: 'Por revisar', cola: 'En cola', enviados: 'Enviados', descartados: 'Descartados' };
+  $('#contenido').innerHTML = `
+    <div class="barra"><h2>Envíos a SIGMA</h2>
+      <div class="pest">${Object.keys(grupos).map((g) => `<button class="mini ${g === filtroEnvios ? 'activo' : ''}" onclick="filtroEnvios='${g}';vistaEnvios()">${nombres[g]}</button>`).join('')}</div>
+      <span class="esp"></span>
+      ${filtroEnvios === 'revisar' ? '<button class="sec" onclick="aprobarTodos()">Aprobar todos los correctos</button>' : ''}
+    </div>
+    <p style="color:var(--suave);margin-top:-6px">Se preparan solos al planificar visitas y al recibir informes. Revisa, corrige lo que quieras y pulsa <b>Aprobar y enviar</b>: el robot lo graba en el portal en ese momento. “Informar citas” usa siempre la fecha y hora citadas.</p>
+    <div id="lista-envios">Cargando…</div>`;
+  let q = sb.from('sigma_envios').select('*, parte:partes(id, numero_servicio, direccion, poblacion, sigma_cuenta, sigma_alerta)')
+    .in('estado', grupos[filtroEnvios]).order('creado_en', { ascending: filtroEnvios === 'revisar' || filtroEnvios === 'cola' });
+  if (filtroEnvios === 'enviados' || filtroEnvios === 'descartados') q = q.limit(60);
+  const { data, error } = await q;
+  if (error) return fallo(error);
+  $('#lista-envios').innerHTML = (data || []).map((e) => {
+    const problema = validarEnvio(e);
+    return `<div class="tarjeta envio" onclick="modalEnvio('${e.id}')">
+      <div class="d">
+        <div class="t">${esc(e.parte?.numero_servicio)} ${etiquetaSigma(e.parte || {})} <span class="et ${e.estado}">${TXT_ENVIO[e.estado]}</span></div>
+        <div>${esc(tituloEnvio(e))}</div>
+        <div style="color:var(--suave);font-size:12px">${esc([e.parte?.direccion, e.parte?.poblacion].filter(Boolean).join(', '))} · ${hace(e.creado_en)}</div>
+        <div class="c">${esc(e.comentario)}</div>
+        ${e.resultado ? `<div class="r ${e.estado === 'enviado' ? 'ok' : 'mal'}">${esc(e.resultado)}</div>` : ''}
+        ${problema && ['borrador', 'error'].includes(e.estado) ? `<div class="r mal">⚠️ ${esc(problema)}</div>` : ''}
+      </div>
+      ${['borrador', 'error'].includes(e.estado) ? `<div class="acc" onclick="event.stopPropagation()">
+        <button class="mini" ${problema ? 'disabled' : ''} onclick="cambiarEnvio('${e.id}','aprobado')">${e.estado === 'error' ? 'Reintentar' : 'Aprobar y enviar'}</button>
+        <button class="mini peligro" onclick="cambiarEnvio('${e.id}','descartado')">Descartar</button></div>` : ''}
+    </div>`;
+  }).join('') || '<div class="tarjeta vacio">No hay envíos aquí.</div>';
+}
+function validarEnvio(e) {
+  if (!e.comentario || !e.comentario.trim()) return 'Falta el comentario';
+  if (e.tipo === 'repaso') {
+    const m = MOTIVOS_REPASO.find((x) => x[0] === String(e.motivo_codigo));
+    if (!m) return 'Elige un motivo';
+    if (!e.fecha) return 'Falta la fecha';
+    const dias = Math.round((deISO(e.fecha) - deISO(hoyISO())) / 86400000);
+    if (dias < 0) return 'La fecha ya ha pasado';
+    if (dias > m[2]) return `Para "${m[1]}" la fecha no puede pasar de ${m[2]} días desde hoy`;
+    if (e.hora && !HORAS_SIGMA.includes(hCorta(e.hora))) return 'La hora debe ser en punto o y media (08:00–21:30)';
+  } else {
+    if (!RESOLUCIONES[e.resolucion]) return 'Elige la resolución';
+    if (!RESOLUCIONES[e.resolucion][1].some((x) => x[0] === e.resolucion_motivo)) return 'Elige el motivo';
+  }
+  return '';
+}
+async function cambiarEnvio(id, estado) {
+  if (estado === 'descartado' && !confirm('¿Descartar este envío? No se mandará a SIGMA.')) return;
+  const { error } = await sb.from('sigma_envios').update({ estado, ...(estado === 'aprobado' ? { resultado: null } : {}) }).eq('id', id);
+  if (error) return fallo(error);
+  aviso(estado === 'aprobado' ? 'Aprobado: enviándolo a SIGMA…' : 'Descartado');
+  cerrarModal(); contarEnvios(); if (vistaActual === 'envios') vistaEnvios();
+}
+async function aprobarTodos() {
+  const { data } = await sb.from('sigma_envios').select('*').in('estado', ['borrador']);
+  const ok = (data || []).filter((e) => !validarEnvio(e));
+  if (!ok.length) return alert('No hay borradores listos para aprobar (revisa los avisos ⚠️).');
+  if (!confirm(`¿Aprobar y enviar ${ok.length} envío(s) a SIGMA?`)) return;
+  for (const e of ok) { const { error } = await sb.from('sigma_envios').update({ estado: 'aprobado' }).eq('id', e.id); if (error) return fallo(error); }
+  aviso(`${ok.length} envío(s) aprobados`); vistaEnvios(); contarEnvios();
+}
+async function nuevoEnvio(parteId) {
+  const { data, error } = await sb.from('sigma_envios').insert({ parte_id: parteId, tipo: 'repaso', origen: 'manual', motivo_codigo: '2', motivo_texto: 'Visita al Cliente', comentario: '' }).select('id').single();
+  if (error) return fallo(error);
+  modalEnvio(data.id);
+}
+async function modalEnvio(id) {
+  const { data: e, error } = await sb.from('sigma_envios').select('*, parte:partes(id, numero_servicio, direccion, poblacion, sigma_cuenta, sigma_alerta, sigma_estado_texto)').eq('id', id).single();
+  if (error) return fallo(error);
+  const editable = ['borrador', 'error'].includes(e.estado);
+  const dis = editable ? '' : 'disabled';
+  const cab = `<h3>${e.tipo === 'repaso' ? 'Repaso' : 'Informar citas'} · ${esc(e.parte.numero_servicio)} <span class="et ${e.estado}">${TXT_ENVIO[e.estado]}</span></h3>
+    <div style="color:var(--suave)">${esc([e.parte.direccion, e.parte.poblacion].filter(Boolean).join(', '))} ${etiquetaSigma(e.parte)}</div>
+    ${e.parte.sigma_estado_texto ? `<div style="font-size:12px;color:var(--suave);margin-top:4px">Estado actual en SIGMA: ${esc(e.parte.sigma_estado_texto)}</div>` : ''}
+    ${e.resultado ? `<div class="nota" style="margin-top:10px;${e.estado === 'enviado' ? 'background:#DDF0E3;color:var(--ok)' : ''}">${esc(e.resultado)}</div>` : ''}`;
+  let campos;
+  if (e.tipo === 'repaso') {
+    const horaActual = hCorta(e.hora);
+    campos = `
+      <label>Motivo</label><select id="en-motivo" ${dis}>${MOTIVOS_REPASO.map((m) => `<option value="${m[0]}" ${String(e.motivo_codigo) === m[0] ? 'selected' : ''}>${esc(m[1])} [${m[2]} días]</option>`).join('')}</select>
+      <div class="dos">
+        <div><label>Fecha siguiente acción</label><input id="en-fecha" type="date" value="${e.fecha || ''}" ${dis}></div>
+        <div><label>Hora</label><select id="en-hora" ${dis}><option value="">Sin hora</option>${HORAS_SIGMA.map((h) => `<option ${h === horaActual ? 'selected' : ''}>${h}</option>`).join('')}${horaActual && !HORAS_SIGMA.includes(horaActual) ? `<option selected value="${horaActual}">${horaActual} (no válida en SIGMA)</option>` : ''}</select></div>
+      </div>`;
+  } else {
+    campos = `
+      <div class="dos">
+        <div><label>Resolución</label><select id="en-res" ${dis} onchange="rellenarMotivosCita()">${Object.entries(RESOLUCIONES).map(([k, v]) => `<option value="${k}" ${e.resolucion === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
+        <div><label>Motivo</label><select id="en-resmot" ${dis} data-actual="${esc(e.resolucion_motivo || '')}"></select></div>
+      </div>
+      <div class="nota" style="margin-top:10px">Se informará con la <b>fecha y hora citadas</b>${e.cita_fecha ? `: ${fDMA(e.cita_fecha)}${e.cita_hora ? ' a las ' + hCorta(e.cita_hora) : ''}` : ''} (las que figuran en el portal), nunca con la hora del informe.</div>`;
+  }
+  abrirModal(`${cab}${campos}
+    <label>Comentario (es lo que verá SIGMA)</label><textarea id="en-com" ${dis} style="min-height:120px">${esc(e.comentario || '')}</textarea>
+    <div class="acciones">
+      ${editable ? `<button class="peligro" onclick="cambiarEnvio('${e.id}','descartado')">Descartar</button>` : ''}
+      <span class="esp"></span>
+      <button class="sec" onclick="cerrarModal();modalParte('${e.parte.id}')">Ver parte</button>
+      ${editable ? `<button class="sec" onclick="guardarEnvio('${e.id}',false)">Guardar</button><button onclick="guardarEnvio('${e.id}',true)">${e.estado === 'error' ? 'Guardar y reintentar' : 'Aprobar y enviar'}</button>` : '<button onclick="cerrarModal()">Cerrar</button>'}
+    </div>`, true);
+  if (e.tipo !== 'repaso') rellenarMotivosCita();
+}
+function rellenarMotivosCita() {
+  const s = $('#en-resmot'); if (!s) return;
+  const lista = RESOLUCIONES[$('#en-res').value][1];
+  const actual = s.dataset.actual;
+  s.innerHTML = lista.map((m) => `<option value="${m[0]}" ${m[0] === actual ? 'selected' : ''}>${esc(m[1])}</option>`).join('');
+}
+async function guardarEnvio(id, aprobar) {
+  const { data: e } = await sb.from('sigma_envios').select('tipo').eq('id', id).single();
+  const fila = { comentario: $('#en-com').value.trim() };
+  if (e.tipo === 'repaso') {
+    const m = MOTIVOS_REPASO.find((x) => x[0] === $('#en-motivo').value);
+    Object.assign(fila, { motivo_codigo: m[0], motivo_texto: m[1], fecha: $('#en-fecha').value || null, hora: $('#en-hora').value || null });
+  } else {
+    const r = $('#en-res').value; const mm = $('#en-resmot').value;
+    Object.assign(fila, { resolucion: r, resolucion_motivo: mm, motivo_texto: RESOLUCIONES[r][1].find((x) => x[0] === mm)?.[1] });
+  }
+  const problema = validarEnvio({ ...e, ...fila });
+  if (aprobar && problema) return alert('No se puede enviar: ' + problema);
+  if (aprobar) { fila.estado = 'aprobado'; fila.resultado = null; }
+  else if (problema) aviso('Guardado (ojo: ' + problema + ')');
+  const { error } = await sb.from('sigma_envios').update(fila).eq('id', id);
+  if (error) return fallo(error);
+  if (aprobar) aviso('Aprobado: enviándolo a SIGMA…'); else if (!problema) aviso('Guardado');
+  cerrarModal(); contarEnvios(); if (vistaActual === 'envios') vistaEnvios();
+}
+
 // ---------- Navegación ----------
 window.addEventListener('hashchange', () => yo && irA(location.hash.slice(1)));
 function irA(v, silencioso) {
-  const vistas = { hoy: vistaHoy, plan: vistaPlan, partes: vistaPartes, informes: vistaInformes, operarios: vistaOperarios };
+  const vistas = { hoy: vistaHoy, plan: vistaPlan, partes: vistaPartes, informes: vistaInformes, envios: vistaEnvios, operarios: vistaOperarios };
   if (!vistas[v]) v = 'hoy';
   vistaActual = v;
   document.querySelectorAll('header nav a').forEach((a) => a.classList.toggle('activo', a.dataset.v === v));
@@ -803,7 +986,7 @@ async function modalParte(id) {
   let p = { compania_id: cache.companias.find((c) => c.nombre === 'SIGMA')?.id, urgente: false, estado: 'pendiente' };
   let historial = '';
   if (id) {
-    const r = await sb.from('partes').select('*, asignaciones!asignaciones_parte_id_fkey(id, fecha, hora, estado, tipo, operario_id), informes!informes_parte_id_fkey(id, creado_en, texto, revisado, operario_id)').eq('id', id).single();
+    const r = await sb.from('partes').select('*, asignaciones!asignaciones_parte_id_fkey(id, fecha, hora, estado, tipo, operario_id), informes!informes_parte_id_fkey(id, creado_en, texto, revisado, operario_id), sigma_envios(id, tipo, estado, fecha, hora, motivo_texto, resolucion, resultado, creado_en)').eq('id', id).single();
     if (r.error) return fallo(r.error);
     p = r.data;
     const vis = (p.asignaciones || []).sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -813,7 +996,10 @@ async function modalParte(id) {
       ${vis.length ? vis.map((a) => `<div><a href="#" onclick="cerrarModal();modalAsignacion('${a.id}');return false">${fCorta(a.fecha)} ${hCorta(a.hora)}</a> · ${esc(nombreDe(a.operario_id))} · ${a.tipo} <span class="et ${a.estado}">${TXT_ESTADO[a.estado]}</span></div>`).join('') : '<div style="color:var(--suave)">Sin visitas.</div>'}
       <label>Informes</label>
       ${infs.length ? infs.map((i) => `<div style="margin-bottom:4px">${fHora(i.creado_en)} · ${esc(nombreDe(i.operario_id))} ${i.revisado ? '' : '<span class="et nuevo">Nuevo</span>'}<div style="color:var(--suave);white-space:pre-wrap">${esc(i.texto.length > 160 ? i.texto.slice(0, 160) + '…' : i.texto)}</div></div>`).join('') +
-        `<a href="#informes" onclick="filtroInformes={parte:'${p.id}'};cerrarModal()">Ver informes con fotos →</a>` : '<div style="color:var(--suave)">Sin informes.</div>'}`;
+        `<a href="#informes" onclick="filtroInformes={parte:'${p.id}'};cerrarModal()">Ver informes con fotos →</a>` : '<div style="color:var(--suave)">Sin informes.</div>'}
+      ${p.sigma_cuenta ? `<label>Envíos a SIGMA</label>
+        ${(p.sigma_envios || []).sort((a, b) => b.creado_en.localeCompare(a.creado_en)).map((e) => `<div><a href="#" onclick="cerrarModal();modalEnvio('${e.id}');return false">${esc(tituloEnvio(e))}</a> <span class="et ${e.estado}">${TXT_ENVIO[e.estado]}</span>${e.resultado ? ` <small style="color:var(--suave)">${esc(e.resultado)}</small>` : ''}</div>`).join('') || '<div style="color:var(--suave)">Ninguno.</div>'}
+        <a href="#" onclick="cerrarModal();nuevoEnvio('${p.id}');return false">+ Nuevo envío a SIGMA (Repaso)</a>` : ''}`;
   }
   abrirModal(`
     <h3>${id ? 'Parte ' + esc(p.numero_servicio) : 'Nuevo parte'}</h3>
