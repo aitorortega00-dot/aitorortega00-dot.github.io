@@ -153,6 +153,27 @@
   .visor .barra-v{display:flex;gap:10px;align-items:center;color:#fff}
   .visor button{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3)}
 
+  /* SIGMA */
+  .sigma-ind{font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;cursor:pointer;white-space:nowrap;background:rgba(255,255,255,.12);color:#fff}
+  .sigma-ind.ok::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#7FD19B;margin-right:6px;vertical-align:1px}
+  .sigma-ind.viejo::before,.sigma-ind.mal::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#F2C14E;margin-right:6px;vertical-align:1px}
+  .sigma-ind.mal{background:#C0392B}
+  .et.sigma{background:#E7E3F4;color:#4B3B8F}
+  .punto{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:0}
+  .punto.rojo{background:#D9534F}.punto.amarillo{background:#E6B325}.punto.verde{background:#4CAF6E}
+  .sigma-caja{background:#F7F5FC;border:1px solid #E1DCF0;border-radius:10px;padding:12px 14px;margin:12px 0 4px}
+  .sigma-caja .cab{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+  .sigma-caja .cab .esp{flex:1}
+  .sigma-datos{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:4px 14px;font-size:13px}
+  .sigma-datos span{color:var(--suave)}
+  .tels{margin-top:8px;font-size:13px}
+  .tels a{font-weight:700;text-decoration:none}
+  .bitacora{max-height:260px;overflow:auto;background:#fff;border:1px solid var(--borde);border-radius:8px;padding:4px 10px;margin-top:6px;font-size:13px}
+  .bitacora div{padding:6px 0;border-top:1px solid var(--borde);white-space:pre-wrap}
+  .bitacora div:first-child{border-top:0}
+  .bitacora b{color:#4B3B8F;font-variant-numeric:tabular-nums}
+  details summary{cursor:pointer;font-weight:600;font-size:13px;margin-top:10px}
+
   @media (max-width:1000px){.hoy-grid{grid-template-columns:1fr}}
   @media (max-width:900px){
     .plan{grid-template-columns:1fr}.sin-plan{position:static;max-height:none}
@@ -190,7 +211,7 @@
       <a href="#informes" data-v="informes">Informes<span id="b-inf" class="badge oculto"></span></a>
       <a href="#operarios" data-v="operarios">Operarios</a>
     </nav>
-    <div class="usuario"><span id="vivo" class="vivo off" title="Actualización en directo"></span><button class="mini" id="btn-avisos" onclick="alternarAvisos()" title="Avisos en este dispositivo">🔕</button><span id="yo"></span><button class="mini" onclick="salir()">Salir</button></div>
+    <div class="usuario"><span id="sigma-ind" class="sigma-ind oculto" onclick="modalSigma()" title="Robot SIGMA: última lectura del portal"></span><span id="vivo" class="vivo off" title="Actualización en directo"></span><button class="mini" id="btn-avisos" onclick="alternarAvisos()" title="Avisos en este dispositivo">🔕</button><span id="yo"></span><button class="mini" onclick="salir()">Salir</button></div>
   </header>
   <main id="contenido"></main>
 </div>
@@ -201,7 +222,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2
+   KUBEL Oficina — v2.2 (robot SIGMA)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -230,7 +251,7 @@ const euros = (n) => Number(n).toFixed(2).replace('.', ',') + ' €';
 const lunesDe = (iso) => { const d = deISO(iso); const dia = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dia); return aISO(d); };
 const ESTADOS_PARTE = ['pendiente', 'asignado', 'en_curso', 'terminado', 'cerrado', 'anulado'];
 const TXT_ESTADO = { pendiente: 'Pendiente', asignado: 'Asignado', en_curso: 'En curso', terminado: 'Terminado', cerrado: 'Cerrado', anulado: 'Anulado', en_camino: 'En camino', hecho: 'Hecho', no_realizado: 'No realizado' };
-const GREMIOS = ['Fontanería', 'Albañilería', 'Pintura', 'Electricidad'];
+const GREMIOS = ['Fontanería', 'Albañilería', 'Pintura', 'Electricidad', 'Carpintería'];
 const dirCompleta = (p) => [p?.direccion, p?.codigo_postal, p?.poblacion].filter(Boolean).join(', ');
 
 function aviso(txt) { const a = $('#aviso'); a.textContent = txt; a.classList.remove('oculto'); clearTimeout(aviso.t); aviso.t = setTimeout(() => a.classList.add('oculto'), 3200); }
@@ -251,7 +272,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if ($('#
 // ---------- Conexión ----------
 let sb = null;
 let yo = null;
-let cache = { operarios: [], companias: [], todosPerfiles: [] };
+let cache = { operarios: [], companias: [], todosPerfiles: [], codigos: {}, sinc: [] };
 let vistaActual = 'hoy';
 
 function mostrar(id) { ['v-carga', 'v-login', 'v-app'].forEach((v) => $('#' + v).classList.toggle('oculto', v !== id)); }
@@ -327,6 +348,10 @@ async function cargarCatalogos() {
   cache.todosPerfiles = o.data || [];
   cache.operarios = cache.todosPerfiles.filter((p) => p.rol === 'operario' && p.activo);
   cache.companias = c.data || [];
+  const { data: cods } = await sb.from('sigma_codigos').select('tipo, codigo, texto');
+  cache.codigos = {};
+  (cods || []).forEach((x) => (cache.codigos[x.tipo + ':' + x.codigo] = x.texto));
+  cargarSigma();
 }
 const nombreDe = (id) => cache.todosPerfiles.find((p) => p.id === id)?.nombre || '—';
 
@@ -338,6 +363,7 @@ function arrancarTiempoReal() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'asignaciones' }, (p) => alCambio('asignaciones', p))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'informes' }, (p) => alCambio('informes', p))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'partes' }, (p) => alCambio('partes', p))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sigma_sincronizaciones' }, () => cargarSigma())
     .subscribe((estado) => $('#vivo').classList.toggle('off', estado !== 'SUBSCRIBED'));
 }
 function pararTiempoReal() { if (canal) { sb.removeChannel(canal); canal = null; } }
@@ -356,6 +382,89 @@ function alCambio(tabla, p) {
 async function contarSinRevisar() {
   const { count } = await sb.from('informes').select('id', { count: 'exact', head: true }).eq('revisado', false);
   const b = $('#b-inf'); b.textContent = count || ''; b.classList.toggle('oculto', !count);
+}
+
+// ---------- SIGMA (robot que lee el portal cada 15 min) ----------
+const CUENTAS_SIGMA = { VLL: 'Valladolid', PAL: 'Palencia' };
+const codigo = (tipo, c) => (c ? cache.codigos[tipo + ':' + String(c).toUpperCase()] || cache.codigos[tipo + ':' + c] || '' : '');
+async function cargarSigma() {
+  const { data } = await sb.from('sigma_sincronizaciones').select('*').eq('prueba', false).order('inicio', { ascending: false }).limit(30);
+  cache.sinc = data || [];
+  pintarSigma();
+}
+function ultimaSigma() {
+  const m = {};
+  for (const s of cache.sinc) if (s.fin && !m[s.cuenta]) m[s.cuenta] = s;
+  return m;
+}
+function pintarSigma() {
+  const el = $('#sigma-ind'); if (!el) return;
+  const ult = Object.values(ultimaSigma());
+  if (!ult.length) { el.classList.add('oculto'); return; }
+  const mal = ult.filter((s) => !s.ok);
+  const ultima = ult.map((s) => s.fin).sort().pop();
+  const masVieja = ult.map((s) => s.fin).sort()[0];
+  const h = new Date().getHours();
+  const viejo = h >= 8 && h < 22 && Date.now() - new Date(masVieja) > 45 * 60000;
+  el.className = 'sigma-ind ' + (mal.length ? 'mal' : viejo ? 'viejo' : 'ok');
+  el.textContent = mal.length ? `SIGMA ⚠️ ${mal.map((s) => CUENTAS_SIGMA[s.cuenta] || s.cuenta).join(', ')}` : `SIGMA ${hace(ultima)}`;
+}
+setInterval(pintarSigma, 60000);
+function modalSigma() {
+  const ult = ultimaSigma();
+  const fila = (s) => `<tr><td>${fHora(s.inicio)}</td><td>${esc(CUENTAS_SIGMA[s.cuenta] || s.cuenta)}</td>
+    <td>${s.fin ? (s.ok ? '<span class="et hecho">OK</span>' : '<span class="et no_realizado">Error</span>') : '<span class="et en_camino">En curso</span>'}</td>
+    <td>${s.en_listado ?? ''}</td><td>${s.nuevos || ''}</td><td>${s.aceptados || ''}</td><td>${s.cambiados || ''}</td><td>${s.desaparecidos || ''}</td>
+    <td style="color:var(--peligro)">${esc(s.error || '')}</td></tr>`;
+  abrirModal(`
+    <h3>Robot SIGMA</h3>
+    <div style="color:var(--suave)">Lee el portal de SIGMA cada 15 minutos (7:00–21:45 en verano, 6:00–20:45 en invierno), da de alta los servicios nuevos, actualiza los cambios y <b>acepta automáticamente los servicios ofrecidos</b>. La oficina recibe un aviso de cada novedad.</div>
+    <div class="kpis" style="margin-top:14px">${Object.keys(CUENTAS_SIGMA).map((c) => {
+      const s = ult[c];
+      return `<div class="kpi ${s && !s.ok ? 'mal' : ''}"><div class="n">${s ? s.en_listado ?? '—' : '—'}</div><div class="t">${CUENTAS_SIGMA[c]} · en curso</div>
+        <div style="font-size:12px;color:var(--suave);margin-top:4px">${s ? (s.ok ? 'Leído ' + hace(s.fin) : '⚠️ ' + esc(s.error || 'Error')) : 'Sin datos todavía'}</div></div>`;
+    }).join('')}</div>
+    <div style="overflow-x:auto"><table class="lista" style="font-size:12px"><thead><tr><th>Hora</th><th>Cuenta</th><th>Resultado</th><th>En curso</th><th>Nuevos</th><th>Aceptados</th><th>Cambios</th><th>Ya no en curso</th><th>Error</th></tr></thead>
+    <tbody>${cache.sinc.slice(0, 20).map(fila).join('') || '<tr><td colspan="9" class="vacio">Sin pasadas todavía.</td></tr>'}</tbody></table></div>
+    <div class="acciones"><button onclick="cerrarModal()">Cerrar</button></div>`, true);
+}
+function etiquetaSigma(p) {
+  if (!p.sigma_cuenta) return '';
+  return `<span class="et sigma" title="SIGMA ${esc(CUENTAS_SIGMA[p.sigma_cuenta] || '')}">${p.sigma_alerta ? `<span class="punto ${p.sigma_alerta}"></span>` : ''}SIGMA ${p.sigma_cuenta === 'PAL' ? 'PA' : 'VA'}</span>`
+    + (p.sigma_en_curso === false ? ' <span class="et anulado" title="Ya no aparece en Servicios en curso del portal">Fuera de SIGMA</span>' : '');
+}
+function bloqueSigma(p) {
+  if (!p.sigma_cuenta) return '';
+  const est = p.sigma_estado_texto || codigo('estado', p.sigma_estado) || p.sigma_estado || '—';
+  const proc = codigo('procedencia', p.sigma_procedencia);
+  const gre = codigo('gremio', p.sigma_gremio);
+  const tels = p.sigma_telefonos || [];
+  const bit = p.sigma_bitacora || [];
+  const fichaOtros = p.sigma_ficha || {};
+  const dato = (t, v) => (v || v === 0 ? `<div><span>${t}:</span> ${esc(v)}</div>` : '');
+  return `<div class="sigma-caja">
+    <div class="cab"><b>Datos de SIGMA · ${esc(CUENTAS_SIGMA[p.sigma_cuenta] || p.sigma_cuenta)}</b> ${etiquetaSigma(p)}
+      ${(p.sigma_marcas || []).map((m) => `<span class="et ${/urgente|reclam/i.test(m) ? 'urg' : ''}">${esc(m)}</span>`).join(' ')}
+      <span class="esp"></span>
+      <a href="https://web.multiasistencia.com/w3multi/repasos1.php?reparacion=${encodeURIComponent(p.numero_servicio)}" target="_blank" rel="noopener" style="font-size:12px">Abrir en el portal ↗</a></div>
+    <div class="sigma-datos">
+      ${dato('Estado', est)}
+      ${dato('Procedencia', proc ? proc.replace(/^Siniestros - /, '') : p.sigma_procedencia)}
+      ${dato('Gremio SIGMA', [p.sigma_gremio, gre].filter(Boolean).join(' '))}
+      ${dato('Caducidad (días)', p.sigma_caducidad)}
+      ${dato('Llamadas', p.sigma_llamadas)}
+      ${dato('Duración', p.sigma_duracion)}
+      ${dato('Póliza', p.sigma_poliza)}
+      ${dato('Baremo', fichaOtros.baremo)}
+      ${dato('Franquicia', fichaOtros.franquicia)}
+      ${dato('Tramitador', fichaOtros.tramitador)}
+      ${dato('Asignado', fichaOtros.asignacion)}
+    </div>
+    ${tels.length ? `<div class="tels">${tels.map((t) => `<div><a href="tel:${esc(t.numero)}">${esc(t.numero)}</a> <span style="color:var(--suave)">${esc([t.tipo, t.desde && t.hasta ? t.desde + '–' + t.hasta : '', t.de === 'perjudicado' ? 'perjudicado' : ''].filter(Boolean).join(' · '))}</span></div>`).join('')}</div>` : ''}
+    ${bit.length ? `<details ${bit.length <= 15 ? 'open' : ''}><summary>Bitácora del portal (${bit.length} anotaciones)</summary>
+      <div class="bitacora">${bit.map((e) => `<div>${e.fecha ? `<b>${esc(fHora(e.fecha.replace(' ', 'T')))}</b> ` : ''}${esc(e.texto)}</div>`).join('')}</div></details>` : ''}
+    <div style="font-size:11px;color:var(--suave);margin-top:8px">${p.sigma_ficha_en ? 'Ficha leída del portal ' + hace(p.sigma_ficha_en) : 'Ficha pendiente de leer (próxima pasada del robot)'} · estos datos los actualiza el robot y no se editan aquí.</div>
+  </div>`;
 }
 
 // ---------- Navegación ----------
@@ -478,15 +587,15 @@ async function vistaPlan() {
       .select('id, fecha, hora, orden, tipo, estado, notas, operario_id, parte:partes!asignaciones_parte_id_fkey(id, numero_servicio, direccion, poblacion, gremio, urgente)')
       .gte('fecha', dias[0]).lte('fecha', dias[6])
       .order('orden').order('hora', { nullsFirst: false }),
-    sb.from('partes').select('id, numero_servicio, direccion, poblacion, gremio, urgente, compania:companias(nombre)')
-      .eq('estado', 'pendiente').order('urgente', { ascending: false }).order('creado_en'),
+    sb.from('partes').select('id, numero_servicio, direccion, poblacion, gremio, urgente, sigma_alerta, sigma_caducidad, compania:companias(nombre)')
+      .eq('estado', 'pendiente').order('urgente', { ascending: false }).order('sigma_caducidad', { ascending: true, nullsFirst: false }).order('creado_en'),
   ]);
   if (asig.error) return fallo(asig.error);
 
   $('#sin-plan').innerHTML = (sinPlan.data || []).map((p) => `
     <div class="chip ${p.urgente ? 'urgente' : ''}" draggable="true"
          ondragstart="arrastrando={tipo:'parte',id:'${p.id}'}" onclick="modalAsignar({parteId:'${p.id}'})">
-      <b>${esc(p.numero_servicio)} ${p.urgente ? '· URGENTE' : ''}</b>
+      <b>${p.sigma_alerta ? `<span class="punto ${p.sigma_alerta}" title="Alerta SIGMA"></span>` : ''}${esc(p.numero_servicio)} ${p.urgente ? '· URGENTE' : ''}</b>
       <div class="dir">${esc(p.direccion)}${p.poblacion ? ', ' + esc(p.poblacion) : ''}</div>
       <div class="dir">${esc([p.compania?.nombre, p.gremio].filter(Boolean).join(' · '))}</div>
     </div>`).join('') || '<div class="vacio">No hay partes pendientes 🎉</div>';
@@ -615,7 +724,7 @@ async function quitarAsignacion(id) {
 // =====================================================================
 //  PARTES
 // =====================================================================
-let filtroPartes = { texto: '', estado: 'abiertos', cia: '' };
+let filtroPartes = { texto: '', estado: 'abiertos', cia: '', sigma: '' };
 
 async function vistaPartes() {
   $('#contenido').innerHTML = `
@@ -628,6 +737,7 @@ async function vistaPartes() {
         <option value="todos">Todos</option>
       </select>
       <select id="fp-cia" style="max-width:160px"><option value="">Todas las compañías</option>${cache.companias.map((c) => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('')}</select>
+      <select id="fp-sigma" style="max-width:190px"><option value="">SIGMA: todas las cuentas</option><option value="VLL">SIGMA Valladolid</option><option value="PAL">SIGMA Palencia</option><option value="rojo">SIGMA alerta roja</option><option value="fuera">Fuera de SIGMA</option></select>
       <span class="esp"></span>
       <button class="sec" onclick="exportarPartes()">Exportar CSV</button>
       <button onclick="modalParte()">+ Nuevo parte</button>
@@ -635,6 +745,8 @@ async function vistaPartes() {
     <div id="tabla-partes">Cargando…</div>`;
   $('#fp-estado').value = filtroPartes.estado;
   $('#fp-cia').value = filtroPartes.cia;
+  $('#fp-sigma').value = filtroPartes.sigma;
+  $('#fp-sigma').onchange = (e) => { filtroPartes.sigma = e.target.value; cargarPartes(); };
   let t; $('#fp-texto').oninput = (e) => { clearTimeout(t); t = setTimeout(() => { filtroPartes.texto = e.target.value.trim(); cargarPartes(); }, 300); };
   $('#fp-estado').onchange = (e) => { filtroPartes.estado = e.target.value; cargarPartes(); };
   $('#fp-cia').onchange = (e) => { filtroPartes.cia = e.target.value; cargarPartes(); };
@@ -648,6 +760,9 @@ async function consultaPartes(limite) {
   if (filtroPartes.estado === 'abiertos') q = q.in('estado', ['pendiente', 'asignado', 'en_curso', 'terminado']);
   else if (filtroPartes.estado !== 'todos') q = q.eq('estado', filtroPartes.estado);
   if (filtroPartes.cia) q = q.eq('compania_id', Number(filtroPartes.cia));
+  if (filtroPartes.sigma === 'VLL' || filtroPartes.sigma === 'PAL') q = q.eq('sigma_cuenta', filtroPartes.sigma);
+  else if (filtroPartes.sigma === 'rojo') q = q.eq('sigma_alerta', 'rojo').eq('sigma_en_curso', true);
+  else if (filtroPartes.sigma === 'fuera') q = q.eq('sigma_en_curso', false);
   if (filtroPartes.texto) {
     const t = filtroPartes.texto.replace(/[,()%*]/g, ' ');
     q = q.or(`numero_servicio.ilike.%${t}%,direccion.ilike.%${t}%,asegurado.ilike.%${t}%,poblacion.ilike.%${t}%,telefono.ilike.%${t}%`);
@@ -664,12 +779,12 @@ async function cargarPartes() {
     <tbody>${data.map((p) => {
       const prox = (p.asignaciones || []).filter((a) => a.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
       return `<tr class="clic" onclick="modalParte('${p.id}')">
-        <td><b>${esc(p.numero_servicio)}</b> ${p.urgente ? '<span class="et urg">URG</span>' : ''}</td>
+        <td><b>${esc(p.numero_servicio)}</b> ${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
         <td class="opc">${esc(p.compania?.nombre)}</td>
         <td>${esc(p.direccion)}${p.poblacion ? '<br><small style="color:var(--suave)">' + esc(p.poblacion) + '</small>' : ''}</td>
         <td class="opc">${esc(p.asegurado || '')}<br><small style="color:var(--suave)">${esc(p.telefono || '')}</small></td>
         <td class="opc">${esc(p.gremio || '')}</td>
-        <td><span class="et ${p.estado}">${TXT_ESTADO[p.estado]}</span></td>
+        <td><span class="et ${p.estado}">${TXT_ESTADO[p.estado]}</span>${p.sigma_estado ? `<br><small style="color:var(--suave)">${esc(codigo('estado', p.sigma_estado) || 'Estado ' + p.sigma_estado)}${p.sigma_caducidad !== null && p.sigma_caducidad !== undefined ? ' · cad. ' + p.sigma_caducidad + ' d' : ''}</small>` : ''}</td>
         <td>${prox ? fCorta(prox.fecha) + '<br><small style="color:var(--suave)">' + esc(nombreDe(prox.operario_id)) + '</small>' : '—'}</td>
       </tr>`;
     }).join('')}</tbody></table></div>
@@ -702,7 +817,8 @@ async function modalParte(id) {
   }
   abrirModal(`
     <h3>${id ? 'Parte ' + esc(p.numero_servicio) : 'Nuevo parte'}</h3>
-    ${id ? `<div style="color:var(--suave);font-size:12px">Creado ${fHora(p.creado_en)} · modificado ${fHora(p.actualizado_en)}</div>` : ''}
+    ${id ? `<div style="color:var(--suave);font-size:12px">Creado ${fHora(p.creado_en)} · modificado ${fHora(p.actualizado_en)}${p.origen === 'sigma' ? ' · importado de SIGMA' : ''}</div>` : ''}
+    ${id ? bloqueSigma(p) : ''}
     <div class="dos">
       <div><label>Compañía *</label><select id="pt-cia">${cache.companias.map((c) => `<option value="${c.id}" ${c.id === p.compania_id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></div>
       <div><label>Nº de servicio *</label><input id="pt-num" value="${esc(p.numero_servicio || '')}"></div>
