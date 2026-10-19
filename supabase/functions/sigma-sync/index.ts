@@ -5,8 +5,9 @@
 // Marca los partes SIN PRIMER CONTACTO (Gestión repaso del portal + estado 15).
 // Marca las CADUCADAS / CADUCAN HOY (filtro Caducidad del listado: REDES, RESTO, CLIENTE) y cuándo salen.
 // También manda a SIGMA lo que la oficina ha aprobado en "Envíos a SIGMA" (Repaso e Informar citas).
-// Si el Repaso está bloqueado por "Documento de Iva pendiente de Validar", avisa a tramitación (Su Gestor/Tramitador,
-// motivo Otros, «Ruego revisión. Urge agilización.»; máx. uno por servicio cada 24 h) y lo explica en la bandeja.
+// Marca los servicios con el Repaso BLOQUEADO por "Documento de Iva pendiente de Validar" (partes.sigma_iva_pendiente):
+// lo comprueba en el portal (~20 servicios por cuenta y pasada) y al fallar un Repaso. La oficina no puede hacer Repaso
+// de esos servicios; en su lugar envía un mensaje a tramitación (envío tipo 'tramitacion' → pestaña Su Gestor/Tramitador).
 // Lo llama pg_cron cada 15 minutos con la cabecera secreta x-kubel-secreto.
 // ?prueba=1  → lee el portal pero NO escribe ni acepta nada y devuelve un resumen.
 // ?cuenta=VLL → solo esa cuenta.  ?enviar=1 → solo manda a SIGMA los envíos aprobados (sin leer el listado).
@@ -25,6 +26,9 @@ const PARALELO = 3;           // fichas a la vez (sin agobiar al portal)
 const FUERA_REFRESCO_H = 2;   // horas: relectura de fichas de servicios fuera de "en curso" aún sin cerrar
 const FUERA_DIAS = 30;        // días que se sigue mirando si se cierra un servicio que salió de "en curso"
 const MAX_FUERA = 15;         // fichas fuera de curso por cuenta y pasada
+const MAX_IVA = 20;           // servicios por cuenta y pasada en los que se comprueba el bloqueo por documento de IVA
+const IVA_MARCADO_MIN = 45;   // minutos: se vuelve a mirar un servicio bloqueado (para desbloquearlo cuanto antes)
+const IVA_LIBRE_H = 6;        // horas: se vuelve a mirar un servicio no bloqueado
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36';
 const dec = new TextDecoder('windows-1252');
 
@@ -441,7 +445,7 @@ const API_REPASO = 'https://mawmods.plataforma-smart.com/me';
 const HORAS_REPASO = Array.from({ length: 28 }, (_, i) => String(28800 + i * 1800)); // 08:00 … 21:30
 const MOTIVOS_CITA: Record<string, string[]> = { V: ['609', '611', '604', '601'], I: ['706', '707', '708'], C: ['213', '215', '212', '214'] };
 type Envio = {
-  id: string; parte_id: string; tipo: 'repaso' | 'informar_cita'; motivo_codigo: string | null; motivo_texto: string | null;
+  id: string; parte_id: string; tipo: 'repaso' | 'informar_cita' | 'tramitacion'; motivo_codigo: string | null; motivo_texto: string | null;
   fecha: string | null; hora: string | null; resolucion: string | null; resolucion_motivo: string | null;
   cita_fecha: string | null; cita_hora: string | null; comentario: string; contacto_en?: string | null; parte: { numero_servicio: string; sigma_cuenta: string };
 };
@@ -475,15 +479,34 @@ class Dudoso extends Error {}
 // El portal bloquea el Repaso porque el documento de IVA está pendiente de validar por SIGMA
 class IvaPendiente extends Error {}
 const IVA_PENDIENTE = /documento\s+de\s+iva\s+pendiente/i;
-const MENSAJE_IVA = 'Ruego revisión. Urge agilización.';
+const BLOQUEO_IVA = 'Bloqueado por SIGMA: documento de IVA pendiente de validar. No se ha enviado el Repaso; usa «Enviar a tramitación» y vuelve a intentarlo cuando SIGMA lo valide.';
+
+// Pase de sesión del componente Repaso (ut): es el mismo para todos los servicios de la cuenta (JWT del usuario)
+async function paseRepaso(s: Sesion, n: string) {
+  const html = await s.pedir(`fechaccion.php?reparacion=${n}&modo=0`);
+  return (html.match(/<multiasistencia-repaso[^>]*\sut="([^"]+)"/i) || [])[1] || null;
+}
+// Solo lectura: ¿deja el portal abrir el Repaso? 'iva' = bloqueado por el documento de IVA · 'ok' · 'otro' (otro motivo)
+// null = no se pudo saber (fallo del portal)
+async function estadoRepaso(ut: string, n: string): Promise<'iva' | 'ok' | 'otro' | null> {
+  try {
+    const r = await fetch(`${API_REPASO}/review-initial-data`, {
+      method: 'POST', signal: AbortSignal.timeout(20000), body: JSON.stringify({ reparation: n }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ut}`, Version: '3.0.0', 'User-Agent': UA, Origin: 'https://web.multiasistencia.com', Referer: BASE + 'fechaccion.php' },
+    });
+    if (!r.ok) { await r.body?.cancel(); return null; }
+    const j = await r.json();
+    if (j?.success) return 'ok';
+    return IVA_PENDIENTE.test(JSON.stringify(j?.metadata ?? j ?? '')) ? 'iva' : 'otro';
+  } catch { return null; }
+}
 
 async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
   const n = e.parte.numero_servicio;
   if (!e.motivo_codigo) throw new Error('Falta el motivo');
   if (!e.fecha) throw new Error('Falta la fecha siguiente acción');
   if (!e.comentario.trim()) throw new Error('Falta el comentario');
-  const html = await s.pedir(`fechaccion.php?reparacion=${n}&modo=0`);
-  const ut = (html.match(/<multiasistencia-repaso[^>]*\sut="([^"]+)"/i) || [])[1];
+  const ut = await paseRepaso(s, n);
   if (!ut) throw new Error('No se pudo abrir la pestaña Repaso de este servicio');
   // Un 50x, un corte o un tiempo agotado en review-update es DUDOSO: el portal pudo guardar el cambio
   // aunque no contestara. Se marca como Dudoso para comprobarlo en la ficha antes de repetir nada.
@@ -659,32 +682,53 @@ async function enviarInformarCita(s: Sesion, e: Envio): Promise<string> {
   return `Cita informada: ${RES[e.resolucion]}${cuando}`;
 }
 
-// Mensaje a tramitación (pestaña "Su Gestor/Tramitador", sugestor.php) cuando el Repaso está bloqueado
-// por el documento de IVA. Como máximo uno por servicio cada 24 h (la página no muestra los ya enviados,
-// así que se mira en la bandeja de KUBEL).
-const MARCA_TRAMITACION = 'Mensaje enviado a tramitación';
-const fechaHoraMadrid = (d = new Date()) => new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d).replace(',', '');
-async function avisarTramitacionIva(admin: SupabaseClient, s: Sesion, e: Envio): Promise<string> {
-  const base = 'Bloqueado por SIGMA: documento de IVA pendiente de validar. No se ha enviado el Repaso; reintenta cuando SIGMA lo valide.';
-  const { data: previos } = await admin.from('sigma_envios').select('resultado, actualizado_en')
-    .eq('parte_id', e.parte_id).ilike('resultado', `%${MARCA_TRAMITACION}%`)
-    .gte('actualizado_en', new Date(Date.now() - 24 * 3600000).toISOString()).limit(1);
-  if (previos?.length) {
-    const cuando = (previos[0].resultado?.match(/tramitación el ([\d/]+ [\d:]+)/) || [])[1];
-    return `${base} Ya se avisó a tramitación${cuando ? ' el ' + cuando : ''} (máx. un aviso al día).`;
-  }
+// Mensaje a tramitación (pestaña "Su Gestor/Tramitador", sugestor.php). Lo pide la oficina con el botón
+// «Enviar a tramitación» (p. ej. cuando el Repaso está bloqueado por el documento de IVA).
+// Formulario formmensaje: reparacion, motivo (1 Consulta/comentario · 3 Ausencias/problemas citas · 4 Otros ·
+// 5 Respuesta a control de presupuestos) y mensaje. Es un envío: no se reintenta si se corta la conexión.
+const MOTIVOS_TRAMITACION: Record<string, string> = { '1': 'Consulta/comentario servicio abierto o cerrado recientemente', '3': 'Ausencias/problemas atención citas', '4': 'Otros', '5': 'Respuesta a control de presupuestos' };
+async function enviarTramitacion(s: Sesion, e: Envio): Promise<string> {
   const n = e.parte.numero_servicio;
-  try {
-    const pagina = await s.pedir(`sugestor.php?reparacion=${n}&modo=0&navid=`);
-    if (pideClave(pagina) || !/name=["']?formmensaje/i.test(pagina)) throw new Error('no se pudo abrir la pestaña Su Gestor/Tramitador');
-    const res = await s.pedir('sugestor.php', { reparacion: n, motivo: '4', mensaje: MENSAJE_IVA });
-    if (pideClave(res) || /C[óo]digo del error/i.test(res)) throw new Error('el portal devolvió un error al enviar el mensaje');
-    console.log('mensaje tramitación', n, limpio(parse(res).body?.textContent).slice(0, 600));
-    return `${base} ${MARCA_TRAMITACION} el ${fechaHoraMadrid()} (Otros: «${MENSAJE_IVA}»).`;
-  } catch (err) {
-    console.error('mensaje tramitación', n, (err as Error).message);
-    return `${base} No se pudo avisar a tramitación (${(err as Error).message}): avísala desde el portal.`;
+  const motivo = MOTIVOS_TRAMITACION[String(e.motivo_codigo)] ? String(e.motivo_codigo) : '4';
+  const mensaje = e.comentario.trim();
+  if (!mensaje) throw new Error('Falta el texto del mensaje');
+  const pagina = await s.pedir(`sugestor.php?reparacion=${n}&modo=0&navid=`);
+  if (pideClave(pagina) || /C[óo]digo del error/i.test(pagina)) throw new Error('No se pudo abrir la pestaña Su Gestor/Tramitador de este servicio');
+  if (!/name=["']?formmensaje/i.test(pagina)) throw new Error('La pestaña Su Gestor/Tramitador no tiene el formulario de mensajes');
+  const res = await s.pedir('sugestor.php', { reparacion: n, motivo, mensaje });
+  const texto = limpio(parse(res).body?.textContent);
+  console.log('mensaje tramitación', n, texto.slice(0, 800));
+  if (pideClave(res) || /C[óo]digo del error/i.test(res)) throw new Error('El portal devolvió un error al enviar el mensaje: mira la pestaña Su Gestor/Tramitador antes de reintentar');
+  return `Mensaje enviado a tramitación (${MOTIVOS_TRAMITACION[motivo]}): «${mensaje}»`;
+}
+
+// Bloqueo del Repaso por documento de IVA: se comprueba en el portal (solo lectura) y se marca en partes.sigma_iva_pendiente.
+// Primero los ya bloqueados (para desbloquearlos), luego los de Repasos (caducadas, sin primer contacto), luego el resto.
+async function revisarIva(admin: SupabaseClient, s: Sesion, ciaId: number, cuenta: string, vivos: string[], prioridad: Set<string>, escribir: boolean) {
+  const { data } = await admin.from('partes').select('id, numero_servicio, sigma_iva_pendiente, sigma_iva_revisado_en')
+    .eq('compania_id', ciaId).eq('sigma_cuenta', cuenta).in('numero_servicio', vivos.length ? vivos : ['-']);
+  const ahoraMs = Date.now();
+  const cola = (data || []).filter((p) => {
+    const edad = p.sigma_iva_revisado_en ? (ahoraMs - new Date(p.sigma_iva_revisado_en).getTime()) / 60000 : 1e9;
+    return p.sigma_iva_pendiente ? edad > IVA_MARCADO_MIN : edad > IVA_LIBRE_H * 60;
+  }).sort((a, b) => (Number(!!b.sigma_iva_pendiente) - Number(!!a.sigma_iva_pendiente))
+    || (Number(prioridad.has(b.numero_servicio)) - Number(prioridad.has(a.numero_servicio)))
+    || String(a.sigma_iva_revisado_en ?? '').localeCompare(String(b.sigma_iva_revisado_en ?? ''))).slice(0, MAX_IVA);
+  const out = { revisados: 0, bloqueados: [] as string[], desbloqueados: [] as string[] };
+  if (!cola.length) return out;
+  const ut = await paseRepaso(s, cola[0].numero_servicio);
+  if (!ut) return out;
+  for (const p of cola) {
+    const est = await estadoRepaso(ut, p.numero_servicio);
+    if (est === null) continue;
+    out.revisados++;
+    const ahora = new Date().toISOString();
+    const d: Record<string, unknown> = { sigma_iva_revisado_en: ahora };
+    if (est === 'iva') { out.bloqueados.push(p.numero_servicio); if (!p.sigma_iva_pendiente) d.sigma_iva_pendiente = ahora; }
+    else if (p.sigma_iva_pendiente) { d.sigma_iva_pendiente = null; out.desbloqueados.push(p.numero_servicio); }
+    if (escribir) await admin.from('partes').update(d).eq('id', p.id);
   }
+  return out;
 }
 
 async function procesarEnvios(admin: SupabaseClient, cuenta: string, nombre: string, usuario: string, clave: string, secretoAvisos: string) {
@@ -708,14 +752,20 @@ async function procesarEnvios(admin: SupabaseClient, cuenta: string, nombre: str
   let enviados = 0; const errores: string[] = [];
   for (const e of lista) {
     try {
-      if (fallidos.has(e.parte_id)) throw new Error('No se envió porque falló el envío anterior de este servicio');
-      const r = e.tipo === 'repaso' ? await enviarRepaso(s, e) : await enviarInformarCita(s, e);
+      if (fallidos.has(e.parte_id) && e.tipo !== 'tramitacion') throw new Error('No se envió porque falló el envío anterior de este servicio');
+      const r = e.tipo === 'repaso' ? await enviarRepaso(s, e) : e.tipo === 'tramitacion' ? await enviarTramitacion(s, e) : await enviarInformarCita(s, e);
+      if (e.tipo === 'repaso') await admin.from('partes').update({ sigma_iva_pendiente: null, sigma_iva_revisado_en: new Date().toISOString() }).eq('id', e.parte_id);
       await admin.from('sigma_envios').update({ estado: 'enviado', resultado: r, enviado_en: new Date().toISOString(), intentos: 1 }).eq('id', e.id);
       await admin.from('partes').update({ sigma_ficha_en: null }).eq('id', e.parte_id); // releer la ficha en la próxima pasada
       enviados++;
     } catch (err) {
-      fallidos.add(e.parte_id);
-      const msg = err instanceof IvaPendiente ? await avisarTramitacionIva(admin, s, e) : (err as Error).message;
+      if (e.tipo !== 'tramitacion') fallidos.add(e.parte_id);
+      const msg = err instanceof IvaPendiente ? BLOQUEO_IVA : (err as Error).message;
+      if (err instanceof IvaPendiente) {
+        const ahora = new Date().toISOString();
+        await admin.from('partes').update({ sigma_iva_pendiente: ahora, sigma_iva_revisado_en: ahora }).eq('id', e.parte_id).is('sigma_iva_pendiente', null);
+        await admin.from('partes').update({ sigma_iva_revisado_en: ahora }).eq('id', e.parte_id);
+      }
       await admin.from('sigma_envios').update({ estado: 'error', resultado: msg }).eq('id', e.id);
       errores.push(`${e.parte.numero_servicio}: ${msg}`);
     }
@@ -737,6 +787,7 @@ type Resumen = {
   nuevos: { numero: string; direccion: string; gremio: string; urgente: boolean }[];
   cambiados: number; fichas: number; desaparecidos: string[]; pendientes: number; error?: string; diagnostico?: unknown;
   aceptados?: Ofrecido[]; sin_contacto?: number; caducadas?: number; cerrados?: string[]; reabiertos?: string[];
+  iva?: { revisados: number; bloqueados: string[]; desbloqueados: string[] };
 };
 
 function partirDireccion(d: string) {
@@ -882,7 +933,9 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
     if (cod && f.procedenciaTexto) nuevosCodigos.push({ tipo: 'procedencia', codigo: cod, texto: f.procedenciaTexto });
   }
 
+  const prioridadIva = new Set<string>([...(caducadasPortal?.keys() ?? []), ...(sinContactoPortal ?? []), ...lis.filas.filter((f) => f.estado === '15').map((f) => f.numero)]);
   if (prueba) {
+    try { r.iva = await revisarIva(admin, s, ciaId, cuenta, numeros, prioridadIva, false); } catch (err) { console.error('iva', (err as Error).message); }
     r.nuevos = nuevosLista; r.desaparecidos = desaparecidos;
     const una = fichas.values().next().value;
     r.diagnostico = {
@@ -1014,6 +1067,8 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
       if (error) console.error('ficha', p.numero_servicio, error.message);
     }
   }
+  // BLOQUEO POR DOCUMENTO DE IVA (solo lectura en el portal; no afecta al resultado de la pasada si falla)
+  try { r.iva = await revisarIva(admin, s, ciaId, cuenta, numeros, prioridadIva, true); } catch (err) { console.error('iva', (err as Error).message); }
   if (erroresFicha.length) r.error = `Fichas con error: ${erroresFicha.length}`;
   r.ok = true;
   return r;
