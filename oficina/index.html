@@ -280,7 +280,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.15 (Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.16 ([PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -1204,7 +1204,7 @@ async function quitarAsignacion(id) {
   const { data: a } = await sb.from('asignaciones').select('parte_id').eq('id', id).single();
   // Si la visita tiene informes, borrarla los borraría también: no se permite.
   const { count: nInf } = await sb.from('informes').select('id', { count: 'exact', head: true }).eq('asignacion_id', id);
-  if (nInf) return alert('Esta visita ya tiene informes del operario y no se puede quitar (se perderían). Cambia su estado o su fecha en su lugar.');
+  if (nInf) return borrarVisitaPrueba(id, a.parte_id, nInf); // [PRUEBAS] antes: alert('Esta visita ya tiene informes…')
   const { error } = await sb.from('asignaciones').delete().eq('id', id);
   if (error) return fallo(error);
   const { count } = await sb.from('asignaciones').select('id', { count: 'exact', head: true }).eq('parte_id', a.parte_id);
@@ -1505,6 +1505,22 @@ async function guardarParte(id) {
   cerrarModal(); aviso(id ? 'Servicio guardado' : 'Servicio creado');
   irA(vistaActual);
 }
+
+// ===== [PRUEBAS] Borrar visita con informes — solo para testeos. Para quitarlo: borrar este bloque
+// y volver a poner el alert en quitarAsignacion (buscar «[PRUEBAS]»). =====
+async function borrarVisitaPrueba(id, parteId, nInf) {
+  if (!confirm(`Esta visita tiene ${nInf} informe(s) del operario.\n\nSOLO PARA PRUEBAS: ¿borrar la visita, sus informes y sus fotos? No se puede deshacer.\n(Lo ya enviado a SIGMA no se deshace.)`)) return;
+  if ((prompt('Para confirmar, escribe BORRAR') || '').trim().toUpperCase() !== 'BORRAR') return aviso('Cancelado');
+  const { data: fs } = await sb.from('fotos').select('ruta').in('informe_id',
+    ((await sb.from('informes').select('id').eq('asignacion_id', id)).data || []).map((i) => i.id));
+  if (fs && fs.length) await sb.storage.from('fotos').remove(fs.map((f) => f.ruta));
+  const { error } = await sb.from('asignaciones').delete().eq('id', id); // informes y fotos se borran en cascada
+  if (error) return fallo(error);
+  const { count } = await sb.from('asignaciones').select('id', { count: 'exact', head: true }).eq('parte_id', parteId);
+  if (count === 0) await sb.from('partes').update({ estado: 'pendiente' }).eq('id', parteId).in('estado', ['asignado', 'en_curso', 'terminado']);
+  cerrarModal(); aviso('Visita de prueba borrada'); irA(vistaActual);
+}
+// ===== [PRUEBAS] fin =====
 
 // =====================================================================
 //  INFORMES
