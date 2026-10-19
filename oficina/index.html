@@ -280,7 +280,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.13 (Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.14 (Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -785,23 +785,16 @@ async function vistaHoy() {
   if (!$('#hoy-raiz')) {
     $('#contenido').innerHTML = `<div id="hoy-raiz">
       <div class="barra"><h2 style="text-transform:capitalize">${fLarga(hoy)}</h2><span class="esp"></span>
-        <button class="sec" onclick="modalParte()">+ Nuevo servicio</button><button onclick="location.hash='plan'">Planificar semana</button></div>
+        <button class="sec" onclick="modalParte()">+ Nuevo servicio</button></div>
       <div class="kpis" id="kpis"></div>
-      <div class="hoy-grid">
-        <div><h3 style="margin:0 0 10px">Rutas de hoy</h3><div id="rutas-hoy">Cargando…</div></div>
-        <div class="tarjeta feed"><h3 style="margin:0 0 6px">Últimos informes</h3><div id="feed">Cargando…</div></div>
-      </div>
-      <div id="inicio-partes" style="margin-top:24px"></div></div>`;
+      <div id="inicio-partes" style="margin-top:8px"></div></div>`;
     await montarPartes($('#inicio-partes'));
   } else cargarPartes(); // recarga en directo sin tocar los filtros
-  const [asig, totalServ, urg, sinRev, ultimos, nuevosHoy] = await Promise.all([
-    sb.from('asignaciones').select('id, fecha, hora, orden, tipo, estado, operario_id, parte:partes!asignaciones_parte_id_fkey(id, numero_servicio, direccion, poblacion, codigo_postal, gremio, urgente, compania:companias(nombre))')
-      .eq('fecha', hoy).order('orden').order('hora', { nullsFirst: false }),
+  const [asig, totalServ, urg, sinRev, nuevosHoy] = await Promise.all([
+    sb.from('asignaciones').select('id, estado').eq('fecha', hoy),
     sb.from('partes').select('id', { count: 'exact', head: true }).in('estado', ABIERTOS),
     sb.from('partes').select('id', { count: 'exact', head: true }).eq('urgente', true).in('estado', ['pendiente', 'asignado', 'en_curso']),
     sb.from('informes').select('id', { count: 'exact', head: true }).eq('revisado', false),
-    sb.from('informes').select('id, creado_en, texto, revisado, trabajo_terminado, necesita_repaso, operario_id, parte:partes!informes_parte_id_fkey(id, numero_servicio, direccion)')
-      .order('creado_en', { ascending: false }).limit(8),
     sb.from('partes').select('id', { count: 'exact', head: true }).or(filtroNuevosHoy()),
   ]);
   if (asig.error) return fallo(asig.error);
@@ -813,35 +806,8 @@ async function vistaHoy() {
     <a class="kpi ${nuevosHoy.count ? 'alerta' : ''}" href="#inicio" title="Servicios que SIGMA nos ha asignado hoy (desde las 00:00)" onclick="verNuevos();return false"><div class="n">${nuevosHoy.count ?? 0}</div><div class="t">Nuevos hoy</div></a>
     <a class="kpi" href="#plan"><div class="n">${hechas}/${lista.length}</div><div class="t">Visitas hechas hoy</div></a>
     <a class="kpi ${noReal ? 'mal' : ''}" href="#plan"><div class="n">${noReal}</div><div class="t">No realizadas hoy</div></a>
-    <a class="kpi ${urg.count ? 'mal' : ''}" href="#inicio" onclick="filtroPartes.estado='abiertos';$('#inicio-partes')?.scrollIntoView({behavior:'smooth'});return false"><div class="n">${urg.count ?? 0}</div><div class="t">Urgentes abiertos</div></a>
-    <a class="kpi ${sinRev.count ? 'alerta' : ''}" href="#informes"><div class="n">${sinRev.count ?? 0}</div><div class="t">Informes sin revisar</div></a>`;
-
-  const porOp = {};
-  lista.forEach((a) => (porOp[a.operario_id] ??= []).push(a));
-  const ids = [...new Set([...cache.operarios.map((o) => o.id), ...Object.keys(porOp)])];
-  $('#rutas-hoy').innerHTML = ids.length ? ids.map((id) => {
-    const v = porOp[id] || [];
-    const h = v.filter((a) => a.estado === 'hecho' || a.estado === 'no_realizado').length;
-    const enCamino = v.find((a) => a.estado === 'en_camino');
-    return `<div class="tarjeta op-hoy">
-      <div class="cab"><b>${esc(nombreDe(id))}</b>${enCamino ? `<span class="et en_camino">En camino → ${esc(enCamino.parte?.numero_servicio)}</span>` : ''}
-        <span class="esp"></span><span style="color:var(--suave)">${h}/${v.length}</span>
-        ${v.length ? `<button class="mini sec" onclick='verRuta(${JSON.stringify(v.map((a) => dirCompleta(a.parte)))})'>Mapa</button>` : ''}</div>
-      ${v.length ? `<div class="progreso"><div style="width:${Math.round((100 * h) / v.length)}%"></div></div>` : ''}
-      ${v.map((a) => `<div class="visita" onclick="modalAsignacion('${a.id}')">
-          <div class="h">${hCorta(a.hora) || '—'}</div>
-          <div class="d"><div><b>${esc(a.parte?.numero_servicio)}</b> ${a.parte?.urgente ? '<span class="et urg">URG</span>' : ''} ${a.tipo === 'repaso' ? '<span class="et pendiente">Repaso</span>' : ''}</div>
-          <div style="color:var(--suave)">${esc(dirCompleta(a.parte))}</div></div>
-          <span class="et ${a.estado}">${TXT_ESTADO[a.estado]}</span></div>`).join('') || '<div style="color:var(--suave)">Sin visitas hoy.</div>'}
-    </div>`;
-  }).join('') : '<div class="tarjeta vacio">No hay operarios. Créalos en el panel de administrador.</div>';
-
-  const u = ultimos.data || [];
-  $('#feed').innerHTML = u.length ? u.map((i) => `
-    <div class="item" onclick="filtroInformes={parte:'${i.parte?.id}'};location.hash='informes'">
-      <div><b>${esc(i.parte?.numero_servicio)}</b> · ${esc(nombreDe(i.operario_id))} <span style="color:var(--suave)">· ${hace(i.creado_en)}</span>
-        ${i.revisado ? '' : '<span class="et nuevo">Nuevo</span>'} ${i.necesita_repaso ? '<span class="et pendiente">Repaso</span>' : ''}</div>
-      <div class="txt">${esc(i.texto)}</div></div>`).join('') : '<div class="vacio">Todavía no hay informes.</div>';
+    <a class="kpi ${sinRev.count ? 'alerta' : ''}" href="#informes"><div class="n">${sinRev.count ?? 0}</div><div class="t">Informes sin revisar</div></a>
+    <a class="kpi ${urg.count ? 'mal' : ''}" href="#inicio" onclick="filtroPartes.estado='abiertos';$('#inicio-partes')?.scrollIntoView({behavior:'smooth'});return false"><div class="n">${urg.count ?? 0}</div><div class="t">Urgentes abiertos</div></a>`;
 }
 
 // =====================================================================
@@ -1366,6 +1332,7 @@ async function montarPartes(destino) {
     <div class="barra">
       <h3 style="margin:0">Servicios</h3>
       <input id="fp-texto" placeholder="Buscar nº, dirección, cliente…" style="max-width:280px" value="${esc(filtroPartes.texto)}">
+      <select id="fp-gremio" style="max-width:260px"><option value="">Todos los gremios</option></select>
       <select id="fp-estado" style="max-width:170px">
         <option value="abiertos">Abiertos</option>
         ${ESTADOS_PARTE.map((e) => `<option value="${e}">${TXT_ESTADO[e]}</option>`).join('')}
@@ -1374,7 +1341,6 @@ async function montarPartes(destino) {
       <select id="fp-cia" style="max-width:160px"><option value="">Todas las compañías</option>${cache.companias.map((c) => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('')}</select>
       <select id="fp-ciudad" style="max-width:170px"><option value="">Todas las provincias</option></select>
       <select id="fp-pueblo" style="max-width:230px" disabled><option value="">Todos los pueblos</option></select>
-      <select id="fp-gremio" style="max-width:260px"><option value="">Todos los gremios</option></select>
       <select id="fp-nuevos" style="max-width:190px"><option value="">Nuevos y anteriores</option><option value="1">Solo nuevos de hoy</option><option value="0">Solo anteriores</option></select>
       <span class="esp"></span>
       <button class="sec" onclick="exportarPartes()">Exportar CSV</button>
