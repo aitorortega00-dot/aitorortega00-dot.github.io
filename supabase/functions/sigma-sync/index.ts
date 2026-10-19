@@ -435,13 +435,23 @@ type Envio = {
   cita_fecha: string | null; cita_hora: string | null; comentario: string; parte: { numero_servicio: string; sigma_cuenta: string };
 };
 
-function traducirCodigos(codes: { code?: string }[] | undefined) {
-  const c = (codes || []).map((x) => x.code || '').filter(Boolean);
-  if (!c.length) return 'El portal no aceptó el cambio (sin detalle)';
-  return c.map((x) => ({
-    APPEND_PENDING_APPOINTMENTS: 'Hay una cita anterior sin informar: primero hay que enviar "Informar citas"',
-    TXT_GENERICERROR: 'Error genérico del portal',
-  } as Record<string, string>)[x] || x).join(' · ');
+// Traduce los códigos de error del servicio de Repaso. Si el código no es conocido (p. ej. "68"),
+// se añade el texto que lo acompañe en la respuesta (message, description…) para que la oficina sepa qué pasa.
+const CODIGOS_REPASO: Record<string, string> = {
+  APPEND_PENDING_APPOINTMENTS: 'Hay una cita anterior sin informar: primero hay que enviar "Informar citas"',
+  TXT_GENERICERROR: 'Error genérico del portal',
+};
+function traducirCodigos(codes: Record<string, unknown>[] | undefined, extra?: unknown) {
+  const lista = (codes || []).filter((x) => x && typeof x === 'object');
+  const textoExtra = typeof extra === 'string' && extra.trim() ? extra.trim() : '';
+  if (!lista.length) return textoExtra ? `El portal no aceptó el cambio: ${textoExtra}` : 'El portal no aceptó el cambio (sin detalle)';
+  return lista.map((x) => {
+    const code = String(x.code ?? '');
+    if (CODIGOS_REPASO[code]) return CODIGOS_REPASO[code];
+    const textos = Object.entries(x).filter(([k, v]) => k !== 'code' && typeof v === 'string' && v.trim()).map(([, v]) => String(v).trim());
+    const detalle = textos.length ? textos.join(' / ') : (textoExtra || JSON.stringify(x).slice(0, 300));
+    return `Código ${code || '?'} del portal: ${detalle}`;
+  }).join(' · ');
 }
 const hoyMadrid = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date());
 // Minuto actual en Madrid con el mismo formato que la bitácora ("aaaa-mm-dd hh:mm"), un minuto antes por margen
@@ -484,7 +494,10 @@ async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
     try { ini = await api('review-initial-data', { reparation: n }); }
     catch (err2) { throw new Error(`Portal SIGMA saturado: ${(err2 as Error).message}. No se envió nada; reintenta en un rato`); }
   }
-  if (!ini?.success) throw new Error(traducirCodigos(ini?.metadata?.errorCodes));
+  if (!ini?.success) {
+    console.error('review-initial-data', n, JSON.stringify(ini?.metadata ?? ini).slice(0, 1500));
+    throw new Error('Al abrir Repaso: ' + traducirCodigos(ini?.metadata?.errorCodes, ini?.metadata?.message ?? ini?.message));
+  }
   const d = ini.data;
   if (!d.availabilityPermission) throw new Error('El portal pide elegir hueco de agenda para este servicio: hazlo a mano en el portal');
   if (d.swConforme) throw new Error('El portal pide una conformidad adicional: hazlo a mano en el portal');
@@ -568,7 +581,8 @@ async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
       };
       continue;
     }
-    throw new Error(traducirCodigos(res?.metadata?.errorCodes));
+    console.error('review-update', n, JSON.stringify(res?.metadata ?? res).slice(0, 1500));
+    throw new Error('Al guardar Repaso: ' + traducirCodigos(res?.metadata?.errorCodes, res?.metadata?.message ?? res?.message));
   }
   throw new Error('El portal pidió demasiados pasos seguidos: revisa el servicio en el portal');
 }
