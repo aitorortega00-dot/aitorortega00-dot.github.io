@@ -401,7 +401,7 @@ function abrirRuta() {
 async function pintarParte() {
   const a = estado.asig; if (!a) return history.back();
   const p = a.parte;
-  const tels = [p.telefono, p.telefono2].filter(Boolean);
+  const tels = []; [p.telefono, p.telefono2].filter(Boolean).forEach((v) => String(v).split(/\s+-\s+|[,;\/]/).map((x) => x.trim()).filter(Boolean).forEach((x) => { if (!tels.includes(x)) tels.push(x); }));
   const dir = dirCompleta(p);
   $('#raiz').innerHTML = `
     <div class="cab"><div class="lado"><button onclick="volver()">‹ Volver</button></div>

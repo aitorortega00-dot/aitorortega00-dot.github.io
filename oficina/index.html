@@ -280,7 +280,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.14 (Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.15 (Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -479,6 +479,12 @@ function modalSigma() {
     <div style="overflow-x:auto"><table class="lista" style="font-size:12px"><thead><tr><th>Hora</th><th>Cuenta</th><th>Resultado</th><th>En curso</th><th>Nuevos</th><th>Aceptados</th><th>Cambios</th><th>Ya no en curso</th><th>Error</th></tr></thead>
     <tbody>${cache.sinc.slice(0, 20).map(fila).join('') || '<tr><td colspan="9" class="vacio">Sin pasadas todavía.</td></tr>'}</tbody></table></div>
     <div class="acciones"><button onclick="cerrarModal()">Cerrar</button></div>`, true);
+}
+// Teléfonos: un campo puede llevar varios «000000000 - 000000000»
+function listaTels(...vals) {
+  const out = [];
+  vals.filter(Boolean).forEach((v) => String(v).split(/\s+-\s+|[,;\/]/).map((t) => t.trim()).filter(Boolean).forEach((t) => { if (!out.includes(t)) out.push(t); }));
+  return out;
 }
 function etiquetaSigma(p) {
   if (!p.sigma_cuenta) return '';
@@ -818,11 +824,11 @@ async function vistaHoy() {
 let clasifRepaso = 'caducadas';
 const CLASIF_REPASOS = [
   { id: 'caducadas', nombre: 'Caducadas / caducan hoy', contar: contarCaducadas, pintar: pintarCaducadas },
-  { id: 'sincontacto', nombre: 'Sin primer contacto', contar: contarSinContacto, pintar: pintarSinContacto },
+  { id: 'sincontacto', nombre: 'Sin primer contacto', contar: contarSinContacto, pintar: pintarSinContacto, informativo: true },
 ];
 async function contarRepasos() {
   const nums = await Promise.all(CLASIF_REPASOS.map((c) => c.contar().catch(() => 0)));
-  const total = nums.reduce((a, n) => a + (n || 0), 0);
+  const total = nums.reduce((a, n, i) => a + (CLASIF_REPASOS[i].informativo ? 0 : (n || 0)), 0); // las informativas no suman
   const b = $('#b-rep'); if (b) { b.textContent = total || ''; b.classList.toggle('oculto', !total); }
   CLASIF_REPASOS.forEach((c, i) => { const e = document.getElementById('cr-n-' + c.id); if (e) { e.textContent = nums[i] || ''; e.classList.toggle('oculto', !nums[i]); } });
   return nums;
@@ -878,7 +884,7 @@ function carrilDe(p) {
 }
 function tarjetaCad(p, carril) {
   const g = GRUPOS_CAD[p.sigma_cad_grupo];
-  const tels = [p.telefono, p.telefono2].filter(Boolean);
+  const tels = listaTels(p.telefono, p.telefono2);
   const envs = (p.sigma_envios || []).filter((e) => e.tipo === 'repaso' && e.estado !== 'descartado').sort((a, b) => b.creado_en.localeCompare(a.creado_en));
   const pend = envs.find((e) => ['borrador', 'aprobado', 'enviando', 'error'].includes(e.estado));
   const env = envs.find((e) => e.estado === 'enviado');
@@ -914,7 +920,7 @@ async function pintarCaducadas(destino) {
   if (!$('#cad-raiz')) {
     destino.innerHTML = `<div id="cad-raiz">
       <div class="barra" style="margin-bottom:8px">
-        <select id="cad-cuenta" style="max-width:190px"><option value="">Valladolid y Palencia</option>${Object.entries(CUENTAS_SIGMA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+        <select id="cad-cuenta" style="max-width:190px"><option value="">Todas las provincias</option>${Object.entries(CUENTAS_SIGMA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
         <span class="esp"></span><span id="cad-leido" style="font-size:12px;color:var(--suave)"></span></div>
       <div id="cad-grupos" class="cad-grupos"></div>
       <div id="cad-tablero">Cargando…</div></div>`;
@@ -988,7 +994,7 @@ async function pintarSinContacto(destino) {
   if (!$('#sc-raiz')) {
     destino.innerHTML = `<div id="sc-raiz">
       <div class="barra" style="margin-bottom:8px">
-        <select id="sc-cuenta" style="max-width:190px"><option value="">Valladolid y Palencia</option>${Object.entries(CUENTAS_SIGMA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+        <select id="sc-cuenta" style="max-width:190px"><option value="">Todas las provincias</option>${Object.entries(CUENTAS_SIGMA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
       <p style="color:var(--suave);font-size:13px;margin-top:0">Servicios de SIGMA en los que todavía no se ha hablado con el cliente. Los clasifica el robot en cada pasada (cada 15 min) con la lista <b>Pendiente de primer contacto</b> de Gestión repaso del portal; salen de aquí solos cuando en SIGMA cambia el estado (p. ej. al enviar un Repaso).</p>
       <div id="sc-lista">Cargando…</div></div>`;
     $('#sc-cuenta').value = filtroSinContacto;
@@ -1005,7 +1011,7 @@ async function pintarSinContacto(destino) {
   $('#sc-lista').innerHTML = lista.length ? `
     <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nº servicio</th><th>Cliente y teléfono</th><th>Dirección</th><th class="opc">Gremio</th><th>Plazo SIGMA</th><th>En la lista desde</th><th></th></tr></thead>
     <tbody>${lista.map((p) => {
-      const tels = [p.telefono, p.telefono2].filter(Boolean);
+      const tels = listaTels(p.telefono, p.telefono2);
       const pendEnvio = (p.sigma_envios || []).some((e) => e.tipo === 'repaso' && ['borrador', 'aprobado', 'enviando'].includes(e.estado));
       const prox = (p.asignaciones || []).filter((a) => a.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
       const bloq = ivaBloq(p);
@@ -1409,7 +1415,7 @@ async function cargarPartes() {
     <p style="color:var(--suave);font-size:12px">${data.length} servicio(s)${data.length === 300 ? ' (máximo 300; afina la búsqueda)' : ''}</p>` : '<div class="tarjeta vacio">No hay servicios con ese filtro.</div>';
 }
 function exportarPartes() {
-  const cols = ['compania', 'numero_servicio', 'estado', 'urgente', 'gremio', 'asegurado', 'telefono', 'telefono2', 'direccion', 'codigo_postal', 'poblacion', 'descripcion', 'creado_en'];
+  const cols = ['compania', 'numero_servicio', 'estado', 'urgente', 'gremio', 'asegurado', 'telefono', 'telefono2', 'telefono_perjudicado', 'telefono_perjudicado2', 'direccion', 'codigo_postal', 'poblacion', 'descripcion', 'creado_en'];
   const csvCelda = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const filas = ultimosPartes.map((p) => cols.map((c) => csvCelda(c === 'compania' ? p.compania?.nombre : c === 'estado' ? TXT_ESTADO[p.estado] : c === 'urgente' ? (p.urgente ? 'Sí' : 'No') : p[c])).join(';'));
   const blob = new Blob(['﻿' + [cols.join(';'), ...filas].join('\r\n')], { type: 'text/csv;charset=utf-8' });
@@ -1455,8 +1461,12 @@ async function modalParte(id) {
       <div><label>Nº de póliza</label><input id="pt-poliza" value="${esc(p.poliza || '')}"></div>
     </div>
     <div class="dos">
-      <div><label>Teléfono</label><input id="pt-tel" type="tel" value="${esc(p.telefono || '')}"></div>
-      <div><label>Teléfono 2</label><input id="pt-tel2" type="tel" value="${esc(p.telefono2 || '')}"></div>
+      <div><label>Teléfono asegurado</label><input id="pt-tel" type="tel" value="${esc(p.telefono || '')}"></div>
+      <div><label>Teléfono asegurado 2</label><input id="pt-tel2" value="${esc(p.telefono2 || '')}" placeholder="000000000 - 000000000"></div>
+    </div>
+    <div class="dos">
+      <div><label>Teléfono perjudicado</label><input id="pt-telp" type="tel" value="${esc(p.telefono_perjudicado || '')}"></div>
+      <div><label>Teléfono perjudicado 2</label><input id="pt-telp2" value="${esc(p.telefono_perjudicado2 || '')}" placeholder="000000000 - 000000000"></div>
     </div>
     <label>Dirección *</label><input id="pt-dir" value="${esc(p.direccion || '')}" placeholder="Calle, número, piso">
     <div class="dos">
@@ -1483,6 +1493,7 @@ async function guardarParte(id) {
   const fila = {
     compania_id: Number(val('pt-cia')), numero_servicio: val('pt-num'), asegurado: val('pt-aseg') || null,
     gremio: val('pt-gremio') || null, telefono: val('pt-tel') || null, telefono2: val('pt-tel2') || null,
+    telefono_perjudicado: val('pt-telp') || null, telefono_perjudicado2: val('pt-telp2') || null,
     direccion: val('pt-dir'), poblacion: val('pt-pob') || null, codigo_postal: val('pt-cp') || null,
     descripcion: val('pt-desc') || null, notas_oficina: val('pt-notas') || null,
     aseguradora: val('pt-aseguradora') || null, poliza: val('pt-poliza') || null,
