@@ -20,6 +20,9 @@ const CUENTAS = [
 const MAX_FICHAS = 50;       // fichas por cuenta y pasada (el resto, en la siguiente)
 const REFRESCO_FICHA_H = 20;  // horas: repaso diario de la bitácora
 const PARALELO = 3;           // fichas a la vez (sin agobiar al portal)
+const FUERA_REFRESCO_H = 2;   // horas: relectura de fichas de servicios fuera de "en curso" aún sin cerrar
+const FUERA_DIAS = 30;        // días que se sigue mirando si se cierra un servicio que salió de "en curso"
+const MAX_FUERA = 15;         // fichas fuera de curso por cuenta y pasada
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36';
 const dec = new TextDecoder('windows-1252');
 
@@ -391,6 +394,11 @@ function leerFicha(html: string) {
   const bit = celdaDescripcion ? leerBitacora(celdaDescripcion) : { descripcion: '', entradas: [] };
   const dp = (cabecera['Distrito Postal'] || '').match(/^(\d{5})\s*-\s*(.*)$/);
   const procTexto = (campos['Procedencia'] || '').replace(/^\d+\s*-\s*/, '').trim();
+  // CIERRE: campo "Fecha/Hora Cierre" de la ficha; si viene vacío, anotación "Cierre de Reparación" de la bitácora
+  const kCierre = Object.keys(campos).find((k) => /cierre/i.test(k) && /fecha/i.test(k));
+  const vCierre = kCierre ? campos[kCierre] : '';
+  const anotCierre = bit.entradas.find((e) => /^Cierre de Reparaci/i.test(e.texto));
+  const cierre = /\d{2}\/\d{2}\/\d{4}/.test(vCierre || '') ? vCierre : (anotCierre ? `bitácora ${anotCierre.fecha ?? ''}`.trim() : null);
   return {
     numero: cabecera['Número Reparación'],
     poliza: cabecera['Número de Póliza'] || null,
@@ -413,6 +421,7 @@ function leerFicha(html: string) {
       confirmado: campos['Confirmado'] || null,
       apertura: campos['Fecha/Hora Apertura'] || null,
       asignacion: campos['Fecha/Hora Asignación'] || null,
+      cierre,
       tramitador: campos['Tramitador'] || null,
       especialidades: campos['Especialidades'] || null,
       herramientas: campos['Herramientas'] || null,
@@ -692,7 +701,7 @@ type Resumen = {
   cuenta: string; ok: boolean; en_listado: number; total_portal: number | null; paginas: number;
   nuevos: { numero: string; direccion: string; gremio: string; urgente: boolean }[];
   cambiados: number; fichas: number; desaparecidos: string[]; pendientes: number; error?: string; diagnostico?: unknown;
-  aceptados?: Ofrecido[]; sin_contacto?: number; caducadas?: number;
+  aceptados?: Ofrecido[]; sin_contacto?: number; caducadas?: number; cerrados?: string[]; reabiertos?: string[];
 };
 
 function partirDireccion(d: string) {
@@ -741,7 +750,7 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
 
   // Lo que ya tenemos
   const numeros = lis.filas.map((f) => f.numero);
-  const campos = 'id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, codigo_postal, gremio, descripcion, urgente, sigma_cuenta, sigma_huella, sigma_en_curso, sigma_ficha_en';
+  const campos = 'id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, codigo_postal, gremio, descripcion, urgente, sigma_cuenta, sigma_huella, sigma_en_curso, sigma_ficha_en, estado, sigma_ficha';
   const existentes = new Map<string, Record<string, unknown>>();
   for (let i = 0; i < numeros.length; i += 200) {
     const { data, error } = await admin.from('partes').select(campos).eq('compania_id', ciaId).in('numero_servicio', numeros.slice(i, i + 200));
@@ -777,7 +786,12 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
       colaFichas.push({ numero: f.numero, prio: 0, edad: 0 });
     } else if (e.sigma_huella !== huella || e.sigma_en_curso !== true || e.sigma_cuenta !== cuenta) {
       r.cambiados++;
-      cambios.push({ id: e.id as string, datos: { ...datosLista, sigma_ficha_en: null } });
+      const datos: Record<string, unknown> = { ...datosLista, sigma_ficha_en: null };
+      if (e.estado === 'cerrado' && (e.sigma_ficha as Record<string, unknown> | null)?.cierre_auto) {
+        datos.estado = 'pendiente'; // se ajusta a "asignado" más abajo si tiene visitas
+        (r.reabiertos ??= []).push(f.numero);
+      }
+      cambios.push({ id: e.id as string, datos });
       colaFichas.push({ numero: f.numero, prio: 1, edad: 0 });
     } else {
       const edad = e.sigma_ficha_en ? (Date.now() - new Date(e.sigma_ficha_en as string).getTime()) / 3600000 : 1e6;
@@ -792,7 +806,21 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
     for (const p of enCurso || []) if (!vivos.has(p.numero_servicio)) desaparecidos.push(p.numero_servicio);
   }
 
-  // Fichas: primero nuevos, luego cambiados, luego las nunca leídas, luego las más antiguas
+  // CERRADOS: los que salen de "en curso" se releen para ver si SIGMA los ha cerrado.
+  // Los de esta pasada enseguida; los de días anteriores sin cerrar, cada FUERA_REFRESCO_H horas (hasta FUERA_DIAS días).
+  const fuera = new Set<string>(desaparecidos);
+  {
+    const limite = new Date(Date.now() - FUERA_DIAS * 86400000).toISOString();
+    const viejo = new Date(Date.now() - FUERA_REFRESCO_H * 3600000).toISOString();
+    const { data: sinCerrar } = await admin.from('partes').select('numero_servicio, sigma_ficha_en')
+      .eq('compania_id', ciaId).eq('sigma_cuenta', cuenta).eq('sigma_en_curso', false)
+      .not('estado', 'in', '(cerrado,anulado)').gte('sigma_cambio_en', limite)
+      .or(`sigma_ficha_en.is.null,sigma_ficha_en.lt.${viejo}`).limit(MAX_FUERA);
+    if (completo) for (const p of sinCerrar || []) if (!numeros.includes(p.numero_servicio)) fuera.add(p.numero_servicio);
+  }
+  for (const n of fuera) colaFichas.push({ numero: n, prio: desaparecidos.includes(n) ? 1 : 2.5, edad: 0 });
+
+  // Fichas: primero nuevos, luego cambiados (y recién salidos), luego las nunca leídas, luego fuera de curso, luego las más antiguas
   colaFichas.sort((a, b) => a.prio - b.prio || b.edad - a.edad);
   const aLeer = colaFichas.slice(0, MAX_FICHAS);
   r.pendientes = colaFichas.length - aLeer.length;
@@ -805,12 +833,13 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
       try {
         fichas.set(numero, leerFicha(await s.pedir(`repasos1.php?reparacion=${numero}`)));
       } catch (err) {
-        erroresFicha.push(`${numero}: ${(err as Error).message}`);
+        if (fuera.has(numero)) console.error('ficha fuera de curso', numero, (err as Error).message);
+        else erroresFicha.push(`${numero}: ${(err as Error).message}`);
       }
     }
   }));
   r.fichas = fichas.size;
-  if (erroresFicha.length && !fichas.size) throw new Error('No se pudo leer ninguna ficha: ' + erroresFicha[0]);
+  if (erroresFicha.length && ![...fichas.keys()].some((n) => !fuera.has(n))) throw new Error('No se pudo leer ninguna ficha: ' + erroresFicha[0]);
   // Procedencia: el código sale en el listado y el nombre en la ficha
   const porNumero = new Map(lis.filas.map((f) => [f.numero, f]));
   for (const [n, f] of fichas) {
@@ -827,6 +856,7 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
       marcas: [...new Set(lis.filas.flatMap((f) => f.marcas))],
       filas_sin_direccion: lis.filas.filter((f) => !f.direccion).length,
       errores_ficha: erroresFicha.slice(0, 5),
+      fuera_de_curso: [...fuera].map((n) => ({ numero: n, leida: fichas.has(n), cierre: fichas.get(n)?.otros.cierre ?? null })),
       sin_primer_contacto: { portal: sinContactoPortal ? [...sinContactoPortal] : 'no leído', estado_15: lis.filas.filter((f) => f.estado === '15').map((f) => f.numero) },
       caducadas: caducadasPortal ? Object.fromEntries(['redes', 'resto', 'cliente'].map((g) => [g, [...caducadasPortal].filter(([, x]) => x === g).map(([n]) => n)])) : 'no leído',
       procedencias: [...new Map(nuevosCodigos.filter((c) => c.tipo === 'procedencia' && c.texto).map((c) => [c.codigo, c.texto])).entries()],
@@ -856,6 +886,12 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
   for (const c of cambios) {
     const { error } = await admin.from('partes').update(c.datos).eq('id', c.id);
     if (error) throw new Error('Actualizar parte: ' + error.message);
+  }
+  if (r.reabiertos?.length) {
+    const { data: conVisita } = await admin.from('asignaciones').select('parte_id, partes!inner(numero_servicio, compania_id)')
+      .eq('partes.compania_id', ciaId).in('partes.numero_servicio', r.reabiertos);
+    const ids = [...new Set((conVisita || []).map((a) => a.parte_id))];
+    if (ids.length) await admin.from('partes').update({ estado: 'asignado' }).in('id', ids).eq('estado', 'pendiente');
   }
   if (desaparecidos.length) {
     const { error } = await admin.from('partes').update({ sigma_en_curso: false, sigma_cambio_en: ahora })
@@ -922,6 +958,15 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
         sigma_poliza: f.poliza, sigma_telefonos: f.telefonos, sigma_bitacora: f.bitacora,
         sigma_estado_texto: f.estadoTexto, sigma_ficha: f.otros, sigma_ficha_en: ahora,
       };
+      // Cerrado en SIGMA: tiene fecha de cierre y ya no está en "Servicios en curso"
+      if (f.otros.cierre && fuera.has(p.numero_servicio) && !['cerrado', 'anulado'].includes(p.estado as string)) {
+        d.estado = 'cerrado';
+        d.sigma_ficha = { ...f.otros, cierre_auto: ahora, estado_antes: p.estado };
+        d.sigma_sin_contacto = false; d.sigma_sin_contacto_desde = null;
+        (r.cerrados ??= []).push(p.numero_servicio);
+      } else if (p.estado === 'cerrado' && (p.sigma_ficha as Record<string, unknown> | null)?.cierre_auto) {
+        d.sigma_ficha = { ...f.otros, cierre_auto: (p.sigma_ficha as Record<string, unknown>).cierre_auto, estado_antes: (p.sigma_ficha as Record<string, unknown>).estado_antes };
+      }
       if (vacio(p.asegurado) && f.cliente) d.asegurado = f.cliente;
       if (vacio(p.telefono) && tels[0]) d.telefono = tels[0];
       if (vacio(p.telefono2) && tels[1]) d.telefono2 = tels[1];
