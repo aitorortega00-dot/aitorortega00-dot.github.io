@@ -441,6 +441,8 @@ function leerFicha(html: string) {
 // Reglas de la oficina (18/10/2026):
 //  - En "Informar citas" la fecha/hora de la visita es SIEMPRE la citada, nunca la del informe.
 //  - El aviso "este aplazamiento va a generar un SMS al cliente" se confirma SIEMPRE con "Sí".
+//  - (19/10/2026) Si el Repaso encuentra una cita anterior sin informar, el robot la informa sola: Visita realizada ·
+//    609 Finalizado no requiere nueva cita · comentario «OK» · fecha/hora citadas; y luego hace el Repaso.
 const API_REPASO = 'https://mawmods.plataforma-smart.com/me';
 const HORAS_REPASO = Array.from({ length: 28 }, (_, i) => String(28800 + i * 1800)); // 08:00 … 21:30
 const MOTIVOS_CITA: Record<string, string[]> = { V: ['609', '611', '604', '601'], I: ['706', '707', '708'], C: ['213', '215', '212', '214'] };
@@ -454,7 +456,7 @@ type Envio = {
 // se añade el texto que lo acompañe en la respuesta (message, description…) para que la oficina sepa qué pasa.
 const CODIGOS_REPASO: Record<string, string> = {
   '68': 'SIGMA pide la fecha y hora en que se contactó con el cliente (servicio sin primer contacto): rellénala en el envío y reintenta',
-  APPEND_PENDING_APPOINTMENTS: 'Hay una cita anterior sin informar: primero hay que enviar "Informar citas"',
+  APPEND_PENDING_APPOINTMENTS: 'Sigue habiendo una cita anterior sin informar después de informarla: revisa «Informar citas» en el portal',
   TXT_GENERICERROR: 'Error genérico del portal',
 };
 function traducirCodigos(codes: Record<string, unknown>[] | undefined, extra?: unknown) {
@@ -533,11 +535,39 @@ async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
     try { ini = await api('review-initial-data', { reparation: n }); }
     catch (err2) { throw new Error(`Portal SIGMA saturado: ${(err2 as Error).message}. No se envió nada; reintenta en un rato`); }
   }
+  // Cita anterior sin informar (APPEND_PENDING_APPOINTMENTS): regla de la oficina (19/10/2026) → el robot la informa
+  // sola, genérica: Visita realizada · 609 Finalizado no requiere nueva cita · comentario «OK» · fecha/hora CITADAS.
+  // Después vuelve a abrir el Repaso. Forma parte del Repaso aprobado por la oficina.
+  const citasInformadas: string[] = [];
+  const pideCita = (r: { metadata?: { errorCodes?: { code?: string }[] } } | null) =>
+    !r?.success && (r?.metadata?.errorCodes || []).some((x) => String(x?.code) === 'APPEND_PENDING_APPOINTMENTS');
+  for (let vuelta = 0; vuelta < 3 && pideCita(ini); vuelta++) {
+    try {
+      const hechas = await informarCitasPendientes(s, n, CITA_GENERICA.resolucion, CITA_GENERICA.motivo, CITA_GENERICA.comentario, null, null, true);
+      citasInformadas.push(...hechas);
+    } catch (err) {
+      throw new Error(`Hay una cita anterior sin informar y no se pudo informar sola: ${(err as Error).message}${citasInformadas.length ? ` (ya informadas: ${citasInformadas.join('; ')})` : ''}`);
+    }
+    try { ini = await api('review-initial-data', { reparation: n }); }
+    catch (err) { throw new Error(`Cita informada (${citasInformadas.join('; ')}), pero el portal no respondió al abrir el Repaso: ${(err as Error).message}. Reintenta el Repaso en un rato`); }
+  }
+  const prefijoCitas = citasInformadas.length ? `Cita anterior informada (Visita realizada · Finalizado · «OK»): ${citasInformadas.join('; ')} · ` : '';
   if (!ini?.success) {
     console.error('review-initial-data', n, JSON.stringify(ini?.metadata ?? ini).slice(0, 1500));
     if (IVA_PENDIENTE.test(JSON.stringify(ini?.metadata?.errorCodes ?? ini?.metadata ?? ini ?? ''))) throw new IvaPendiente('Documento de IVA pendiente de validar');
-    throw new Error('Al abrir Repaso: ' + traducirCodigos(ini?.metadata?.errorCodes, ini?.metadata?.message ?? ini?.message));
+    throw new Error(prefijoCitas + 'Al abrir Repaso: ' + traducirCodigos(ini?.metadata?.errorCodes, ini?.metadata?.message ?? ini?.message));
   }
+  try {
+    return prefijoCitas + await guardarRepaso(s, e, n, ini, api);
+  } catch (err) {
+    if (prefijoCitas && !(err instanceof IvaPendiente)) throw new Error(prefijoCitas + (err as Error).message);
+    throw err;
+  }
+}
+
+// Segunda parte del Repaso (ya abierto en el portal): valida el envío y lo guarda con review-update
+// deno-lint-ignore no-explicit-any
+async function guardarRepaso(s: Sesion, e: Envio, n: string, ini: any, api: (ruta: string, cuerpo: unknown) => Promise<any>): Promise<string> {
   const d = ini.data;
   if (!d.availabilityPermission) throw new Error('El portal pide elegir hueco de agenda para este servicio: hazlo a mano en el portal');
   if (d.swConforme) throw new Error('El portal pide una conformidad adicional: hazlo a mano en el portal');
@@ -638,11 +668,14 @@ async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
   throw new Error('El portal pidió demasiados pasos seguidos: revisa el servicio en el portal');
 }
 
-async function enviarInformarCita(s: Sesion, e: Envio): Promise<string> {
-  const n = e.parte.numero_servicio;
-  if (!e.resolucion || !e.resolucion_motivo) throw new Error('Falta la resolución o el motivo');
-  if (!MOTIVOS_CITA[e.resolucion]?.includes(e.resolucion_motivo)) throw new Error('El motivo no corresponde a la resolución elegida');
-  if (!e.comentario.trim()) throw new Error('Falta el comentario');
+// Cita genérica que el robot informa solo antes de un Repaso (decisión del usuario 19/10/2026)
+const CITA_GENERICA = { resolucion: 'V', motivo: '609', comentario: 'OK' };
+const RES_CITA: Record<string, string> = { V: 'Visita realizada', I: 'Visita cancelada', C: 'Cita cancelada' };
+
+// Informa en citasPendientes.php una cita pendiente (o todas si `todas`). Devuelve una línea por cita informada.
+// La fecha/hora de la visita es SIEMPRE la citada que muestra el portal (si no se ve, la planificada en el envío).
+async function informarCitasPendientes(s: Sesion, n: string, resolucion: string, motivo: string, comentario: string,
+  citaFecha: string | null, citaHora: string | null, todas: boolean): Promise<string[]> {
   const leer = async () => {
     const html = await s.pedir(`citasPendientes.php?reparacion=${n}&modo=0`);
     const doc = parse(html);
@@ -653,33 +686,52 @@ async function enviarInformarCita(s: Sesion, e: Envio): Promise<string> {
     }).filter((f) => f.id);
     return { doc, filas };
   };
-  const { doc, filas } = await leer();
-  if (!filas.length) throw new Error('El portal no tiene ninguna cita pendiente de informar en este servicio');
-  const fila = filas.find((f) => f.fecha && f.fecha === e.cita_fecha) ?? filas[0];
-  const form = doc.querySelector('form[name="datos_cita"]') as Element | null;
-  if (!form) throw new Error('No se encontró el formulario de Informar citas');
-  const oculto = (nombre: string) => (form.querySelector(`input[name="${nombre}"]`) as Element | null)?.getAttribute('value') ?? '';
-  const campos: Record<string, string> = {
-    idCita: fila.id, reparacion: oculto('reparacion') || n, desde: oculto('desde'), UpdateFrm: '1',
-    resolucion: e.resolucion, motivo: e.resolucion_motivo, comentario: e.comentario.trim(),
-  };
-  let cuando = '';
-  if ((e.resolucion === 'V') && fila.primera) {
-    // Hora de llegada = la CITADA (la del portal; si no se ve, la que planificamos)
-    const fecha = fila.fecha ?? e.cita_fecha;
-    const hora = fila.hora ?? e.cita_hora?.slice(0, 5) ?? null;
-    if (!fecha || !hora) throw new Error('No se sabe la fecha y hora citadas de la visita');
-    const [a, mes, dia] = fecha.split('-');
-    const [hh, mm] = hora.split(':');
-    if (Number(hh) < 7 || Number(hh) > 22) throw new Error('La hora citada está fuera del rango que admite el portal (07–22 h)');
-    Object.assign(campos, { dia: String(Number(dia)), mes: String(Number(mes)), ano: a, hora: hh.padStart(2, '0'), minutos: mm.padStart(2, '0') });
-    cuando = ` · visita ${dia}/${mes}/${a} ${hh}:${mm}`;
+  const hechas: string[] = [];
+  let actual = await leer();
+  if (!actual.filas.length) throw new Error('El portal no tiene ninguna cita pendiente de informar en este servicio');
+  for (let i = 0; i < 5 && actual.filas.length; i++) {
+    const { doc } = actual;
+    // En modo automático (todas) solo citas ya pasadas: nunca se da por realizada una cita futura
+    const ahora = minutoMadrid();
+    const filas = todas ? actual.filas.filter((f) => f.fecha && `${f.fecha} ${f.hora ?? '00:00'}` <= ahora) : actual.filas;
+    if (!filas.length) {
+      if (hechas.length) break;
+      throw new Error('La cita pendiente del portal aún no ha pasado (o no se ve su fecha): infórmala a mano en «Informar citas»');
+    }
+    const fila = (!todas && citaFecha ? filas.find((f) => f.fecha === citaFecha) : null) ?? filas[0];
+    const form = doc.querySelector('form[name="datos_cita"]') as Element | null;
+    if (!form) throw new Error('No se encontró el formulario de Informar citas');
+    const oculto = (nombre: string) => (form.querySelector(`input[name="${nombre}"]`) as Element | null)?.getAttribute('value') ?? '';
+    const campos: Record<string, string> = {
+      idCita: fila.id, reparacion: oculto('reparacion') || n, desde: oculto('desde'), UpdateFrm: '1',
+      resolucion, motivo, comentario,
+    };
+    const fecha = fila.fecha ?? citaFecha;
+    const hora = fila.hora ?? citaHora?.slice(0, 5) ?? null;
+    if (resolucion === 'V' && fila.primera) {
+      if (!fecha || !hora) throw new Error('No se sabe la fecha y hora citadas de la visita');
+      const [a, mes, dia] = fecha.split('-');
+      const [hh, mm] = hora.split(':');
+      if (Number(hh) < 7 || Number(hh) > 22) throw new Error('La hora citada está fuera del rango que admite el portal (07–22 h)');
+      Object.assign(campos, { dia: String(Number(dia)), mes: String(Number(mes)), ano: a, hora: hh.padStart(2, '0'), minutos: mm.padStart(2, '0') });
+    }
+    await s.pedir(form.getAttribute('action') || 'citasPendientes.php', campos);
+    actual = await leer();
+    if (actual.filas.some((f) => f.id === fila.id)) throw new Error('El portal no dio por informada la cita (sigue pendiente)');
+    const [a, mes, dia] = (fecha ?? '').split('-');
+    hechas.push(`${RES_CITA[resolucion]}${fecha ? ` cita ${dia}/${mes}/${a}${hora ? ' ' + hora : ''}` : ''}`);
+    if (!todas) break;
   }
-  await s.pedir(form.getAttribute('action') || 'citasPendientes.php', campos);
-  const despues = await leer();
-  if (despues.filas.some((f) => f.id === fila.id)) throw new Error('El portal no dio por informada la cita (sigue pendiente)');
-  const RES: Record<string, string> = { V: 'Visita realizada', I: 'Visita cancelada', C: 'Cita cancelada' };
-  return `Cita informada: ${RES[e.resolucion]}${cuando}`;
+  return hechas;
+}
+
+async function enviarInformarCita(s: Sesion, e: Envio): Promise<string> {
+  const n = e.parte.numero_servicio;
+  if (!e.resolucion || !e.resolucion_motivo) throw new Error('Falta la resolución o el motivo');
+  if (!MOTIVOS_CITA[e.resolucion]?.includes(e.resolucion_motivo)) throw new Error('El motivo no corresponde a la resolución elegida');
+  if (!e.comentario.trim()) throw new Error('Falta el comentario');
+  const hechas = await informarCitasPendientes(s, n, e.resolucion, e.resolucion_motivo, e.comentario.trim(), e.cita_fecha, e.cita_hora, false);
+  return `Cita informada: ${hechas.join('; ')}`;
 }
 
 // Mensaje a tramitación (pestaña "Su Gestor/Tramitador", sugestor.php). Lo pide la oficina con el botón
