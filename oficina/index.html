@@ -272,7 +272,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.11 (servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.12 (Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -751,7 +751,7 @@ async function vistaHoy() {
     sb.from('informes').select('id', { count: 'exact', head: true }).eq('revisado', false),
     sb.from('informes').select('id, creado_en, texto, revisado, trabajo_terminado, necesita_repaso, operario_id, parte:partes!informes_parte_id_fkey(id, numero_servicio, direccion)')
       .order('creado_en', { ascending: false }).limit(8),
-    sb.from('partes').select('id', { count: 'exact', head: true }).gte('creado_en', inicioHoyISO()),
+    sb.from('partes').select('id', { count: 'exact', head: true }).gte('asignado_en', inicioHoyISO()),
   ]);
   if (asig.error) return fallo(asig.error);
   const lista = asig.data || [];
@@ -759,7 +759,7 @@ async function vistaHoy() {
   const noReal = lista.filter((a) => a.estado === 'no_realizado').length;
   $('#kpis').innerHTML = `
     <a class="kpi" href="#inicio" title="Servicios abiertos (pendientes, asignados, en curso y terminados)" onclick="filtroPartes.estado='abiertos';if($('#fp-estado')){$('#fp-estado').value='abiertos';cargarPartes()}$('#inicio-partes')?.scrollIntoView({behavior:'smooth'});return false"><div class="n">${totalServ.count ?? 0}</div><div class="t">Total servicios</div></a>
-    <a class="kpi ${nuevosHoy.count ? 'alerta' : ''}" href="#inicio" title="Servicios que han entrado hoy en el hub (desde las 00:00)" onclick="verNuevos();return false"><div class="n">${nuevosHoy.count ?? 0}</div><div class="t">Nuevos hoy</div></a>
+    <a class="kpi ${nuevosHoy.count ? 'alerta' : ''}" href="#inicio" title="Servicios que SIGMA nos ha asignado hoy (desde las 00:00)" onclick="verNuevos();return false"><div class="n">${nuevosHoy.count ?? 0}</div><div class="t">Nuevos hoy</div></a>
     <a class="kpi" href="#plan"><div class="n">${hechas}/${lista.length}</div><div class="t">Visitas hechas hoy</div></a>
     <a class="kpi ${noReal ? 'mal' : ''}" href="#plan"><div class="n">${noReal}</div><div class="t">No realizadas hoy</div></a>
     <a class="kpi ${urg.count ? 'mal' : ''}" href="#inicio" onclick="filtroPartes.estado='abiertos';$('#inicio-partes')?.scrollIntoView({behavior:'smooth'});return false"><div class="n">${urg.count ?? 0}</div><div class="t">Urgentes abiertos</div></a>
@@ -1186,9 +1186,10 @@ async function quitarAsignacion(id) {
 //  PARTES
 // =====================================================================
 let filtroPartes = { texto: '', estado: 'abiertos', cia: '', ciudad: '', pueblo: '', gremio: '', nuevos: '' };
-// Servicio «nuevo» = entró en el hub hoy (desde las 00:00, hora del ordenador)
+// Servicio «nuevo» = SIGMA nos lo ha asignado hoy (fecha de asignación de la ficha, desde las 00:00).
+// Los manuales: dados de alta hoy. Columna partes.asignado_en (la calcula la BD).
 function inicioHoyISO() { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); }
-function esNuevoHoy(p) { return !!p.creado_en && new Date(p.creado_en) >= new Date(inicioHoyISO()); }
+function esNuevoHoy(p) { return !!p.asignado_en && new Date(p.asignado_en) >= new Date(inicioHoyISO()); }
 function verNuevos() {
   filtroPartes.nuevos = '1'; filtroPartes.estado = 'todos';
   if ($('#fp-nuevos')) { $('#fp-nuevos').value = '1'; $('#fp-estado').value = 'todos'; cargarPartes(); }
@@ -1332,8 +1333,8 @@ async function consultaPartes(limite) {
   if (filtroPartes.estado === 'abiertos') q = q.in('estado', ABIERTOS);
   else if (filtroPartes.estado !== 'todos') q = q.eq('estado', filtroPartes.estado);
   if (filtroPartes.cia) q = q.eq('compania_id', Number(filtroPartes.cia));
-  if (filtroPartes.nuevos === '1') q = q.gte('creado_en', inicioHoyISO());
-  else if (filtroPartes.nuevos === '0') q = q.lt('creado_en', inicioHoyISO());
+  if (filtroPartes.nuevos === '1') q = q.gte('asignado_en', inicioHoyISO());
+  else if (filtroPartes.nuevos === '0') q = q.or(`asignado_en.lt.${inicioHoyISO()},asignado_en.is.null`);
   if (filtroPartes.pueblo && cachePueblos?.cat.get(filtroPartes.pueblo)) q = q.in('id', cachePueblos.cat.get(filtroPartes.pueblo).ids);
   else if (filtroPartes.ciudad) {
     const pr = Object.keys(PROVINCIAS_CP).find((k) => PROVINCIAS_CP[k] === filtroPartes.ciudad);
@@ -1361,7 +1362,7 @@ async function cargarPartes() {
       const prox = (p.asignaciones || []).filter((a) => a.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
       const nuevo = esNuevoHoy(p);
       return `<tr class="clic${nuevo ? ' nuevo-hoy' : ''}" onclick="modalParte('${p.id}')">
-        <td><b>${esc(p.numero_servicio)}</b> ${nuevo ? `<span class="et nuevo" title="Entró en el hub hoy a las ${new Date(p.creado_en).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}">NUEVO</span> ` : ''}${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
+        <td><b>${esc(p.numero_servicio)}</b> ${nuevo ? `<span class="et nuevo" title="Asignado hoy a las ${new Date(p.asignado_en).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}">NUEVO</span> ` : ''}${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
         <td class="opc">${esc(p.compania?.nombre)}</td>
         <td>${esc(p.direccion)}${p.poblacion ? '<br><small style="color:var(--suave)">' + esc(p.poblacion) + '</small>' : ''}</td>
         <td class="opc">${esc(p.asegurado || '')}<br><small style="color:var(--suave)">${esc(p.telefono || '')}</small></td>
