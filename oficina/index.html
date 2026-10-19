@@ -269,7 +269,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.8 (sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.9 (Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -578,6 +578,8 @@ async function vistaEnvios() {
     </div>`;
   }).join('') || '<div class="tarjeta vacio">No hay envíos aquí.</div>';
 }
+// Fecha a formato de <input type="datetime-local"> (hora local del navegador)
+function aLocal(d) { const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`; }
 function validarEnvio(e) {
   if (!e.comentario || !e.comentario.trim()) return 'Falta el comentario';
   if (e.tipo === 'repaso') {
@@ -588,6 +590,11 @@ function validarEnvio(e) {
     if (dias < 0) return 'La fecha ya ha pasado';
     if (dias > m[2]) return `Para "${m[1]}" la fecha no puede pasar de ${m[2]} días desde hoy`;
     if (e.hora && !HORAS_SIGMA.includes(hCorta(e.hora))) return 'La hora debe ser en punto o y media (08:00–21:30)';
+    // Servicio sin primer contacto (estado 15): SIGMA exige la fecha y hora en que se contactó con el cliente
+    if (e.parte && String(e.parte.sigma_estado) === '15') {
+      if (!e.contacto_en) return 'Falta la fecha y hora en que contactasteis con el cliente (SIGMA la exige en servicios sin primer contacto)';
+      if (new Date(e.contacto_en).getTime() > Date.now() + 5 * 60000) return 'La fecha de contacto con el cliente no puede ser futura';
+    }
   } else {
     if (!RESOLUCIONES[e.resolucion]) return 'Elige la resolución';
     if (!RESOLUCIONES[e.resolucion][1].some((x) => x[0] === e.resolucion_motivo)) return 'Elige el motivo';
@@ -602,11 +609,11 @@ async function cambiarEnvio(id, estado) {
   cerrarModal(); contarEnvios(); if (vistaActual === 'envios') vistaEnvios();
 }
 async function aprobarTodos() {
-  const { data } = await sb.from('sigma_envios').select('*').in('estado', ['borrador']);
+  const { data } = await sb.from('sigma_envios').select('*, parte:partes(sigma_estado)').in('estado', ['borrador']);
   const ok = (data || []).filter((e) => !validarEnvio(e));
   if (!ok.length) return alert('No hay borradores listos para aprobar (revisa los avisos ⚠️).');
   if (!confirm(`¿Aprobar y enviar ${ok.length} envío(s) a SIGMA?`)) return;
-  for (const e of ok) { const { error } = await sb.from('sigma_envios').update({ estado: 'aprobado' }).eq('id', e.id); if (error) return fallo(error); }
+  for (const e of ok) { const { error } = await sb.from('sigma_envios').update({ estado: 'aprobado', resultado: null }).eq('id', e.id); if (error) return fallo(error); }
   aviso(`${ok.length} envío(s) aprobados`); vistaEnvios(); contarEnvios();
 }
 async function nuevoEnvio(parteId) {
@@ -615,7 +622,7 @@ async function nuevoEnvio(parteId) {
   modalEnvio(data.id);
 }
 async function modalEnvio(id) {
-  const { data: e, error } = await sb.from('sigma_envios').select('*, parte:partes(id, numero_servicio, direccion, poblacion, sigma_cuenta, sigma_alerta, sigma_estado_texto)').eq('id', id).single();
+  const { data: e, error } = await sb.from('sigma_envios').select('*, parte:partes(id, numero_servicio, direccion, poblacion, sigma_cuenta, sigma_alerta, sigma_estado, sigma_estado_texto)').eq('id', id).single();
   if (error) return fallo(error);
   const editable = ['borrador', 'error'].includes(e.estado);
   const dis = editable ? '' : 'disabled';
@@ -631,7 +638,10 @@ async function modalEnvio(id) {
       <div class="dos">
         <div><label>Fecha siguiente acción</label><input id="en-fecha" type="date" value="${e.fecha || ''}" ${dis}></div>
         <div><label>Hora</label><select id="en-hora" ${dis}><option value="">Sin hora</option>${HORAS_SIGMA.map((h) => `<option ${h === horaActual ? 'selected' : ''}>${h}</option>`).join('')}${horaActual && !HORAS_SIGMA.includes(horaActual) ? `<option selected value="${horaActual}">${horaActual} (no válida en SIGMA)</option>` : ''}</select></div>
-      </div>`;
+      </div>
+      ${String(e.parte.sigma_estado) === '15' || e.contacto_en ? `
+      <div class="nota" style="margin-top:10px">Servicio <b>sin primer contacto</b>: SIGMA exige la fecha y hora en que contactasteis con el cliente.</div>
+      <label>Fecha y hora del contacto con el cliente</label><input id="en-contacto" type="datetime-local" step="60" max="${aLocal(new Date())}" value="${e.contacto_en ? aLocal(new Date(e.contacto_en)) : ''}" ${dis}>` : ''}`;
   } else {
     campos = `
       <div class="dos">
@@ -657,11 +667,12 @@ function rellenarMotivosCita() {
   s.innerHTML = lista.map((m) => `<option value="${m[0]}" ${m[0] === actual ? 'selected' : ''}>${esc(m[1])}</option>`).join('');
 }
 async function guardarEnvio(id, aprobar) {
-  const { data: e } = await sb.from('sigma_envios').select('tipo').eq('id', id).single();
+  const { data: e } = await sb.from('sigma_envios').select('tipo, parte:partes(sigma_estado)').eq('id', id).single();
   const fila = { comentario: $('#en-com').value.trim() };
   if (e.tipo === 'repaso') {
     const m = MOTIVOS_REPASO.find((x) => x[0] === $('#en-motivo').value);
     Object.assign(fila, { motivo_codigo: m[0], motivo_texto: m[1], fecha: $('#en-fecha').value || null, hora: $('#en-hora').value || null });
+    if ($('#en-contacto')) fila.contacto_en = $('#en-contacto').value ? new Date($('#en-contacto').value).toISOString() : null;
   } else {
     const r = $('#en-res').value; const mm = $('#en-resmot').value;
     Object.assign(fila, { resolucion: r, resolucion_motivo: mm, motivo_texto: RESOLUCIONES[r][1].find((x) => x[0] === mm)?.[1] });

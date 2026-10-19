@@ -432,12 +432,13 @@ const MOTIVOS_CITA: Record<string, string[]> = { V: ['609', '611', '604', '601']
 type Envio = {
   id: string; parte_id: string; tipo: 'repaso' | 'informar_cita'; motivo_codigo: string | null; motivo_texto: string | null;
   fecha: string | null; hora: string | null; resolucion: string | null; resolucion_motivo: string | null;
-  cita_fecha: string | null; cita_hora: string | null; comentario: string; parte: { numero_servicio: string; sigma_cuenta: string };
+  cita_fecha: string | null; cita_hora: string | null; comentario: string; contacto_en?: string | null; parte: { numero_servicio: string; sigma_cuenta: string };
 };
 
 // Traduce los códigos de error del servicio de Repaso. Si el código no es conocido (p. ej. "68"),
 // se añade el texto que lo acompañe en la respuesta (message, description…) para que la oficina sepa qué pasa.
 const CODIGOS_REPASO: Record<string, string> = {
+  '68': 'SIGMA pide la fecha y hora en que se contactó con el cliente (servicio sin primer contacto): rellénala en el envío y reintenta',
   APPEND_PENDING_APPOINTMENTS: 'Hay una cita anterior sin informar: primero hay que enviar "Informar citas"',
   TXT_GENERICERROR: 'Error genérico del portal',
 };
@@ -516,10 +517,21 @@ async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
     if (!HORAS_REPASO.includes(hourRaw)) throw new Error('La hora del Repaso debe ser en punto o y media, entre 08:00 y 21:30');
   }
   const [a, mes, dia] = e.fecha.split('-');
+  // Servicio sin primer contacto (estado 15): SIGMA exige «Fecha en la que contactó con el cliente» (si falta → código 68)
+  let contacto: Record<string, string> | null = null;
+  if (d.dates?.clientContact) {
+    if (!e.contacto_en) throw new Error('SIGMA pide la fecha y hora en que se contactó con el cliente (servicio sin primer contacto): rellénala en el envío y reintenta');
+    const cuando = new Date(e.contacto_en);
+    if (cuando.getTime() > Date.now() + 5 * 60000) throw new Error('La fecha de contacto con el cliente no puede ser futura');
+    const pz = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(cuando).map((x) => [x.type, x.value]));
+    const hh = pz.hour.padStart(2, '0'), mi = pz.minute.padStart(2, '0');
+    contacto = { day: String(Number(pz.day)), month: String(Number(pz.month)), year: pz.year, hourRaw: String(3600 * Number(hh) + 60 * Number(mi)), hour: hh, minute: mi };
+  }
   const cmd: Record<string, unknown> = {
     reparation: n, controlAvailability: 1, controlDuration: 1,
     reviewReason: String(e.motivo_codigo), comment: e.comentario.trim(),
-    dates: { actionDate: { day: String(Number(dia)), month: String(Number(mes)), year: a, hourRaw }, exceededDate: d.dates?.exceededDate ?? null },
+    dates: { actionDate: { day: String(Number(dia)), month: String(Number(mes)), year: a, hourRaw }, exceededDate: d.dates?.exceededDate ?? null, ...(contacto ? { clientContactDate: contacto } : {}) },
   };
   if (d.heater?.enabled && d.heater.ageHeater) cmd.heater = { ageHeater: d.heater.ageHeater };
   // Secuencia del portal (probada a mano el 18/10/2026, servicio 29385460):
@@ -530,7 +542,7 @@ async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
   //  3) vuelve a pedir el aviso de SMS → siempre "Sí"
   //  4) APLAZAMOK = guardado.
   const nombreMotivo = String(motivo.label).replace(/\s*\[\d+\]/, '').trim();
-  const resumen = (extra = '') => `Repaso guardado: ${nombreMotivo} ${dia}/${mes}/${a}${e.hora ? ' ' + e.hora.slice(0, 5) : ''}${extra}`;
+  const resumen = (extra = '') => `Repaso guardado: ${nombreMotivo} ${dia}/${mes}/${a}${e.hora ? ' ' + e.hora.slice(0, 5) : ''}${contacto ? ` · contacto con el cliente ${contacto.day}/${contacto.month} ${contacto.hour}:${contacto.minute}` : ''}${extra}`;
   const inicio = minutoMadrid(); // para reconocer en la bitácora la anotación de este envío
   // ¿Ya está en SIGMA? Busca en la bitácora de la ficha una anotación de este motivo y fecha/hora hecha desde el inicio del envío
   const yaGuardado = async () => {
@@ -577,7 +589,7 @@ async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
       // Igual que la opción a) del portal; el formulario se rehace, así que el aviso de SMS se pregunta otra vez
       enviar = {
         ...cmd, hourRadioButton: hourRaw,
-        dates: { actionDate: { day: String(Number(dia)), month: String(Number(mes)), year: a, hourRaw, date: `${dia}/${mes}/${a}` }, exceededDate: nd.dates.exceededDate ?? null },
+        dates: { actionDate: { day: String(Number(dia)), month: String(Number(mes)), year: a, hourRaw, date: `${dia}/${mes}/${a}` }, exceededDate: nd.dates.exceededDate ?? null, ...(contacto ? { clientContactDate: contacto } : {}) },
       };
       continue;
     }
