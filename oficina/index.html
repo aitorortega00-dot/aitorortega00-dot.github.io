@@ -269,7 +269,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.9 (Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.10 (Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -616,17 +616,26 @@ async function aprobarTodos() {
   for (const e of ok) { const { error } = await sb.from('sigma_envios').update({ estado: 'aprobado', resultado: null }).eq('id', e.id); if (error) return fallo(error); }
   aviso(`${ok.length} envío(s) aprobados`); vistaEnvios(); contarEnvios();
 }
+// Repaso nuevo: no se guarda en la bandeja hasta pulsar Guardar o Aprobar (abrir y cerrar no deja nada)
+let envioNuevo = null;
 async function nuevoEnvio(parteId) {
-  const { data, error } = await sb.from('sigma_envios').insert({ parte_id: parteId, tipo: 'repaso', origen: 'manual', motivo_codigo: '2', motivo_texto: 'Visita al Cliente', comentario: '' }).select('id').single();
+  const { data: parte, error } = await sb.from('partes').select('id, numero_servicio, direccion, poblacion, sigma_cuenta, sigma_alerta, sigma_estado, sigma_estado_texto').eq('id', parteId).single();
   if (error) return fallo(error);
-  modalEnvio(data.id);
+  envioNuevo = { id: 'nuevo', parte_id: parteId, tipo: 'repaso', origen: 'manual', estado: 'borrador', motivo_codigo: '2', motivo_texto: 'Visita al Cliente', comentario: '', parte };
+  modalEnvio('nuevo');
 }
 async function modalEnvio(id) {
-  const { data: e, error } = await sb.from('sigma_envios').select('*, parte:partes(id, numero_servicio, direccion, poblacion, sigma_cuenta, sigma_alerta, sigma_estado, sigma_estado_texto)').eq('id', id).single();
-  if (error) return fallo(error);
+  let e;
+  if (id === 'nuevo') e = envioNuevo;
+  else {
+    const r = await sb.from('sigma_envios').select('*, parte:partes(id, numero_servicio, direccion, poblacion, sigma_cuenta, sigma_alerta, sigma_estado, sigma_estado_texto)').eq('id', id).single();
+    if (r.error) return fallo(r.error);
+    e = r.data;
+  }
+  const esNuevo = id === 'nuevo';
   const editable = ['borrador', 'error'].includes(e.estado);
   const dis = editable ? '' : 'disabled';
-  const cab = `<h3>${e.tipo === 'repaso' ? 'Repaso' : 'Informar citas'} · ${esc(e.parte.numero_servicio)} <span class="et ${e.estado}">${TXT_ENVIO[e.estado]}</span></h3>
+  const cab = `<h3>${e.tipo === 'repaso' ? 'Repaso' : 'Informar citas'} · ${esc(e.parte.numero_servicio)} ${esNuevo ? '<span class="et borrador">Nuevo</span>' : `<span class="et ${e.estado}">${TXT_ENVIO[e.estado]}</span>`}</h3>
     <div style="color:var(--suave)">${esc([e.parte.direccion, e.parte.poblacion].filter(Boolean).join(', '))} ${etiquetaSigma(e.parte)}</div>
     ${e.parte.sigma_estado_texto ? `<div style="font-size:12px;color:var(--suave);margin-top:4px">Estado actual en SIGMA: ${esc(e.parte.sigma_estado_texto)}</div>` : ''}
     ${e.resultado ? `<div class="nota" style="margin-top:10px;${e.estado === 'enviado' ? 'background:#DDF0E3;color:var(--ok)' : ''}">${esc(e.resultado)}</div>` : ''}`;
@@ -653,7 +662,8 @@ async function modalEnvio(id) {
   abrirModal(`${cab}${campos}
     <label>Comentario (es lo que verá SIGMA)</label><textarea id="en-com" ${dis} style="min-height:120px">${esc(e.comentario || '')}</textarea>
     <div class="acciones">
-      ${editable ? `<button class="peligro" onclick="cambiarEnvio('${e.id}','descartado')">Descartar</button>` : ''}
+      ${editable && !esNuevo ? `<button class="peligro" onclick="cambiarEnvio('${e.id}','descartado')">Descartar</button>` : ''}
+      ${esNuevo ? '<button class="sec" onclick="cerrarModal()">Cancelar</button>' : ''}
       <span class="esp"></span>
       <button class="sec" onclick="cerrarModal();modalParte('${e.parte.id}')">Ver servicio</button>
       ${editable ? `<button class="sec" onclick="guardarEnvio('${e.id}',false)">Guardar</button><button onclick="guardarEnvio('${e.id}',true)">${e.estado === 'error' ? 'Guardar y reintentar' : 'Aprobar y enviar'}</button>` : '<button onclick="cerrarModal()">Cerrar</button>'}
@@ -667,7 +677,8 @@ function rellenarMotivosCita() {
   s.innerHTML = lista.map((m) => `<option value="${m[0]}" ${m[0] === actual ? 'selected' : ''}>${esc(m[1])}</option>`).join('');
 }
 async function guardarEnvio(id, aprobar) {
-  const { data: e } = await sb.from('sigma_envios').select('tipo, parte:partes(sigma_estado)').eq('id', id).single();
+  const esNuevo = id === 'nuevo';
+  const e = esNuevo ? envioNuevo : (await sb.from('sigma_envios').select('tipo, parte:partes(sigma_estado)').eq('id', id).single()).data;
   const fila = { comentario: $('#en-com').value.trim() };
   if (e.tipo === 'repaso') {
     const m = MOTIVOS_REPASO.find((x) => x[0] === $('#en-motivo').value);
@@ -681,8 +692,17 @@ async function guardarEnvio(id, aprobar) {
   if (aprobar && problema) return alert('No se puede enviar: ' + problema);
   if (aprobar) { fila.estado = 'aprobado'; fila.resultado = null; }
   else if (problema) aviso('Guardado (ojo: ' + problema + ')');
-  const { error } = await sb.from('sigma_envios').update(fila).eq('id', id);
+  if (esNuevo && !aprobar && !fila.comentario) return alert('Escribe el comentario antes de guardar (si no, no se guarda nada).');
+  let error;
+  if (esNuevo) {
+    // Se crea como borrador y, si se aprueba, se pasa a aprobado (el disparo inmediato salta al cambiar el estado)
+    const { estado, resultado, ...datos } = fila;
+    const r = await sb.from('sigma_envios').insert({ parte_id: e.parte_id, tipo: 'repaso', origen: 'manual', ...datos }).select('id').single();
+    error = r.error;
+    if (!error && aprobar) error = (await sb.from('sigma_envios').update({ estado: 'aprobado', resultado: null }).eq('id', r.data.id)).error;
+  } else error = (await sb.from('sigma_envios').update(fila).eq('id', id)).error;
   if (error) return fallo(error);
+  if (esNuevo) envioNuevo = null;
   if (aprobar) aviso('Aprobado: enviándolo a SIGMA…'); else if (!problema) aviso('Guardado');
   cerrarModal(); contarEnvios(); if (vistaActual === 'envios') vistaEnvios();
 }
