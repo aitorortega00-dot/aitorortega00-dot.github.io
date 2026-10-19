@@ -280,7 +280,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.16 ([PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.17 (Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -847,6 +847,38 @@ async function vistaRepasos() {
   await CLASIF_REPASOS.find((c) => c.id === clasifRepaso).pintar($('#rep-cont'));
 }
 
+// ---------- Nuevos / antiguos (común a las clasificaciones de Repasos) ----------
+// Antigüedad = «Fecha/Hora Asignación» de la ficha SIGMA (si aún no hay ficha, cuándo entró en el hub).
+// Nuevo = asignado hoy (misma regla que en Inicio). Sirve para ordenar la prioridad del repaso.
+const SEL_ASIG = 'origen, creado_en, asig:sigma_ficha->>asignacion';
+const OPC_ANTIG = [['antiguos', 'Antiguos primero'], ['nuevos', 'Nuevos primero'], ['solo_nuevos', 'Solo nuevos de hoy'], ['solo_antiguos', 'Solo antiguos']];
+let filtroAntig = 'antiguos';
+function fechaAsig(p) {
+  const m = String(p.asig || '').match(/(\d{2})\/(\d{2})\/(\d{4})(?:\D+(\d{2}):(\d{2}))?/);
+  if (m) return new Date(+m[3], m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0));
+  return p.creado_en ? new Date(p.creado_en) : null;
+}
+function esNuevoRep(p) { const d = fechaAsig(p); return !!d && d >= new Date(inicioHoyISO()); }
+function filtrarAntig(lista) {
+  if (filtroAntig === 'solo_nuevos') return lista.filter(esNuevoRep);
+  if (filtroAntig === 'solo_antiguos') return lista.filter((p) => !esNuevoRep(p));
+  return lista;
+}
+function ordenAntig(a, b) {
+  const ta = fechaAsig(a)?.getTime() ?? 0, tb = fechaAsig(b)?.getTime() ?? 0;
+  return filtroAntig === 'nuevos' ? tb - ta : ta - tb;
+}
+function selectAntig(id) {
+  return `<select id="${id}" style="max-width:190px" title="Ordenar por fecha de asignación de SIGMA">${OPC_ANTIG.map(([v, t]) => `<option value="${v}" ${v === filtroAntig ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+}
+function etiquetaAntig(p) {
+  const d = fechaAsig(p);
+  if (!d) return '';
+  if (esNuevoRep(p)) return `<span class="et nuevo" title="Asignado hoy a las ${dos(d.getHours())}:${dos(d.getMinutes())}">NUEVO</span>`;
+  const dias = Math.round((new Date(inicioHoyISO()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
+  return `<span class="et" title="Asignado el ${dos(d.getDate())}/${dos(d.getMonth() + 1)}/${d.getFullYear()}">${dias === 1 ? 'Ayer' : 'Hace ' + dias + ' d'}</span>`;
+}
+
 // ---------- Clasificador: CADUCADAS / CADUCAN HOY ----------
 // El robot lee el filtro Caducidad del listado del portal (REDES / RESTO / CLIENTE) y guarda en cada
 // parte cuándo entró (sigma_cad_desde) y cuándo salió (sigma_cad_hasta) con el estado de antes y después.
@@ -906,7 +938,7 @@ function tarjetaCad(p, carril) {
   const bloq = ivaBloq(p) && carril !== 'resuelta';
   return `<div class="cad ${salto ? 'salto' : ''} ${bloq ? 'bloq' : ''}" ${bloq ? `title="${esc(TXT_BLOQUEO_IVA)}"` : `onclick="modalParte('${p.id}')"`}>
     <div class="l1">${p.sigma_alerta ? `<span class="punto ${p.sigma_alerta}" title="Alerta ${p.sigma_alerta}"></span>` : ''}<b>${esc(p.numero_servicio)}</b>
-      ${p.urgente ? '<span class="et urg">URG</span>' : ''}<span class="esp"></span>
+      ${etiquetaAntig(p)} ${p.urgente ? '<span class="et urg">URG</span>' : ''}<span class="esp"></span>
       ${g ? `<span class="et gr g-${p.sigma_cad_grupo}">${g.nombre}</span>` : ''}<span class="et sigma">SIGMA ${p.sigma_cuenta === 'PAL' ? 'PALENCIA' : 'VALLADOLID'}</span></div>
     ${estado}
     <div class="met">${esc(p.asegurado || '—')}${tels.length ? ' · ' + tels.map((t) => `<a href="tel:${esc(t)}" onclick="event.stopPropagation()">${esc(t)}</a>`).join(' · ') : ''}</div>
@@ -921,18 +953,21 @@ async function pintarCaducadas(destino) {
     destino.innerHTML = `<div id="cad-raiz">
       <div class="barra" style="margin-bottom:8px">
         <select id="cad-cuenta" style="max-width:190px"><option value="">Todas las provincias</option>${Object.entries(CUENTAS_SIGMA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+        ${selectAntig('cad-antig')}
         <span class="esp"></span><span id="cad-leido" style="font-size:12px;color:var(--suave)"></span></div>
       <div id="cad-grupos" class="cad-grupos"></div>
       <div id="cad-tablero">Cargando…</div></div>`;
     $('#cad-cuenta').value = filtroCadCuenta;
     $('#cad-cuenta').onchange = (e) => { filtroCadCuenta = e.target.value; pintarCaducadas(destino); };
+    $('#cad-antig').onchange = (e) => { filtroAntig = e.target.value; pintarCaducadas(destino); };
   }
-  let q = sb.from('partes').select('id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, urgente, sigma_cuenta, sigma_alerta, sigma_estado, sigma_caducidad, sigma_llamadas, sigma_cad_grupo, sigma_cad_desde, sigma_cad_hasta, sigma_cad_estado, sigma_cad_estado_fin, sigma_iva_pendiente, sigma_envios(id, tipo, estado, creado_en, enviado_en)')
+  let q = sb.from('partes').select(`id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, urgente, sigma_cuenta, sigma_alerta, sigma_estado, sigma_caducidad, sigma_llamadas, sigma_cad_grupo, sigma_cad_desde, sigma_cad_hasta, sigma_cad_estado, sigma_cad_estado_fin, sigma_iva_pendiente, ${SEL_ASIG}, sigma_envios(id, tipo, estado, creado_en, enviado_en)`)
     .not('sigma_cad_desde', 'is', null).or(`sigma_cad_hasta.is.null,sigma_cad_hasta.gte.${inicioHoy()}`);
   if (filtroCadCuenta) q = q.eq('sigma_cuenta', filtroCadCuenta);
   const { data, error } = await q;
   if (error) return fallo(error);
-  const todas = (data || []).map((p) => ({ ...p, carril: carrilDe(p) }));
+  $('#cad-antig').value = filtroAntig;
+  const todas = filtrarAntig((data || []).map((p) => ({ ...p, carril: carrilDe(p) })));
 
   // Grupos: pendientes y avance del día
   const resumen = (lista) => { const res = lista.filter((p) => p.carril === 'resuelta').length; return { pend: lista.length - res, res, tot: lista.length }; };
@@ -950,12 +985,12 @@ async function pintarCaducadas(destino) {
   const lista = todas.filter((p) => !filtroCadGrupo || p.sigma_cad_grupo === filtroCadGrupo);
   const orden = { rojo: 0, amarillo: 1, verde: 2 };
   if (!todas.length) {
-    $('#cad-tablero').innerHTML = '<div class="tarjeta vacio">No hay servicios caducados ni que caduquen hoy. 👍<br><small>Si acabas de activar esta vista, aparecerán tras la próxima lectura del portal.</small></div>';
+    $('#cad-tablero').innerHTML = filtroAntig.startsWith('solo_') ? '<div class="tarjeta vacio">No hay servicios con este filtro.</div>' : '<div class="tarjeta vacio">No hay servicios caducados ni que caduquen hoy. 👍<br><small>Si acabas de activar esta vista, aparecerán tras la próxima lectura del portal.</small></div>';
   } else {
     $('#cad-tablero').innerHTML = `<div class="carriles">${CARRILES_CAD.map(([id, nombre, ayuda]) => {
       const en = lista.filter((p) => p.carril === id).sort(id === 'resuelta'
         ? (a, b) => b.sigma_cad_hasta.localeCompare(a.sigma_cad_hasta)
-        : (a, b) => (ivaBloq(a) - ivaBloq(b)) || (b.urgente - a.urgente) || ((orden[a.sigma_alerta] ?? 3) - (orden[b.sigma_alerta] ?? 3)) || ((b.sigma_caducidad ?? -99) - (a.sigma_caducidad ?? -99)));
+        : (a, b) => (ivaBloq(a) - ivaBloq(b)) || ordenAntig(a, b) || (b.urgente - a.urgente) || ((orden[a.sigma_alerta] ?? 3) - (orden[b.sigma_alerta] ?? 3)) || ((b.sigma_caducidad ?? -99) - (a.sigma_caducidad ?? -99)));
       return `<section class="carril c-${id}"><h3>${nombre}<span class="n">${en.length}</span></h3><p>${ayuda}</p>
         ${en.map((p) => tarjetaCad(p, id)).join('') || '<div class="vacio" style="padding:10px;font-size:12px">—</div>'}</section>`;
     }).join('')}</div>`;
@@ -994,19 +1029,21 @@ async function pintarSinContacto(destino) {
   if (!$('#sc-raiz')) {
     destino.innerHTML = `<div id="sc-raiz">
       <div class="barra" style="margin-bottom:8px">
-        <select id="sc-cuenta" style="max-width:190px"><option value="">Todas las provincias</option>${Object.entries(CUENTAS_SIGMA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+        <select id="sc-cuenta" style="max-width:190px"><option value="">Todas las provincias</option>${Object.entries(CUENTAS_SIGMA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select> ${selectAntig('sc-antig')}</div>
       <p style="color:var(--suave);font-size:13px;margin-top:0">Servicios de SIGMA en los que todavía no se ha hablado con el cliente. Los clasifica el robot en cada pasada (cada 15 min) con la lista <b>Pendiente de primer contacto</b> de Gestión repaso del portal; salen de aquí solos cuando en SIGMA cambia el estado (p. ej. al enviar un Repaso).</p>
       <div id="sc-lista">Cargando…</div></div>`;
     $('#sc-cuenta').value = filtroSinContacto;
     $('#sc-cuenta').onchange = (e) => { filtroSinContacto = e.target.value; pintarSinContacto(destino); };
+    $('#sc-antig').onchange = (e) => { filtroAntig = e.target.value; pintarSinContacto(destino); };
   }
-  let q = sb.from('partes').select('id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, gremio, urgente, estado, sigma_cuenta, sigma_alerta, sigma_en_curso, sigma_estado, sigma_estado_texto, sigma_caducidad, sigma_llamadas, sigma_sin_contacto_desde, sigma_iva_pendiente, sigma_envios(tipo, estado, creado_en, enviado_en), asignaciones!asignaciones_parte_id_fkey(fecha, operario_id)')
+  let q = sb.from('partes').select(`id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, gremio, urgente, estado, sigma_cuenta, sigma_alerta, sigma_en_curso, sigma_estado, sigma_estado_texto, sigma_caducidad, sigma_llamadas, sigma_sin_contacto_desde, sigma_iva_pendiente, ${SEL_ASIG}, sigma_envios(tipo, estado, creado_en, enviado_en), asignaciones!asignaciones_parte_id_fkey(fecha, operario_id)`)
     .eq('sigma_sin_contacto', true).eq('sigma_en_curso', true);
   if (filtroSinContacto) q = q.eq('sigma_cuenta', filtroSinContacto);
   const { data, error } = await q;
   if (error) return fallo(error);
-  const lista = (data || []).map((p) => ({ ...p, plazo: plazoContacto(p) }))
-    .sort((a, b) => (ivaBloq(a) - ivaBloq(b)) || (b.urgente - a.urgente) || ((a.plazo?.getTime() ?? 9e15) - (b.plazo?.getTime() ?? 9e15)) || ((a.sigma_caducidad ?? 999) - (b.sigma_caducidad ?? 999)));
+  $('#sc-antig').value = filtroAntig;
+  const lista = filtrarAntig((data || []).map((p) => ({ ...p, plazo: plazoContacto(p) })))
+    .sort((a, b) => (ivaBloq(a) - ivaBloq(b)) || ordenAntig(a, b) || (b.urgente - a.urgente) || ((a.plazo?.getTime() ?? 9e15) - (b.plazo?.getTime() ?? 9e15)) || ((a.sigma_caducidad ?? 999) - (b.sigma_caducidad ?? 999)));
   const hoy = hoyISO();
   $('#sc-lista').innerHTML = lista.length ? `
     <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nº servicio</th><th>Cliente y teléfono</th><th>Dirección</th><th class="opc">Gremio</th><th>Plazo SIGMA</th><th>En la lista desde</th><th></th></tr></thead>
@@ -1016,7 +1053,7 @@ async function pintarSinContacto(destino) {
       const prox = (p.asignaciones || []).filter((a) => a.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
       const bloq = ivaBloq(p);
       return `<tr class="${bloq ? 'bloq' : 'clic'}" ${bloq ? `title="${esc(TXT_BLOQUEO_IVA)}"` : `onclick="modalParte('${p.id}')"`}>
-        <td><b>${esc(p.numero_servicio)}</b> ${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
+        <td><b>${esc(p.numero_servicio)}</b> ${etiquetaAntig(p)} ${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
         <td>${esc(p.asegurado || '—')}${tels.map((t) => `<br><a href="tel:${esc(t)}" onclick="event.stopPropagation()">${esc(t)}</a>`).join('')}</td>
         <td>${esc(p.direccion)}${p.poblacion ? '<br><small style="color:var(--suave)">' + esc(p.poblacion) + '</small>' : ''}</td>
         <td class="opc">${esc(p.gremio || '')}</td>
@@ -1029,7 +1066,7 @@ async function pintarSinContacto(destino) {
       </tr>`;
     }).join('')}</tbody></table></div>
     <p style="color:var(--suave);font-size:12px">${lista.length} servicio(s) sin primer contacto</p>`
-    : '<div class="tarjeta vacio">No hay servicios pendientes de primer contacto. 👍</div>';
+    : filtroAntig.startsWith('solo_') ? '<div class="tarjeta vacio">No hay servicios con este filtro.</div>' : '<div class="tarjeta vacio">No hay servicios pendientes de primer contacto. 👍</div>';
 }
 
 function verRuta(dirs) {
