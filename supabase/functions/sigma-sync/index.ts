@@ -576,7 +576,7 @@ async function guardarRepaso(s: Sesion, e: Envio, n: string, ini: any, api: (rut
   if (motivo.sub?.length) throw new Error(`El motivo "${motivo.label}" pide un submotivo: hazlo a mano en el portal`);
   const max = Number((String(motivo.label).match(/\[(\d+)\]/) || [])[1] ?? NaN);
   const hoy = hoyMadrid();
-  const dias = Math.round((Date.parse(e.fecha) - Date.parse(hoy)) / 86400000);
+  const dias = Math.round((Date.parse(e.fecha!) - Date.parse(hoy)) / 86400000);
   if (dias < 0) throw new Error('La fecha ya ha pasado');
   if (Number.isFinite(max) && dias > max) throw new Error(`Para "${motivo.label}" la fecha no puede pasar de ${max} días desde hoy`);
   let hourRaw = '';
@@ -585,7 +585,7 @@ async function guardarRepaso(s: Sesion, e: Envio, n: string, ini: any, api: (rut
     hourRaw = String(h * 3600 + m * 60);
     if (!HORAS_REPASO.includes(hourRaw)) throw new Error('La hora del Repaso debe ser en punto o y media, entre 08:00 y 21:30');
   }
-  const [a, mes, dia] = e.fecha.split('-');
+  const [a, mes, dia] = e.fecha!.split('-');
   // Servicio sin primer contacto (estado 15): SIGMA exige «Fecha en la que contactó con el cliente» (si falta → código 68)
   let contacto: Record<string, string> | null = null;
   if (d.dates?.clientContact) {
