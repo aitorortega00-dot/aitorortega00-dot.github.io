@@ -280,7 +280,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.21 (contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.22 (Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -547,7 +547,19 @@ const fDMA = (iso) => (iso ? iso.split('-').reverse().join('/') : '');
 const MOTIVOS_TRAMITACION = [['4', 'Otros'], ['1', 'Consulta/comentario servicio abierto o cerrado recientemente'], ['3', 'Ausencias/problemas atención citas'], ['5', 'Respuesta a control de presupuestos']];
 const MENSAJE_TRAMITACION_IVA = 'Ruego revisión. Urge agilización.';
 const TXT_BLOQUEO_IVA = 'Repaso bloqueado por SIGMA: documento de IVA pendiente de validar. Hasta que un tramitador de SIGMA lo valide no se puede hacer Repaso; envía un mensaje a tramitación.';
-const ivaBloq = (p) => !!p?.sigma_iva_pendiente;
+// Repaso bloqueado por SIGMA: IVA pendiente de validar, o estado 6 / 16 (pendiente de compañía/perito o de tramitar presupuesto)
+const BLOQUEOS_ESTADO = {
+  '6': { etq: 'Pendiente compañía/perito', txt: 'Repaso bloqueado por SIGMA: servicio en «Aplazamiento Pte. Cia./Perito». Mientras siga en ese estado SIGMA no admite Repaso; envía un mensaje a tramitación.', msg: 'Servicio en aplazamiento pendiente de compañía/perito. Ruego revisión para poder continuar. Urge agilización.' },
+  '16': { etq: 'Presupuesto pendiente de tramitar', txt: 'Repaso bloqueado por SIGMA: confirmación o presupuesto pendiente de tramitar. Hasta que SIGMA lo tramite no se puede hacer Repaso; envía un mensaje a tramitación.', msg: 'Confirmación/presupuesto pendiente de tramitar. Ruego revisión. Urge agilización.' },
+};
+function bloqueo(p) {
+  if (!p) return null;
+  if (p.sigma_iva_pendiente) return { etq: 'IVA pendiente de validar', txt: TXT_BLOQUEO_IVA, msg: MENSAJE_TRAMITACION_IVA };
+  return BLOQUEOS_ESTADO[String(p.sigma_estado ?? '')] || null;
+}
+const ivaBloq = (p) => !!bloqueo(p);
+const txtBloq = (p) => bloqueo(p)?.txt || TXT_BLOQUEO_IVA;
+const etqBloq = (p) => bloqueo(p)?.etq || 'Repaso bloqueado';
 const TXT_CERRADO = 'Servicio cerrado en SIGMA: ya no admite Repaso. Descarta este envío';
 function ultimaTramitacion(p) {
   const t = (p.sigma_envios || []).filter((e) => e.tipo === 'tramitacion' && e.estado !== 'descartado').sort((a, b) => (b.creado_en || '').localeCompare(a.creado_en || ''))[0];
@@ -615,7 +627,7 @@ function validarEnvio(e) {
   if (e.tipo === 'tramitacion') return e.comentario && e.comentario.trim() ? '' : 'Falta el texto del mensaje';
   if (!e.comentario || !e.comentario.trim()) return 'Falta el comentario';
   if (e.tipo === 'repaso' && e.parte?.estado === 'cerrado') return TXT_CERRADO;
-  if (e.tipo === 'repaso' && ivaBloq(e.parte)) return 'Repaso bloqueado por SIGMA: documento de IVA pendiente de validar. Envía un mensaje a tramitación';
+  if (e.tipo === 'repaso' && ivaBloq(e.parte)) return txtBloq(e.parte);
   if (e.tipo === 'repaso') {
     const m = MOTIVOS_REPASO.find((x) => x[0] === String(e.motivo_codigo));
     if (!m) return 'Elige un motivo';
@@ -678,7 +690,7 @@ async function nuevoEnvio(parteId) {
   if (error) return fallo(error);
   if (parte.estado === 'cerrado') return alert(`${parte.numero_servicio}: servicio cerrado. SIGMA ya no admite Repaso.`);
   if (ivaBloq(parte)) { // SIGMA no deja hacer Repaso: en su lugar, mensaje a tramitación
-    if (confirm(`${parte.numero_servicio}: ${TXT_BLOQUEO_IVA}\n\n¿Preparar el mensaje a tramitación?`)) nuevaTramitacion(parteId);
+    if (confirm(`${parte.numero_servicio}: ${txtBloq(parte)}\n\n¿Preparar el mensaje a tramitación?`)) nuevaTramitacion(parteId);
     return;
   }
   envioNuevo = { id: 'nuevo', parte_id: parteId, tipo: 'repaso', origen: 'manual', estado: 'borrador', motivo_codigo: '2', motivo_texto: 'Visita al Cliente', comentario: '', parte };
@@ -691,7 +703,7 @@ async function nuevaTramitacion(parteId) {
     sb.from('sigma_envios').select('estado, creado_en, enviado_en').eq('parte_id', parteId).eq('tipo', 'tramitacion').neq('estado', 'descartado').order('creado_en', { ascending: false }).limit(1),
   ]);
   if (error) return fallo(error);
-  envioNuevo = { id: 'nuevo', parte_id: parteId, tipo: 'tramitacion', origen: 'manual', estado: 'borrador', motivo_codigo: '4', motivo_texto: 'Otros', comentario: ivaBloq(parte) ? MENSAJE_TRAMITACION_IVA : '', parte, previo: previos?.[0] || null };
+  envioNuevo = { id: 'nuevo', parte_id: parteId, tipo: 'tramitacion', origen: 'manual', estado: 'borrador', motivo_codigo: '4', motivo_texto: 'Otros', comentario: ivaBloq(parte) ? bloqueo(parte).msg : '', parte, previo: previos?.[0] || null };
   modalEnvio('nuevo');
 }
 async function modalEnvio(id) {
@@ -713,11 +725,11 @@ async function modalEnvio(id) {
   if (e.tipo === 'tramitacion') {
     const p = e.previo;
     campos = `
-      ${ivaBloq(e.parte) ? `<div class="aviso-bloq">🔒 ${esc(TXT_BLOQUEO_IVA)}</div>` : ''}
+      ${ivaBloq(e.parte) ? `<div class="aviso-bloq">🔒 ${esc(txtBloq(e.parte))}</div>` : ''}
       ${p ? `<div class="nota" style="margin-top:10px">Último mensaje a tramitación de este servicio: ${p.estado === 'enviado' ? 'enviado ' + hace(p.enviado_en || p.creado_en) : TXT_ENVIO[p.estado].toLowerCase() + ' (' + hace(p.creado_en) + ')'}.</div>` : ''}
       <label>Motivo</label><select id="en-motivo" ${dis}>${MOTIVOS_TRAMITACION.map((m) => `<option value="${m[0]}" ${String(e.motivo_codigo) === m[0] ? 'selected' : ''}>${esc(m[1])}</option>`).join('')}</select>`;
   } else if (e.tipo === 'repaso') {
-    if (ivaBloq(e.parte) && editable) campos = `<div class="aviso-bloq">🔒 ${esc(TXT_BLOQUEO_IVA)}<div style="margin-top:8px">${botonTramitacion(e.parte.id).replace('nuevaTramitacion', 'cerrarModal();nuevaTramitacion')}</div></div>`;
+    if (ivaBloq(e.parte) && editable) campos = `<div class="aviso-bloq">🔒 ${esc(txtBloq(e.parte))}<div style="margin-top:8px">${botonTramitacion(e.parte.id).replace('nuevaTramitacion', 'cerrarModal();nuevaTramitacion')}</div></div>`;
     else campos = '';
     const horaActual = hCorta(e.hora);
     campos += `
@@ -966,12 +978,12 @@ function tarjetaCad(p, carril) {
     else accion = `<button class="mini acento" onclick="nuevoEnvio('${p.id}')">Repaso</button>`;
     if (ivaBloq(p)) { // SIGMA bloquea el Repaso: tarjeta en gris, sin entrar; solo mensaje a tramitación
       const ult = ultimaTramitacion(p);
-      accion = `<span class="et bloq" title="${esc(TXT_BLOQUEO_IVA)}">🔒 IVA pendiente de validar</span> ${botonTramitacion(p.id)}${ult ? `<span class="met" style="width:100%">${esc(ult)}</span>` : ''}`;
+      accion = `<span class="et bloq" title="${esc(txtBloq(p))}">🔒 ${esc(etqBloq(p))}</span> ${botonTramitacion(p.id)}${ult ? `<span class="met" style="width:100%">${esc(ult)}</span>` : ''}`;
     }
   }
   const salto = carrilAntes.has(p.id) && carrilAntes.get(p.id) !== carril;
   const bloq = ivaBloq(p) && carril !== 'resuelta';
-  return `<div class="cad ${salto ? 'salto' : ''} ${bloq ? 'bloq' : ''}" ${bloq ? `title="${esc(TXT_BLOQUEO_IVA)}"` : `onclick="modalParte('${p.id}')"`}>
+  return `<div class="cad ${salto ? 'salto' : ''} ${bloq ? 'bloq' : ''}" ${bloq ? `title="${esc(txtBloq(p))}"` : `onclick="modalParte('${p.id}')"`}>
     <div class="l1">${p.sigma_alerta ? `<span class="punto ${p.sigma_alerta}" title="Alerta ${p.sigma_alerta}"></span>` : ''}<b>${esc(p.numero_servicio)}</b>
       ${etiquetaAntig(p)} ${p.urgente ? '<span class="et urg">URG</span>' : ''}<span class="esp"></span>
       ${g ? `<span class="et gr g-${p.sigma_cad_grupo}">${g.nombre}</span>` : ''}<span class="et sigma">SIGMA ${p.sigma_cuenta === 'PAL' ? 'PALENCIA' : 'VALLADOLID'}</span></div>
@@ -1093,7 +1105,7 @@ async function pintarSinContacto(destino) {
       const pendEnvio = (p.sigma_envios || []).some((e) => e.tipo === 'repaso' && ['borrador', 'aprobado', 'enviando'].includes(e.estado));
       const prox = (p.asignaciones || []).filter((a) => a.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
       const bloq = ivaBloq(p);
-      return `<tr class="${bloq ? 'bloq' : 'clic'}" ${bloq ? `title="${esc(TXT_BLOQUEO_IVA)}"` : `onclick="modalParte('${p.id}')"`}>
+      return `<tr class="${bloq ? 'bloq' : 'clic'}" ${bloq ? `title="${esc(txtBloq(p))}"` : `onclick="modalParte('${p.id}')"`}>
         <td><b>${esc(p.numero_servicio)}</b> ${etiquetaAntig(p)} ${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
         <td>${esc(p.asegurado || '—')}${tels.map((t) => `<br><a href="tel:${esc(t)}" onclick="event.stopPropagation()">${esc(t)}</a>`).join('')}</td>
         <td>${esc(p.direccion)}${p.poblacion ? '<br><small style="color:var(--suave)">' + esc(p.poblacion) + '</small>' : ''}</td>
@@ -1101,7 +1113,7 @@ async function pintarSinContacto(destino) {
         <td>${textoPlazo(p.plazo) || '—'}${p.sigma_caducidad !== null && p.sigma_caducidad !== undefined ? `<br><small style="color:var(--suave)">cad. ${p.sigma_caducidad} d${p.sigma_llamadas ? ' · ' + p.sigma_llamadas + ' llamadas' : ''}</small>` : ''}</td>
         <td>${p.sigma_sin_contacto_desde ? hace(p.sigma_sin_contacto_desde) : '—'}${prox ? `<br><small style="color:var(--suave)">Visita ${fCorta(prox.fecha)} · ${esc(nombreDe(prox.operario_id))}</small>` : ''}</td>
         <td style="white-space:nowrap" class="${bloq ? 'acc-bloq' : ''}" onclick="event.stopPropagation()">
-          ${bloq ? `<span class="et bloq" title="${esc(TXT_BLOQUEO_IVA)}">🔒 IVA pendiente de validar</span><br>${botonTramitacion(p.id)}${ultimaTramitacion(p) ? `<br><small>${esc(ultimaTramitacion(p))}</small>` : ''}`
+          ${bloq ? `<span class="et bloq" title="${esc(txtBloq(p))}">🔒 ${esc(etqBloq(p))}</span><br>${botonTramitacion(p.id)}${ultimaTramitacion(p) ? `<br><small>${esc(ultimaTramitacion(p))}</small>` : ''}`
             : pendEnvio ? '<span class="et en_camino" title="Hay un Repaso preparado en Envíos a SIGMA">Repaso en bandeja</span>' : `<button class="mini" onclick="nuevoEnvio('${p.id}')">Repaso</button>`}
           <a class="mini" href="https://web.multiasistencia.com/w3multi/repasos1.php?reparacion=${encodeURIComponent(p.numero_servicio)}" target="_blank" rel="noopener" title="Abrir en el portal" style="margin-left:6px">↗</a></td>
       </tr>`;
@@ -1545,7 +1557,7 @@ async function modalParte(id) {
         `<a href="#informes" onclick="filtroInformes={parte:'${p.id}'};cerrarModal()">Ver informes con fotos →</a>` : '<div style="color:var(--suave)">Sin informes.</div>'}
       ${p.sigma_cuenta ? `<label>Envíos a SIGMA</label>
         ${(p.sigma_envios || []).sort((a, b) => b.creado_en.localeCompare(a.creado_en)).map((e) => `<div><a href="#" onclick="cerrarModal();modalEnvio('${e.id}');return false">${esc(tituloEnvio(e))}</a> <span class="et ${e.estado}">${TXT_ENVIO[e.estado]}</span>${e.resultado ? ` <small style="color:var(--suave)">${esc(e.resultado)}</small>` : ''}</div>`).join('') || '<div style="color:var(--suave)">Ninguno.</div>'}
-        ${ivaBloq(p) ? `<div class="aviso-bloq">🔒 ${esc(TXT_BLOQUEO_IVA)}${ultimaTramitacion(p) ? `<div style="font-size:12px;margin-top:4px">${esc(ultimaTramitacion(p))}</div>` : ''}</div>
+        ${ivaBloq(p) ? `<div class="aviso-bloq">🔒 ${esc(txtBloq(p))}${ultimaTramitacion(p) ? `<div style="font-size:12px;margin-top:4px">${esc(ultimaTramitacion(p))}</div>` : ''}</div>
         <a href="#" onclick="cerrarModal();nuevaTramitacion('${p.id}');return false">+ Enviar mensaje a tramitación</a>`
         : `<a href="#" onclick="cerrarModal();nuevoEnvio('${p.id}');return false">+ Nuevo envío a SIGMA (Repaso)</a> · <a href="#" onclick="cerrarModal();nuevaTramitacion('${p.id}');return false">Mensaje a tramitación</a>`}` : ''}`;
   }
