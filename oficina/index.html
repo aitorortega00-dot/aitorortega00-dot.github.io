@@ -280,7 +280,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.18 (Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.19 (Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -548,6 +548,7 @@ const MOTIVOS_TRAMITACION = [['4', 'Otros'], ['1', 'Consulta/comentario servicio
 const MENSAJE_TRAMITACION_IVA = 'Ruego revisión. Urge agilización.';
 const TXT_BLOQUEO_IVA = 'Repaso bloqueado por SIGMA: documento de IVA pendiente de validar. Hasta que un tramitador de SIGMA lo valide no se puede hacer Repaso; envía un mensaje a tramitación.';
 const ivaBloq = (p) => !!p?.sigma_iva_pendiente;
+const TXT_CERRADO = 'Servicio cerrado en SIGMA: ya no admite Repaso. Descarta este envío';
 function ultimaTramitacion(p) {
   const t = (p.sigma_envios || []).filter((e) => e.tipo === 'tramitacion' && e.estado !== 'descartado').sort((a, b) => (b.creado_en || '').localeCompare(a.creado_en || ''))[0];
   if (!t) return '';
@@ -586,7 +587,7 @@ async function vistaEnvios() {
     </div>
     <p style="color:var(--suave);margin-top:-6px">Se preparan solos al planificar visitas y al recibir informes. Revisa, corrige lo que quieras y pulsa <b>Aprobar y enviar</b>: el robot lo graba en el portal en ese momento. “Informar citas” usa siempre la fecha y hora citadas.</p>
     <div id="lista-envios">Cargando…</div>`;
-  let q = sb.from('sigma_envios').select('*, parte:partes(id, numero_servicio, direccion, poblacion, sigma_cuenta, sigma_alerta, sigma_estado, sigma_iva_pendiente)')
+  let q = sb.from('sigma_envios').select('*, parte:partes(id, numero_servicio, direccion, poblacion, estado, sigma_cuenta, sigma_alerta, sigma_estado, sigma_iva_pendiente)')
     .in('estado', grupos[filtroEnvios]).order('creado_en', { ascending: filtroEnvios === 'revisar' || filtroEnvios === 'cola' });
   if (filtroEnvios === 'enviados' || filtroEnvios === 'descartados') q = q.limit(60);
   const { data, error } = await q;
@@ -613,6 +614,7 @@ function aLocal(d) { const z = (n) => String(n).padStart(2, '0'); return `${d.ge
 function validarEnvio(e) {
   if (e.tipo === 'tramitacion') return e.comentario && e.comentario.trim() ? '' : 'Falta el texto del mensaje';
   if (!e.comentario || !e.comentario.trim()) return 'Falta el comentario';
+  if (e.tipo === 'repaso' && e.parte?.estado === 'cerrado') return TXT_CERRADO;
   if (e.tipo === 'repaso' && ivaBloq(e.parte)) return 'Repaso bloqueado por SIGMA: documento de IVA pendiente de validar. Envía un mensaje a tramitación';
   if (e.tipo === 'repaso') {
     const m = MOTIVOS_REPASO.find((x) => x[0] === String(e.motivo_codigo));
@@ -620,6 +622,7 @@ function validarEnvio(e) {
     if (!e.fecha) return 'Falta la fecha';
     const dias = Math.round((deISO(e.fecha) - deISO(hoyISO())) / 86400000);
     if (dias < 0) return 'La fecha ya ha pasado';
+    if (dias === 0 && e.hora && hCorta(e.hora) <= hCorta(new Date().toTimeString())) return 'La hora ya ha pasado: pon una fecha y hora futuras';
     if (dias > m[2]) return `Para "${m[1]}" la fecha no puede pasar de ${m[2]} días desde hoy`;
     if (e.hora && !HORAS_SIGMA.includes(hCorta(e.hora))) return 'La hora debe ser en punto o y media (08:00–21:30)';
     // Servicio sin primer contacto (estado 15): SIGMA exige la fecha y hora en que se contactó con el cliente
@@ -641,7 +644,7 @@ async function cambiarEnvio(id, estado) {
   cerrarModal(); contarEnvios(); if (vistaActual === 'envios') vistaEnvios();
 }
 async function aprobarTodos() {
-  const { data } = await sb.from('sigma_envios').select('*, parte:partes(sigma_estado, sigma_iva_pendiente)').in('estado', ['borrador']);
+  const { data } = await sb.from('sigma_envios').select('*, parte:partes(estado, sigma_estado, sigma_iva_pendiente)').in('estado', ['borrador']);
   const ok = (data || []).filter((e) => !validarEnvio(e));
   if (!ok.length) return alert('No hay borradores listos para aprobar (revisa los avisos ⚠️).');
   if (!confirm(`¿Aprobar y enviar ${ok.length} envío(s) a SIGMA?`)) return;
@@ -667,11 +670,12 @@ function marcarRepasoLocal(parteId) {
   if (vistaActual === 'repasos' && clasifRepaso === 'caducadas' && datosCad) pintarTableroCad();
 }
 let guardandoEnvio = false;
-const CAMPOS_PARTE_ENVIO = 'id, numero_servicio, direccion, poblacion, sigma_cuenta, sigma_alerta, sigma_estado, sigma_estado_texto, sigma_iva_pendiente';
+const CAMPOS_PARTE_ENVIO = 'id, numero_servicio, direccion, poblacion, estado, sigma_cuenta, sigma_alerta, sigma_estado, sigma_estado_texto, sigma_iva_pendiente';
 async function nuevoEnvio(parteId) {
   if (enviosLocales.has(parteId)) return aviso('Este servicio ya tiene un Repaso en la bandeja');
   const { data: parte, error } = await sb.from('partes').select(CAMPOS_PARTE_ENVIO).eq('id', parteId).single();
   if (error) return fallo(error);
+  if (parte.estado === 'cerrado') return alert(`${parte.numero_servicio}: servicio cerrado. SIGMA ya no admite Repaso.`);
   if (ivaBloq(parte)) { // SIGMA no deja hacer Repaso: en su lugar, mensaje a tramitación
     if (confirm(`${parte.numero_servicio}: ${TXT_BLOQUEO_IVA}\n\n¿Preparar el mensaje a tramitación?`)) nuevaTramitacion(parteId);
     return;
@@ -753,7 +757,7 @@ function rellenarMotivosCita() {
 }
 async function guardarEnvio(id, aprobar) {
   const esNuevo = id === 'nuevo';
-  const e = esNuevo ? envioNuevo : (await sb.from('sigma_envios').select('tipo, parte:partes(sigma_estado, sigma_iva_pendiente)').eq('id', id).single()).data;
+  const e = esNuevo ? envioNuevo : (await sb.from('sigma_envios').select('tipo, parte:partes(estado, sigma_estado, sigma_iva_pendiente)').eq('id', id).single()).data;
   const fila = { comentario: $('#en-com').value.trim() };
   if (e.tipo === 'tramitacion') {
     const m = MOTIVOS_TRAMITACION.find((x) => x[0] === $('#en-motivo').value) || MOTIVOS_TRAMITACION[0];

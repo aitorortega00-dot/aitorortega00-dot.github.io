@@ -449,7 +449,7 @@ const MOTIVOS_CITA: Record<string, string[]> = { V: ['609', '611', '604', '601']
 type Envio = {
   id: string; parte_id: string; tipo: 'repaso' | 'informar_cita' | 'tramitacion'; motivo_codigo: string | null; motivo_texto: string | null;
   fecha: string | null; hora: string | null; resolucion: string | null; resolucion_motivo: string | null;
-  cita_fecha: string | null; cita_hora: string | null; comentario: string; contacto_en?: string | null; parte: { numero_servicio: string; sigma_cuenta: string };
+  cita_fecha: string | null; cita_hora: string | null; comentario: string; contacto_en?: string | null; parte: { numero_servicio: string; sigma_cuenta: string; estado?: string };
 };
 
 // Traduce los códigos de error del servicio de Repaso. Si el código no es conocido (p. ej. "68"),
@@ -458,6 +458,10 @@ const CODIGOS_REPASO: Record<string, string> = {
   '68': 'SIGMA pide la fecha y hora en que se contactó con el cliente (servicio sin primer contacto): rellénala en el envío y reintenta',
   APPEND_PENDING_APPOINTMENTS: 'Sigue habiendo una cita anterior sin informar después de informarla: revisa «Informar citas» en el portal',
   TXT_GENERICERROR: 'Error genérico del portal',
+  // (20/10/2026) Vistos en envíos reales
+  '3057': 'El servicio está cerrado en SIGMA: ya no admite Repaso',
+  '4106': 'SIGMA no acepta esa fecha/hora de la siguiente acción (normalmente porque ya ha pasado): pon una fecha y hora futuras y reintenta',
+  'Aplazamiento Pte. Cia./Perito': 'Servicio en «Aplazamiento Pte. Cia./Perito»: SIGMA no deja hacer Repaso hasta que responda la compañía o el perito',
 };
 function traducirCodigos(codes: Record<string, unknown>[] | undefined, extra?: unknown) {
   const lista = (codes || []).filter((x) => x && typeof x === 'object');
@@ -466,6 +470,8 @@ function traducirCodigos(codes: Record<string, unknown>[] | undefined, extra?: u
   return lista.map((x) => {
     const code = String(x.code ?? '');
     if (CODIGOS_REPASO[code]) return CODIGOS_REPASO[code];
+    // El portal a veces manda el motivo del bloqueo como texto en «code» (p. ej. el estado del servicio)
+    if (/[a-záéíóúñ]{3,}\s/i.test(code)) return `SIGMA no deja hacer el Repaso: ${code}`;
     const textos = Object.entries(x).filter(([k, v]) => k !== 'code' && typeof v === 'string' && v.trim()).map(([, v]) => String(v).trim());
     const detalle = textos.length ? textos.join(' / ') : (textoExtra || JSON.stringify(x).slice(0, 300));
     return `Código ${code || '?'} del portal: ${detalle}`;
@@ -578,6 +584,7 @@ async function guardarRepaso(s: Sesion, e: Envio, n: string, ini: any, api: (rut
   const hoy = hoyMadrid();
   const dias = Math.round((Date.parse(e.fecha!) - Date.parse(hoy)) / 86400000);
   if (dias < 0) throw new Error('La fecha ya ha pasado');
+  if (dias === 0 && e.hora && e.hora.slice(0, 5) <= minutoMadrid().slice(11, 16)) throw new Error('La hora de la siguiente acción ya ha pasado: pon una fecha y hora futuras y reintenta');
   if (Number.isFinite(max) && dias > max) throw new Error(`Para "${motivo.label}" la fecha no puede pasar de ${max} días desde hoy`);
   let hourRaw = '';
   if (e.hora) {
@@ -788,7 +795,7 @@ async function procesarEnvios(admin: SupabaseClient, cuenta: string, nombre: str
   await admin.from('sigma_envios').update({ estado: 'error', resultado: 'Envío interrumpido: comprueba en el portal si se guardó antes de reintentar' })
     .eq('estado', 'enviando').lt('actualizado_en', new Date(Date.now() - 10 * 60000).toISOString());
   const { data: cola } = await admin.from('sigma_envios')
-    .select('*, parte:partes!inner(numero_servicio, sigma_cuenta)').eq('estado', 'aprobado').eq('parte.sigma_cuenta', cuenta)
+    .select('*, parte:partes!inner(numero_servicio, sigma_cuenta, estado)').eq('estado', 'aprobado').eq('parte.sigma_cuenta', cuenta)
     .order('creado_en');
   if (!cola?.length) return { enviados: 0, errores: 0 };
   // Reservar (evita que dos pasadas manden lo mismo)
@@ -805,6 +812,7 @@ async function procesarEnvios(admin: SupabaseClient, cuenta: string, nombre: str
   for (const e of lista) {
     try {
       if (fallidos.has(e.parte_id) && e.tipo !== 'tramitacion') throw new Error('No se envió porque falló el envío anterior de este servicio');
+      if (e.tipo === 'repaso' && e.parte.estado === 'cerrado') throw new Error(CODIGOS_REPASO['3057']);
       const r = e.tipo === 'repaso' ? await enviarRepaso(s, e) : e.tipo === 'tramitacion' ? await enviarTramitacion(s, e) : await enviarInformarCita(s, e);
       if (e.tipo === 'repaso') await admin.from('partes').update({ sigma_iva_pendiente: null, sigma_iva_revisado_en: new Date().toISOString() }).eq('id', e.parte_id);
       await admin.from('sigma_envios').update({ estado: 'enviado', resultado: r, enviado_en: new Date().toISOString(), intentos: 1 }).eq('id', e.id);
@@ -1104,6 +1112,10 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
         d.sigma_ficha = { ...f.otros, cierre_auto: ahora, estado_antes: p.estado };
         d.sigma_sin_contacto = false; d.sigma_sin_contacto_desde = null;
         (r.cerrados ??= []).push(p.numero_servicio);
+        // Lo que quedaba pendiente en la bandeja ya no se puede enviar (el portal responde 3057)
+        const { error: eDesc } = await admin.from('sigma_envios').update({ estado: 'descartado', resultado: `Descartado solo: SIGMA cerró el servicio (${f.otros.cierre})` })
+          .eq('parte_id', p.id).in('estado', ['borrador', 'aprobado', 'error']);
+        if (eDesc) console.error('descartar envíos', p.numero_servicio, eDesc.message);
       } else if (p.estado === 'cerrado' && (p.sigma_ficha as Record<string, unknown> | null)?.cierre_auto) {
         d.sigma_ficha = { ...f.otros, cierre_auto: (p.sigma_ficha as Record<string, unknown>).cierre_auto, estado_antes: (p.sigma_ficha as Record<string, unknown>).estado_antes };
       }
