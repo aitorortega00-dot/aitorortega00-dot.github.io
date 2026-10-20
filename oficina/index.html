@@ -280,7 +280,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.17 (Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.18 (Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -650,8 +650,26 @@ async function aprobarTodos() {
 }
 // Repaso nuevo: no se guarda en la bandeja hasta pulsar Guardar o Aprobar (abrir y cerrar no deja nada)
 let envioNuevo = null;
+// Repasos recién guardados/aprobados desde esta pantalla: se muestran al momento (sin esperar a la BD)
+// para que el servicio salga de «Caducada» en el acto y no se pueda hacer otro Repaso por duplicado.
+const enviosLocales = new Map(); // parte_id → { id, tipo, estado, creado_en, local: true }
+function conLocales(p) {
+  const l = enviosLocales.get(p.id);
+  if (!l) return p;
+  const desde = new Date(l.creado_en).getTime() - 60000;
+  const llegado = (p.sigma_envios || []).some((e) => e.tipo === 'repaso' && e.estado !== 'descartado' && new Date(e.creado_en).getTime() >= desde);
+  if (llegado || Date.now() - new Date(l.creado_en).getTime() > 120000) { enviosLocales.delete(p.id); return p; }
+  return { ...p, sigma_envios: [...(p.sigma_envios || []), l] };
+}
+// Cambia al instante los botones «Repaso» de ese servicio y vuelve a pintar Repasos con los datos ya cargados
+function marcarRepasoLocal(parteId) {
+  document.querySelectorAll(`[onclick="nuevoEnvio('${parteId}')"]`).forEach((b) => { b.outerHTML = '<span class="et en_camino" title="Hay un Repaso preparado en Envíos a SIGMA">Repaso en bandeja</span>'; });
+  if (vistaActual === 'repasos' && clasifRepaso === 'caducadas' && datosCad) pintarTableroCad();
+}
+let guardandoEnvio = false;
 const CAMPOS_PARTE_ENVIO = 'id, numero_servicio, direccion, poblacion, sigma_cuenta, sigma_alerta, sigma_estado, sigma_estado_texto, sigma_iva_pendiente';
 async function nuevoEnvio(parteId) {
+  if (enviosLocales.has(parteId)) return aviso('Este servicio ya tiene un Repaso en la bandeja');
   const { data: parte, error } = await sb.from('partes').select(CAMPOS_PARTE_ENVIO).eq('id', parteId).single();
   if (error) return fallo(error);
   if (ivaBloq(parte)) { // SIGMA no deja hacer Repaso: en su lugar, mensaje a tramitación
@@ -753,6 +771,13 @@ async function guardarEnvio(id, aprobar) {
   if (aprobar) { fila.estado = 'aprobado'; fila.resultado = null; }
   else if (problema) aviso('Guardado (ojo: ' + problema + ')');
   if (esNuevo && !aprobar && !fila.comentario) return alert('Escribe el comentario antes de guardar (si no, no se guarda nada).');
+  if (guardandoEnvio) return; // evita doble clic
+  guardandoEnvio = true;
+  const local = esNuevo && e.tipo === 'repaso';
+  if (local) { // al instante: fuera de «Caducada» y sin botón Repaso, antes de esperar al servidor
+    enviosLocales.set(e.parte_id, { id: 'local', tipo: 'repaso', estado: aprobar ? 'aprobado' : 'borrador', creado_en: new Date().toISOString(), local: true });
+    cerrarModal(); marcarRepasoLocal(e.parte_id);
+  }
   let error;
   if (esNuevo) {
     // Se crea como borrador y, si se aprueba, se pasa a aprobado (el disparo inmediato salta al cambiar el estado)
@@ -761,7 +786,11 @@ async function guardarEnvio(id, aprobar) {
     error = r.error;
     if (!error && aprobar) error = (await sb.from('sigma_envios').update({ estado: 'aprobado', resultado: null }).eq('id', r.data.id)).error;
   } else error = (await sb.from('sigma_envios').update(fila).eq('id', id)).error;
-  if (error) return fallo(error);
+  guardandoEnvio = false;
+  if (error) {
+    if (local) { enviosLocales.delete(e.parte_id); if (vistaActual === 'repasos') vistaRepasos(); }
+    return fallo(error);
+  }
   if (esNuevo) envioNuevo = null;
   if (aprobar) aviso(e.tipo === 'tramitacion' ? 'Enviando el mensaje a tramitación…' : 'Aprobado: enviándolo a SIGMA…'); else if (!problema) aviso('Guardado');
   cerrarModal(); contarEnvios(); if (vistaActual === 'envios') vistaEnvios(); if (vistaActual === 'repasos') vistaRepasos();
@@ -926,7 +955,8 @@ function tarjetaCad(p, carril) {
     accion = `<span class="met">Resuelta ${hace(p.sigma_cad_hasta)}</span>`;
   } else {
     estado = `<div class="est">${esc(textoEstado(p.sigma_estado))}</div>`;
-    if (carril === 'bandeja') accion = `<span class="et ${pend.estado}">${TXT_ENVIO[pend.estado]}</span> <button class="mini ${pend.estado === 'error' ? 'peligro' : ''}" onclick="modalEnvio('${pend.id}')">${pend.estado === 'borrador' || pend.estado === 'error' ? 'Revisar y enviar' : 'Ver'}</button>`;
+    if (carril === 'bandeja' && pend.local) accion = `<span class="et ${pend.estado}">${pend.estado === 'aprobado' ? 'Enviando…' : 'Guardando…'}</span>`;
+    else if (carril === 'bandeja') accion = `<span class="et ${pend.estado}">${TXT_ENVIO[pend.estado]}</span> <button class="mini ${pend.estado === 'error' ? 'peligro' : ''}" onclick="modalEnvio('${pend.id}')">${pend.estado === 'borrador' || pend.estado === 'error' ? 'Revisar y enviar' : 'Ver'}</button>`;
     else if (carril === 'enviada') accion = `<span class="met">Enviado ${env?.enviado_en ? hace(env.enviado_en) : ''}</span>`;
     else accion = `<button class="mini acento" onclick="nuevoEnvio('${p.id}')">Repaso</button>`;
     if (ivaBloq(p)) { // SIGMA bloquea el Repaso: tarjeta en gris, sin entrar; solo mensaje a tramitación
@@ -966,8 +996,14 @@ async function pintarCaducadas(destino) {
   if (filtroCadCuenta) q = q.eq('sigma_cuenta', filtroCadCuenta);
   const { data, error } = await q;
   if (error) return fallo(error);
+  datosCad = data || [];
+  pintarTableroCad();
+}
+let datosCad = null;
+function pintarTableroCad() {
+  if (!$('#cad-tablero')) return;
   $('#cad-antig').value = filtroAntig;
-  const todas = filtrarAntig((data || []).map((p) => ({ ...p, carril: carrilDe(p) })));
+  const todas = filtrarAntig(datosCad.map(conLocales).map((p) => ({ ...p, carril: carrilDe(p) })));
 
   // Grupos: pendientes y avance del día
   const resumen = (lista) => { const res = lista.filter((p) => p.carril === 'resuelta').length; return { pend: lista.length - res, res, tot: lista.length }; };
@@ -1042,7 +1078,7 @@ async function pintarSinContacto(destino) {
   const { data, error } = await q;
   if (error) return fallo(error);
   $('#sc-antig').value = filtroAntig;
-  const lista = filtrarAntig((data || []).map((p) => ({ ...p, plazo: plazoContacto(p) })))
+  const lista = filtrarAntig((data || []).map(conLocales).map((p) => ({ ...p, plazo: plazoContacto(p) })))
     .sort((a, b) => (ivaBloq(a) - ivaBloq(b)) || ordenAntig(a, b) || (b.urgente - a.urgente) || ((a.plazo?.getTime() ?? 9e15) - (b.plazo?.getTime() ?? 9e15)) || ((a.sigma_caducidad ?? 999) - (b.sigma_caducidad ?? 999)));
   const hoy = hoyISO();
   $('#sc-lista').innerHTML = lista.length ? `
