@@ -11,4 +11,5 @@ llegan a todos los móviles sin reinstalar. Se fabrica con la acción **APK Andr
 ## Automático
 - **Notificaciones push**: función Supabase `notificar`, llamada por disparadores de la base de datos (servicio nuevo/cambiado/retirado → operario; informe o visita no realizada → oficina).
 - **Supabase siempre activo**: ping diario (pg_cron dentro de Supabase + acción "Copia de seguridad" de GitHub).
+- **Presupuestos SIGMA**: función Supabase `sigma-presupuestos` (pg_cron a los minutos 07 y 37). Lee la pestaña Presupuesto del portal de los gremios 11A, 77A, 30A, 10A y 76A y los clasifica (aceptado / pendiente de valoración / enviado / rechazado) para la vista **Presupuestos** de la oficina.
 - **Copia de seguridad**: cada lunes, cifrada, 90 días en Actions → "Copia de seguridad". Se abre desde el panel de administrador (/admin/).

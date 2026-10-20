@@ -241,6 +241,15 @@
   @media (prefers-reduced-motion:reduce){.cad.salto{animation:none;outline:2px solid var(--c)}}
   @media (max-width:900px){.carriles{grid-template-columns:1fr}}
 
+  /* Presupuestos (pestaña Presupuesto de SIGMA) */
+  .p-aceptado{--c:var(--ok)}.p-sin_valorar{--c:#B8660B}.p-enviado{--c:var(--azul)}.p-rechazado{--c:var(--peligro)}
+  .et.pt{background:color-mix(in srgb,var(--c) 13%,#fff);color:var(--c);font-weight:700}
+  .ptto-lineas{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;background:#fff}
+  .ptto-lineas td,.ptto-lineas th{padding:4px 6px;border-top:1px solid var(--borde);text-align:left;vertical-align:top}
+  .ptto-lineas th{color:var(--suave);font-weight:600}
+  .ptto-res{font-size:12px;color:var(--suave);margin-top:3px}
+  .ptto-res b{font-variant-numeric:tabular-nums}
+
   @media (max-width:1000px){.hoy-grid{grid-template-columns:1fr}}
   @media (max-width:900px){
     .plan{grid-template-columns:1fr}.sin-plan{position:static;max-height:none}
@@ -265,6 +274,7 @@
     <nav>
       <a href="#inicio" data-v="inicio">Inicio</a>
       <a href="#repasos" data-v="repasos">Repasos<span id="b-rep" class="badge oculto"></span></a>
+      <a href="#presupuestos" data-v="presupuestos">Presupuestos<span id="b-ptto" class="badge oculto"></span></a>
       <a href="#plan" data-v="plan">Planificación</a>
       <a href="#informes" data-v="informes">Informes<span id="b-inf" class="badge oculto"></span></a>
       <a href="#envios" data-v="envios">Envíos a SIGMA<span id="b-env" class="badge oculto"></span></a>
@@ -280,7 +290,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.22 (Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.23 (Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -369,6 +379,7 @@ async function alCambiarSesion(sesion) {
   contarEnvios();
   KubelAvisos.sincronizar(sb).then(pintarBotonAvisos);
   contarRepasos();
+  contarPresupuestos();
   irA(location.hash.slice(1) || 'inicio');
 }
 
@@ -426,7 +437,7 @@ function alCambio(tabla, p) {
     if (p.new.estado === 'no_realizado') aviso(`⚠️ ${nombreDe(p.new.operario_id)}: visita no realizada`);
   }
   if (tabla === 'informes') contarSinRevisar();
-  if (tabla === 'partes') { clearTimeout(alCambio.sc); alCambio.sc = setTimeout(contarRepasos, 800); }
+  if (tabla === 'partes') { clearTimeout(alCambio.sc); alCambio.sc = setTimeout(() => { contarRepasos(); contarPresupuestos(); }, 800); }
   // No recargar si hay una ventana abierta (para no perder lo que se está escribiendo)
   clearTimeout(recargaT);
   recargaT = setTimeout(() => { if (!$('#modal').innerHTML) irA(vistaActual, true); }, 600);
@@ -521,6 +532,7 @@ function bloqueSigma(p) {
     ${tels.length ? `<div class="tels">${tels.map((t) => `<div><a href="tel:${esc(t.numero)}">${esc(t.numero)}</a> <span style="color:var(--suave)">${esc([t.tipo, t.desde && t.hasta ? t.desde + '–' + t.hasta : '', t.de === 'perjudicado' ? 'perjudicado' : ''].filter(Boolean).join(' · '))}</span></div>`).join('')}</div>` : ''}
     ${bit.length ? `<details ${bit.length <= 15 ? 'open' : ''}><summary>Bitácora del portal (${bit.length} anotaciones)</summary>
       <div class="bitacora">${bit.map((e) => `<div>${e.fecha ? `<b>${esc(fHora(e.fecha.replace(' ', 'T')))}</b> ` : ''}${esc(e.texto)}</div>`).join('')}</div></details>` : ''}
+    ${bloquePresupuesto(p)}
     <div style="font-size:11px;color:var(--suave);margin-top:8px">${p.sigma_ficha_en ? 'Ficha leída del portal ' + hace(p.sigma_ficha_en) : 'Ficha pendiente de leer (próxima pasada del robot)'} · estos datos los actualiza el robot y no se editan aquí.</div>
   </div>`;
 }
@@ -816,7 +828,7 @@ async function guardarEnvio(id, aprobar) {
 // ---------- Navegación ----------
 window.addEventListener('hashchange', () => yo && irA(location.hash.slice(1)));
 function irA(v, silencioso) {
-  const vistas = { inicio: vistaHoy, repasos: vistaRepasos, plan: vistaPlan, informes: vistaInformes, envios: vistaEnvios };
+  const vistas = { inicio: vistaHoy, repasos: vistaRepasos, presupuestos: vistaPresupuestos, plan: vistaPlan, informes: vistaInformes, envios: vistaEnvios };
   // Direcciones antiguas: #hoy y #partes → Inicio (que ya incluye los partes); #sincontacto → Repasos
   let irAPartes = false;
   if (v === 'hoy') v = 'inicio';
@@ -1120,6 +1132,123 @@ async function pintarSinContacto(destino) {
     }).join('')}</tbody></table></div>
     <p style="color:var(--suave);font-size:12px">${lista.length} servicio(s) sin primer contacto</p>`
     : filtroAntig.startsWith('solo_') ? '<div class="tarjeta vacio">No hay servicios con este filtro.</div>' : '<div class="tarjeta vacio">No hay servicios pendientes de primer contacto. 👍</div>';
+}
+
+// =====================================================================
+//  PRESUPUESTOS — pestaña «Presupuesto» del portal SIGMA (gremios 11A, 77A, 30A, 10A y 76A)
+//  Los clasifica el robot sigma-presupuestos cada 30 min (partes.sigma_ptto_*). Reglas de la oficina (21/10/2026):
+//   · Aceptado: en la última fecha con decisión hay alguna partida ACEPTADO (por compañía o por MA)
+//   · Rechazado: en la última fecha con decisión solo hay partidas RECHAZADO → volver a valorar
+//   · Enviado: hay partidas «Pendiente», esperando respuesta de compañía/MA
+//   · Pendiente de valoración: ninguna partida subida (o el portal aún no deja valorar: 'bloqueado', con su motivo)
+// =====================================================================
+const GREMIOS_PTTO = ['11A', '77A', '30A', '10A', '76A'];
+const FILTROS_PTTO = [
+  { id: 'aceptado', nombre: 'Aceptados', ayuda: 'Baremos aceptados por compañía o MA', estados: ['aceptado'] },
+  { id: 'sin_valorar', nombre: 'Pendientes de valoración', ayuda: 'Sin ninguna valoración subida', estados: ['sin_valorar', 'bloqueado'] },
+  { id: 'enviado', nombre: 'Enviados', ayuda: 'Valorados, pendientes de respuesta', estados: ['enviado'] },
+  { id: 'rechazado', nombre: 'Rechazados', ayuda: 'Pendientes de volver a valorar', estados: ['rechazado'] },
+];
+const TXT_PTTO = { aceptado: 'Aceptado', sin_valorar: 'Sin valorar', bloqueado: 'Sin valorar', enviado: 'Enviado', rechazado: 'Rechazado' };
+const grupoPtto = (e) => (e === 'bloqueado' ? 'sin_valorar' : e);
+let filtroPtto = 'rechazado', filtroPttoCuenta = '', filtroPttoGremio = '', datosPtto = null;
+
+function consultaPtto(campos, opciones) {
+  return sb.from('partes').select(campos, opciones).eq('sigma_en_curso', true).in('sigma_gremio', GREMIOS_PTTO).not('estado', 'in', '(cerrado,anulado)');
+}
+async function contarPresupuestos() {
+  const { count } = await consultaPtto('id', { count: 'exact', head: true }).eq('sigma_ptto_estado', 'rechazado');
+  const b = $('#b-ptto'); if (b) { b.textContent = count || ''; b.classList.toggle('oculto', !count); b.title = 'Rechazados pendientes de volver a valorar'; }
+}
+// Resumen corto de las partidas: «3 aceptadas · 2 rechazadas · última decisión 24/09/2026»
+function resumenPtto(p) {
+  const l = p.sigma_ptto_lineas || [];
+  if (p.sigma_ptto_estado === 'bloqueado') return `<span title="Lo dice el portal al abrir la pestaña Presupuesto">🔒 ${esc(p.sigma_ptto_motivo || 'El portal aún no deja valorar')}</span>`;
+  if (!l.length) return 'Ninguna partida subida';
+  const n = (re) => l.filter((x) => re.test(x.estado)).length;
+  const ult = p.sigma_ptto_fecha ? l.filter((x) => x.fecha === p.sigma_ptto_fecha) : [];
+  const partes = [];
+  const pend = n(/^pendiente/i);
+  if (pend) partes.push(`<b>${pend}</b> pendiente${pend > 1 ? 's' : ''} de respuesta`);
+  if (p.sigma_ptto_fecha) {
+    const a = ult.filter((x) => /ACEPTAD/i.test(x.estado)).length, r = ult.filter((x) => /RECHAZAD/i.test(x.estado)).length;
+    const quien = [...new Set(ult.map((x) => (/ MA$/i.test(x.estado) ? 'MA' : /COMPA/i.test(x.estado) ? 'compañía' : '')).filter(Boolean))].join(' y ');
+    partes.push(`${fDMA(p.sigma_ptto_fecha)}${quien ? ' (' + quien + ')' : ''}: ${[a ? `<b>${a}</b> aceptada${a > 1 ? 's' : ''}` : '', r ? `<b>${r}</b> rechazada${r > 1 ? 's' : ''}` : ''].filter(Boolean).join(', ')}`);
+  }
+  return `${l.length} partida${l.length > 1 ? 's' : ''} · ${partes.join(' · ')}`;
+}
+function bloquePresupuesto(p) {
+  if (!p.sigma_ptto_estado) return '';
+  const l = p.sigma_ptto_lineas || [];
+  const g = grupoPtto(p.sigma_ptto_estado);
+  return `<details ${g === 'rechazado' ? 'open' : ''}><summary>Presupuesto en el portal <span class="et pt p-${g}">${TXT_PTTO[p.sigma_ptto_estado]}</span></summary>
+    <div class="ptto-res">${resumenPtto(p)}</div>
+    ${l.length ? `<table class="ptto-lineas"><thead><tr><th>Baremo</th><th>Descripción</th><th>Uds.</th><th>Estado</th><th>Fecha</th></tr></thead><tbody>
+      ${l.map((x) => `<tr><td><b>${esc(x.baremo)}</b></td><td>${esc(x.descripcion)}</td><td>${esc(x.unidades)}</td>
+        <td style="color:${/ACEPTAD/i.test(x.estado) ? 'var(--ok)' : /RECHAZAD/i.test(x.estado) ? 'var(--peligro)' : 'var(--azul)'};font-weight:600">${esc(x.estado)}</td><td>${esc(fDMA(x.fecha) || '—')}</td></tr>`).join('')}
+    </tbody></table>` : ''}
+    <div style="font-size:11px;color:var(--suave);margin-top:4px">${p.sigma_ptto_revisado_en ? 'Leído del portal ' + hace(p.sigma_ptto_revisado_en) : ''}
+      · <a href="https://web.multiasistencia.com/w3multi/valprincipal.php?reparacion=${encodeURIComponent(p.numero_servicio)}&modo=0" target="_blank" rel="noopener">Abrir Presupuesto en el portal ↗</a></div>
+  </details>`;
+}
+
+async function vistaPresupuestos() {
+  if (!$('#ptto-raiz')) {
+    $('#contenido').innerHTML = `<div id="ptto-raiz">
+      <div class="barra"><h2>Presupuestos</h2>
+        <select id="ptto-cuenta" style="max-width:190px"><option value="">Todas las provincias</option>${Object.entries(CUENTAS_SIGMA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+        <select id="ptto-gremio" style="max-width:240px"><option value="">Todos los gremios (${GREMIOS_PTTO.length})</option>${GREMIOS_PTTO.map((g) => `<option value="${g}">${g}${codigo('gremio', g) ? ' · ' + esc(codigo('gremio', g)) : ''}</option>`).join('')}</select>
+        <span class="esp"></span><span id="ptto-leido" style="font-size:12px;color:var(--suave)"></span></div>
+      <div class="cad-grupos" id="ptto-filtros"></div>
+      <div id="ptto-lista">Cargando…</div></div>`;
+    $('#ptto-cuenta').value = filtroPttoCuenta;
+    $('#ptto-gremio').value = filtroPttoGremio;
+    $('#ptto-cuenta').onchange = (e) => { filtroPttoCuenta = e.target.value; pintarPresupuestos(); };
+    $('#ptto-gremio').onchange = (e) => { filtroPttoGremio = e.target.value; pintarPresupuestos(); };
+  }
+  const { data, error } = await consultaPtto(`id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, gremio, urgente, estado, sigma_cuenta, sigma_alerta, sigma_en_curso, sigma_gremio, sigma_ptto_estado, sigma_ptto_motivo, sigma_ptto_lineas, sigma_ptto_fecha, sigma_ptto_desde, sigma_ptto_revisado_en, ${SEL_ASIG}`);
+  if (error) return fallo(error);
+  datosPtto = data || [];
+  pintarPresupuestos();
+  contarPresupuestos();
+}
+
+function pintarPresupuestos() {
+  if (!datosPtto || !$('#ptto-raiz')) return;
+  const base = datosPtto.filter((p) => (!filtroPttoCuenta || p.sigma_cuenta === filtroPttoCuenta) && (!filtroPttoGremio || p.sigma_gremio === filtroPttoGremio));
+  const de = (f) => base.filter((p) => f.estados.includes(p.sigma_ptto_estado));
+  const sinLeer = base.filter((p) => !p.sigma_ptto_estado).length;
+  $('#ptto-filtros').innerHTML = FILTROS_PTTO.map((f) => {
+    const n = de(f).length;
+    const bloq = f.id === 'sin_valorar' ? de(f).filter((p) => p.sigma_ptto_estado === 'bloqueado').length : 0;
+    return `<button class="cad-g p-${f.id} ${filtroPtto === f.id ? 'activo' : ''}" onclick="filtroPtto='${f.id}';pintarPresupuestos()">
+      <div class="t">${f.nombre}</div><div class="n">${n}</div><div class="s">${f.ayuda}${bloq ? ` · ${bloq} bloqueado${bloq > 1 ? 's' : ''} por el portal` : ''}</div></button>`;
+  }).join('');
+  const ult = datosPtto.map((p) => p.sigma_ptto_revisado_en).filter(Boolean).sort().pop();
+  $('#ptto-leido').textContent = ult ? `Portal leído ${hace(ult)} · se actualiza cada 30 min` : 'Pendiente de la primera lectura del portal';
+  const f = FILTROS_PTTO.find((x) => x.id === filtroPtto) || FILTROS_PTTO[0];
+  // Orden: rechazados y enviados por la fecha de la última decisión (los más viejos primero); el resto por antigüedad del servicio
+  const lista = de(f).sort((a, b) => (f.id === 'rechazado' || f.id === 'enviado' ? String(a.sigma_ptto_fecha || '').localeCompare(String(b.sigma_ptto_fecha || '')) : 0)
+    || (f.id === 'sin_valorar' ? (a.sigma_ptto_estado === 'bloqueado') - (b.sigma_ptto_estado === 'bloqueado') : 0)
+    || ((fechaAsig(a)?.getTime() ?? 0) - (fechaAsig(b)?.getTime() ?? 0)));
+  const portal = (n) => `https://web.multiasistencia.com/w3multi/valprincipal.php?reparacion=${encodeURIComponent(n)}&modo=0`;
+  $('#ptto-lista').innerHTML = (lista.length ? `
+    <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nº servicio</th><th>Cliente</th><th>Dirección</th><th class="opc">Gremio</th><th>Presupuesto</th><th>En este estado</th><th></th></tr></thead>
+    <tbody>${lista.map((p) => {
+      const tels = listaTels(p.telefono, p.telefono2);
+      return `<tr class="clic p-${grupoPtto(p.sigma_ptto_estado)}" onclick="modalParte('${p.id}')">
+        <td><b>${esc(p.numero_servicio)}</b> ${etiquetaAntig(p)} ${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
+        <td>${esc(p.asegurado || '—')}${tels.slice(0, 1).map((t) => `<br><a href="tel:${esc(t)}" onclick="event.stopPropagation()">${esc(t)}</a>`).join('')}</td>
+        <td>${esc(p.direccion)}${p.poblacion ? '<br><small style="color:var(--suave)">' + esc(p.poblacion) + '</small>' : ''}</td>
+        <td class="opc"><b>${esc(p.sigma_gremio)}</b><br><small style="color:var(--suave)">${esc(codigo('gremio', p.sigma_gremio) || p.gremio || '')}</small></td>
+        <td><span class="et pt p-${grupoPtto(p.sigma_ptto_estado)}">${TXT_PTTO[p.sigma_ptto_estado]}</span><div class="ptto-res">${resumenPtto(p)}</div></td>
+        <td>${p.sigma_ptto_desde ? hace(p.sigma_ptto_desde) : '—'}</td>
+        <td onclick="event.stopPropagation()"><a class="mini" href="${portal(p.numero_servicio)}" target="_blank" rel="noopener" title="Abrir la pestaña Presupuesto en el portal">Portal ↗</a></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>
+    <p style="color:var(--suave);font-size:12px">${lista.length} servicio(s) · ${esc(f.nombre.toLowerCase())}</p>`
+    : `<div class="tarjeta vacio">No hay servicios en «${esc(f.nombre)}» con estos filtros.</div>`)
+    + (sinLeer ? `<p style="color:var(--suave);font-size:12px">${sinLeer} servicio(s) de estos gremios aún sin leer del portal: aparecerán tras la próxima lectura.</p>` : '');
 }
 
 function verRuta(dirs) {
