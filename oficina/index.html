@@ -290,7 +290,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.24 (Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.25 (Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -556,6 +556,22 @@ const RESOLUCIONES = {
 const TXT_ENVIO = { borrador: 'Por revisar', aprobado: 'Aprobado', enviando: 'Enviando…', enviado: 'Enviado', error: 'Error', descartado: 'Descartado' };
 const HORAS_SIGMA = [...Array(28)].map((_, i) => `${dos(8 + Math.floor(i / 2))}:${i % 2 ? '30' : '00'}`);
 const fDMA = (iso) => (iso ? iso.split('-').reverse().join('/') : '');
+// Cita presencial marcada en SIGMA con un Repaso (motivo 2 «Visita al Cliente» u 86 «Visita de instalación»):
+// el estado del portal la trae como «Visita al Cliente (21/10/2026 - 16:00) …». Devuelve { fecha, hora } o null.
+const MOTIVOS_CITA = ['2', '86'];
+function citaSigma(p) {
+  if (!MOTIVOS_CITA.includes(String(p.sigma_estado || ''))) return null;
+  const m = /\((\d{2})\/(\d{2})\/(\d{4})\s*-\s*(\d{2}:\d{2})\)/.exec(p.sigma_estado_texto || '');
+  return m ? { fecha: `${m[3]}-${m[2]}-${m[1]}`, hora: m[4] } : null;
+}
+// Próxima visita: la primera de hoy en adelante entre las visitas planificadas en Kubel y la cita marcada en SIGMA
+function proximaVisita(p, hoy = hoyISO()) {
+  const c = (p.asignaciones || []).filter((a) => a.fecha >= hoy).map((a) => ({ fecha: a.fecha, hora: hCorta(a.hora), operario_id: a.operario_id }));
+  const s = citaSigma(p);
+  if (s && s.fecha >= hoy) c.push({ ...s, sigma: true });
+  return c.sort((a, b) => (a.fecha + (a.hora || '')).localeCompare(b.fecha + (b.hora || '')))[0] || null;
+}
+const quienProx = (prox) => (prox.sigma ? 'Cita en SIGMA (Repaso)' : nombreDe(prox.operario_id));
 const MOTIVOS_TRAMITACION = [['4', 'Otros'], ['1', 'Consulta/comentario servicio abierto o cerrado recientemente'], ['3', 'Ausencias/problemas atención citas'], ['5', 'Respuesta a control de presupuestos']];
 const MENSAJE_TRAMITACION_IVA = 'Ruego revisión. Urge agilización.';
 const TXT_BLOQUEO_IVA = 'Repaso bloqueado por SIGMA: documento de IVA pendiente de validar. Hasta que un tramitador de SIGMA lo valide no se puede hacer Repaso; envía un mensaje a tramitación.';
@@ -1115,7 +1131,7 @@ async function pintarSinContacto(destino) {
     <tbody>${lista.map((p) => {
       const tels = listaTels(p.telefono, p.telefono2);
       const pendEnvio = (p.sigma_envios || []).some((e) => e.tipo === 'repaso' && ['borrador', 'aprobado', 'enviando'].includes(e.estado));
-      const prox = (p.asignaciones || []).filter((a) => a.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+      const prox = proximaVisita(p, hoy);
       const bloq = ivaBloq(p);
       return `<tr class="${bloq ? 'bloq' : 'clic'}" ${bloq ? `title="${esc(txtBloq(p))}"` : `onclick="modalParte('${p.id}')"`}>
         <td><b>${esc(p.numero_servicio)}</b> ${etiquetaAntig(p)} ${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
@@ -1123,7 +1139,7 @@ async function pintarSinContacto(destino) {
         <td>${esc(p.direccion)}${p.poblacion ? '<br><small style="color:var(--suave)">' + esc(p.poblacion) + '</small>' : ''}</td>
         <td class="opc">${esc(p.gremio || '')}</td>
         <td>${textoPlazo(p.plazo) || '—'}${p.sigma_caducidad !== null && p.sigma_caducidad !== undefined ? `<br><small style="color:var(--suave)">cad. ${p.sigma_caducidad} d${p.sigma_llamadas ? ' · ' + p.sigma_llamadas + ' llamadas' : ''}</small>` : ''}</td>
-        <td>${p.sigma_sin_contacto_desde ? hace(p.sigma_sin_contacto_desde) : '—'}${prox ? `<br><small style="color:var(--suave)">Visita ${fCorta(prox.fecha)} · ${esc(nombreDe(prox.operario_id))}</small>` : ''}</td>
+        <td>${p.sigma_sin_contacto_desde ? hace(p.sigma_sin_contacto_desde) : '—'}${prox ? `<br><small style="color:var(--suave)">Visita ${fCorta(prox.fecha)}${prox.hora ? ' ' + prox.hora : ''} · ${esc(quienProx(prox))}</small>` : ''}</td>
         <td style="white-space:nowrap" class="${bloq ? 'acc-bloq' : ''}" onclick="event.stopPropagation()">
           ${bloq ? `<span class="et bloq" title="${esc(txtBloq(p))}">🔒 ${esc(etqBloq(p))}</span><br>${botonTramitacion(p.id)}${ultimaTramitacion(p) ? `<br><small>${esc(ultimaTramitacion(p))}</small>` : ''}`
             : pendEnvio ? '<span class="et en_camino" title="Hay un Repaso preparado en Envíos a SIGMA">Repaso en bandeja</span>' : `<button class="mini" onclick="nuevoEnvio('${p.id}')">Repaso</button>`}
@@ -1645,7 +1661,7 @@ async function cargarPartes() {
   $('#tabla-partes').innerHTML = data.length ? `
     <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nº servicio</th><th class="opc">Compañía</th><th>Dirección</th><th class="opc">Cliente</th><th class="opc">Gremio</th><th>Estado</th><th>Próxima visita</th></tr></thead>
     <tbody>${data.map((p) => {
-      const prox = (p.asignaciones || []).filter((a) => a.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+      const prox = proximaVisita(p, hoy);
       const nuevo = esNuevoHoy(p);
       return `<tr class="clic${nuevo ? ' nuevo-hoy' : ''}" onclick="modalParte('${p.id}')">
         <td><b>${esc(p.numero_servicio)}</b> ${nuevo ? `<span class="et nuevo" title="Asignado hoy a las ${horaAsignacion(p)}">NUEVO</span> ` : ''}${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
@@ -1654,7 +1670,7 @@ async function cargarPartes() {
         <td class="opc">${esc(p.asegurado || '')}<br><small style="color:var(--suave)">${esc(p.telefono || '')}</small></td>
         <td class="opc">${esc(p.gremio || '')}</td>
         <td><span class="et ${p.estado}">${TXT_ESTADO[p.estado]}</span>${p.sigma_estado ? `<br><small style="color:var(--suave)">${esc(codigo('estado', p.sigma_estado) || 'Estado ' + p.sigma_estado)}${p.sigma_caducidad !== null && p.sigma_caducidad !== undefined ? ' · cad. ' + p.sigma_caducidad + ' d' : ''}</small>` : ''}</td>
-        <td>${prox ? fCorta(prox.fecha) + '<br><small style="color:var(--suave)">' + esc(nombreDe(prox.operario_id)) + '</small>' : '—'}</td>
+        <td>${prox ? fCorta(prox.fecha) + (prox.hora ? ' ' + prox.hora : '') + '<br><small style="color:var(--suave)">' + esc(quienProx(prox)) + '</small>' : '—'}</td>
       </tr>`;
     }).join('')}</tbody></table></div>
     <p style="color:var(--suave);font-size:12px">${data.length} servicio(s)${data.length === 300 ? ' (máximo 300; afina la búsqueda)' : ''}</p>` : '<div class="tarjeta vacio">No hay servicios con ese filtro.</div>';
@@ -1679,6 +1695,7 @@ async function modalParte(id) {
     const infs = (p.informes || []).sort((a, b) => b.creado_en.localeCompare(a.creado_en));
     historial = `
       <label>Visitas</label>
+      ${citaSigma(p) ? `<div>${fCorta(citaSigma(p).fecha)} ${citaSigma(p).hora} · cita presencial marcada en SIGMA (Repaso)${citaSigma(p).fecha < hoyISO() ? ' <small style="color:var(--suave)">(pasada)</small>' : ''}</div>` : ''}
       ${vis.length ? vis.map((a) => `<div><a href="#" onclick="cerrarModal();modalAsignacion('${a.id}');return false">${fCorta(a.fecha)} ${hCorta(a.hora)}</a> · ${esc(nombreDe(a.operario_id))} · ${a.tipo} <span class="et ${a.estado}">${TXT_ESTADO[a.estado]}</span></div>`).join('') : '<div style="color:var(--suave)">Sin visitas.</div>'}
       <label>Informes</label>
       ${infs.length ? infs.map((i) => `<div style="margin-bottom:4px">${fHora(i.creado_en)} · ${esc(nombreDe(i.operario_id))} ${i.revisado ? '' : '<span class="et nuevo">Nuevo</span>'}<div style="color:var(--suave);white-space:pre-wrap">${esc(i.texto.length > 160 ? i.texto.slice(0, 160) + '…' : i.texto)}</div></div>`).join('') +
