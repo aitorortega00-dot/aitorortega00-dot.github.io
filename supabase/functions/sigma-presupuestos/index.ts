@@ -146,14 +146,25 @@ async function cargarTextos() {
   } catch (err) { console.error('textos', (err as Error).message); }
 }
 
+// Motivos de bloqueo vistos en el portal (por si no se pudieran cargar los textos oficiales)
+const BLOQUEOS_CONOCIDOS: Record<string, string> = {
+  TXTNOCONFIRMADO: 'Debe confirmar el siniestro antes de introducir la valoración',
+  '6030': 'Antes de introducir el presupuesto se debe recoger la firma del presupuesto/encargo',
+};
 const fechaDMA = (t?: string | null) => { const m = String(t || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
 
 // deno-lint-ignore no-explicit-any
 function clasificar(j: any): Ptto | null {
   if (!j?.success) {
     const codes: string[] = (j?.metadata?.errorCodes || []).map((x: { code?: string }) => String(x?.code ?? '')).filter(Boolean);
-    if (!codes.length) return null; // respuesta rara: no se toca nada
-    const motivo = codes.map((c) => TEXTOS?.[c] || (c === 'TXTNOCONFIRMADO' ? 'Debe confirmar el siniestro antes de introducir la valoración' : `Código ${c} del portal`)).join(' · ');
+    // Solo es «bloqueado» si el portal da un motivo de su propio diccionario (siniestro sin confirmar, falta la firma…).
+    // Cualquier otro error (p. ej. «PASARELA: Error interno…») es pasajero: se reintenta y el servicio conserva su estado.
+    const conocido = (c: string) => !!BLOQUEOS_CONOCIDOS[c] || (!!TEXTOS?.[c] && !/generic|error|pasarela/i.test(c + ' ' + TEXTOS?.[c]));
+    if (!codes.length || !codes.every(conocido)) {
+      if (codes.length) console.warn('error pasajero del portal', codes.join(' | '));
+      return null;
+    }
+    const motivo = codes.map((c) => TEXTOS?.[c] || BLOQUEOS_CONOCIDOS[c]).join(' · ');
     return { estado: 'bloqueado', lineas: [], fecha: null, motivo };
   }
   // deno-lint-ignore no-explicit-any
@@ -180,8 +191,10 @@ async function leer(ut: string, n: string): Promise<Ptto | null> {
         method: 'POST', signal: AbortSignal.timeout(20000), body: JSON.stringify({ reparation: n }), headers: cabeceras(ut),
       });
       if (r.status === 401) { await r.body?.cancel(); throw new Error('El portal no aceptó el pase de la pestaña Presupuesto (401)'); }
-      if (r.ok) return clasificar(await r.json());
-      await r.body?.cancel();
+      if (r.ok) {
+        const c = clasificar(await r.json());
+        if (c) return c; // si es null (error pasajero) se reintenta una vez
+      } else await r.body?.cancel();
     } catch (err) { if (/401/.test((err as Error).message)) throw err; }
     await new Promise((res) => setTimeout(res, 4000));
   }
