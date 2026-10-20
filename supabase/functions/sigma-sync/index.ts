@@ -8,6 +8,8 @@
 // Marca los servicios con el Repaso BLOQUEADO por "Documento de Iva pendiente de Validar" (partes.sigma_iva_pendiente):
 // lo comprueba en el portal (~20 servicios por cuenta y pasada) y al fallar un Repaso. La oficina no puede hacer Repaso
 // de esos servicios; en su lugar envía un mensaje a tramitación (envío tipo 'tramitacion' → pestaña Su Gestor/Tramitador).
+// Pasa a CERRADO los que SIGMA cierra y a ANULADO los que ya no son nuestros (fuera de curso + ficha con
+// "La Reparación No Pertenece Al Profesional", pedida siempre con la cuenta del propio servicio). Los reabre si vuelven.
 // Lo llama pg_cron cada 15 minutos con la cabecera secreta x-kubel-secreto.
 // ?prueba=1  → lee el portal pero NO escribe ni acepta nada y devuelve un resumen.
 // ?cuenta=VLL → solo esa cuenta.  ?enviar=1 → solo manda a SIGMA los envíos aprobados (sin leer el listado).
@@ -358,8 +360,15 @@ function filasDe(tabla: Element) {
 }
 const tablaDe = (el: Element) => { let p = el.parentElement; while (p && p.tagName !== 'TABLE') p = p.parentElement; return p; };
 
+// El portal dice "La Reparación No Pertenece Al Profesional" cuando SIGMA nos ha quitado o anulado el servicio.
+// OJO: sale el mismo texto si se pide un servicio con la cuenta equivocada (VLL/PAL); por eso solo se pide
+// cada ficha con la cuenta del propio servicio y solo se anula si además ha salido de "Servicios en curso".
+class NoPertenece extends Error {}
+const noPertenece = (html: string) => /no\s+pertenece\s+al\s+profesional/i.test(html);
+
 function leerFicha(html: string) {
   if (pideClave(html)) throw new Error('Sesión caducada en la ficha');
+  if (noPertenece(html)) throw new NoPertenece('La Reparación No Pertenece Al Profesional');
   const doc = parse(html);
   const cab = [...doc.querySelectorAll('td.tcab')] as Element[];
   // Cabecera horizontal: títulos en una fila, valores en la siguiente
@@ -864,7 +873,7 @@ type Resumen = {
   cuenta: string; ok: boolean; en_listado: number; total_portal: number | null; paginas: number;
   nuevos: { numero: string; direccion: string; gremio: string; urgente: boolean }[];
   cambiados: number; fichas: number; desaparecidos: string[]; pendientes: number; error?: string; diagnostico?: unknown;
-  aceptados?: Ofrecido[]; sin_contacto?: number; caducadas?: number; cerrados?: string[]; reabiertos?: string[];
+  aceptados?: Ofrecido[]; sin_contacto?: number; caducadas?: number; cerrados?: string[]; anulados?: string[]; reabiertos?: string[];
   iva?: { revisados: number; bloqueados: string[]; desbloqueados: string[] };
 };
 
@@ -951,7 +960,8 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
     } else if (e.sigma_huella !== huella || e.sigma_en_curso !== true || e.sigma_cuenta !== cuenta) {
       r.cambiados++;
       const datos: Record<string, unknown> = { ...datosLista, sigma_ficha_en: null };
-      if (e.estado === 'cerrado' && (e.sigma_ficha as Record<string, unknown> | null)?.cierre_auto) {
+      const fx = e.sigma_ficha as Record<string, unknown> | null;
+      if ((e.estado === 'cerrado' && fx?.cierre_auto) || (e.estado === 'anulado' && fx?.anulado_auto)) {
         datos.estado = 'pendiente'; // se ajusta a "asignado" más abajo si tiene visitas
         (r.reabiertos ??= []).push(f.numero);
       }
@@ -990,6 +1000,7 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
   r.pendientes = colaFichas.length - aLeer.length;
   const fichas = new Map<string, ReturnType<typeof leerFicha>>();
   const erroresFicha: string[] = [];
+  const retirados = new Set<string>(); // fuera de curso + "No Pertenece Al Profesional" con su propia cuenta
   let idx = 0;
   await Promise.all(Array.from({ length: PARALELO }, async () => {
     while (idx < aLeer.length) {
@@ -997,7 +1008,8 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
       try {
         fichas.set(numero, leerFicha(await s.pedir(`repasos1.php?reparacion=${numero}`)));
       } catch (err) {
-        if (fuera.has(numero)) console.error('ficha fuera de curso', numero, (err as Error).message);
+        if (err instanceof NoPertenece && fuera.has(numero)) retirados.add(numero);
+        else if (fuera.has(numero)) console.error('ficha fuera de curso', numero, (err as Error).message);
         else erroresFicha.push(`${numero}: ${(err as Error).message}`);
       }
     }
@@ -1022,7 +1034,7 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
       marcas: [...new Set(lis.filas.flatMap((f) => f.marcas))],
       filas_sin_direccion: lis.filas.filter((f) => !f.direccion).length,
       errores_ficha: erroresFicha.slice(0, 5),
-      fuera_de_curso: [...fuera].map((n) => ({ numero: n, leida: fichas.has(n), cierre: fichas.get(n)?.otros.cierre ?? null })),
+      fuera_de_curso: [...fuera].map((n) => ({ numero: n, leida: fichas.has(n), cierre: fichas.get(n)?.otros.cierre ?? null, retirado: retirados.has(n) })),
       sin_primer_contacto: { portal: sinContactoPortal ? [...sinContactoPortal] : 'no leído', estado_15: lis.filas.filter((f) => f.estado === '15').map((f) => f.numero) },
       caducadas: caducadasPortal ? Object.fromEntries(['redes', 'resto', 'cliente'].map((g) => [g, [...caducadasPortal].filter(([, x]) => x === g).map(([n]) => n)])) : 'no leído',
       procedencias: [...new Map(nuevosCodigos.filter((c) => c.tipo === 'procedencia' && c.texto).map((c) => [c.codigo, c.texto])).entries()],
@@ -1147,6 +1159,24 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
       if (f.urgente && !p.urgente) d.urgente = true;
       const { error } = await admin.from('partes').update(d).eq('id', p.id);
       if (error) console.error('ficha', p.numero_servicio, error.message);
+    }
+  }
+  // RETIRADOS / ANULADOS POR SIGMA: ya no salen en curso y el portal dice que no son nuestros → Anulado
+  if (retirados.size) {
+    const { data: actuales } = await admin.from('partes').select('id, numero_servicio, estado, sigma_ficha')
+      .eq('compania_id', ciaId).eq('sigma_cuenta', cuenta).eq('sigma_en_curso', false)
+      .in('numero_servicio', [...retirados]).not('estado', 'in', '(cerrado,anulado)');
+    for (const p of actuales || []) {
+      const { error } = await admin.from('partes').update({
+        estado: 'anulado', sigma_ficha_en: ahora, sigma_sin_contacto: false, sigma_sin_contacto_desde: null, sigma_iva_pendiente: null,
+        sigma_ficha: { ...((p.sigma_ficha as Record<string, unknown>) ?? {}), anulado_auto: ahora, estado_antes: p.estado, anulado_motivo: 'La Reparación No Pertenece Al Profesional' },
+      }).eq('id', p.id);
+      if (error) { console.error('anular', p.numero_servicio, error.message); continue; }
+      await admin.from('partes').update({ sigma_cad_hasta: ahora, sigma_cad_estado_fin: null }).eq('id', p.id).not('sigma_cad_desde', 'is', null).is('sigma_cad_hasta', null);
+      const { error: eDesc } = await admin.from('sigma_envios').update({ estado: 'descartado', resultado: 'Descartado solo: SIGMA ha retirado o anulado el servicio (no pertenece al profesional)' })
+        .eq('parte_id', p.id).in('estado', ['borrador', 'aprobado', 'error']);
+      if (eDesc) console.error('descartar envíos', p.numero_servicio, eDesc.message);
+      (r.anulados ??= []).push(p.numero_servicio);
     }
   }
   // BLOQUEO POR DOCUMENTO DE IVA (solo lectura en el portal; no afecta al resultado de la pasada si falla)
