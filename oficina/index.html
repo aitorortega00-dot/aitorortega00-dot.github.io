@@ -290,7 +290,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.23 (Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.24 (Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -1187,7 +1187,7 @@ function bloquePresupuesto(p) {
       ${l.map((x) => `<tr><td><b>${esc(x.baremo)}</b></td><td>${esc(x.descripcion)}</td><td>${esc(x.unidades)}</td>
         <td style="color:${/ACEPTAD/i.test(x.estado) ? 'var(--ok)' : /RECHAZAD/i.test(x.estado) ? 'var(--peligro)' : 'var(--azul)'};font-weight:600">${esc(x.estado)}</td><td>${esc(fDMA(x.fecha) || '—')}</td></tr>`).join('')}
     </tbody></table>` : ''}
-    <div style="font-size:11px;color:var(--suave);margin-top:4px">${p.sigma_ptto_revisado_en ? 'Leído del portal ' + hace(p.sigma_ptto_revisado_en) : ''}
+    <div style="font-size:11px;color:var(--suave);margin-top:4px">Se comprueba en el portal cada 30 min${p.sigma_ptto_revisado_en ? ' · último cambio ' + hace(p.sigma_ptto_revisado_en) : ''}
       · <a href="https://web.multiasistencia.com/w3multi/valprincipal.php?reparacion=${encodeURIComponent(p.numero_servicio)}&modo=0" target="_blank" rel="noopener">Abrir Presupuesto en el portal ↗</a></div>
   </details>`;
 }
@@ -1224,8 +1224,7 @@ function pintarPresupuestos() {
     return `<button class="cad-g p-${f.id} ${filtroPtto === f.id ? 'activo' : ''}" onclick="filtroPtto='${f.id}';pintarPresupuestos()">
       <div class="t">${f.nombre}</div><div class="n">${n}</div><div class="s">${f.ayuda}${bloq ? ` · ${bloq} bloqueado${bloq > 1 ? 's' : ''} por el portal` : ''}</div></button>`;
   }).join('');
-  const ult = datosPtto.map((p) => p.sigma_ptto_revisado_en).filter(Boolean).sort().pop();
-  $('#ptto-leido').textContent = ult ? `Portal leído ${hace(ult)} · se actualiza cada 30 min` : 'Pendiente de la primera lectura del portal';
+  $('#ptto-leido').textContent = 'Se lee del portal cada 30 min';
   const f = FILTROS_PTTO.find((x) => x.id === filtroPtto) || FILTROS_PTTO[0];
   // Orden: rechazados y enviados por la fecha de la última decisión (los más viejos primero); el resto por antigüedad del servicio
   const lista = de(f).sort((a, b) => (f.id === 'rechazado' || f.id === 'enviado' ? String(a.sigma_ptto_fecha || '').localeCompare(String(b.sigma_ptto_fecha || '')) : 0)

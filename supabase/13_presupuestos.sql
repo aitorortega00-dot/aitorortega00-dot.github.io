@@ -15,7 +15,7 @@
 --  · partes.sigma_ptto_lineas       = partidas leídas: [{baremo, descripcion, unidades, estado, fecha}]
 --  · partes.sigma_ptto_fecha        = fecha de la última decisión de compañía/MA (dd/mm/aaaa → date)
 --  · partes.sigma_ptto_desde        = desde cuándo está en la clasificación actual
---  · partes.sigma_ptto_revisado_en  = última lectura del portal
+--  · partes.sigma_ptto_revisado_en  = última vez que el robot guardó un cambio (solo escribe cuando cambia algo)
 -- =====================================================================
 alter table public.partes
   add column if not exists sigma_ptto_estado text

@@ -10,6 +10,8 @@
 //                     cuenta como sin valorar; el texto del portal va en sigma_ptto_motivo
 // Va aparte de sigma-sync para no tocar el robot principal. Lo llama pg_cron a los minutos 07 y 37 (entre pasadas de
 // sigma-sync, que dura < 2 min) con la cabecera secreta x-kubel-secreto.
+// Solo guarda un servicio cuando cambia su presupuesto (estado, partidas, motivo o fecha de decisión): así no se toca
+// partes.actualizado_en («modificado» en la ficha) ni se avisa en directo a la oficina sin motivo (21/10/2026).
 // ?prueba=1 → lee el portal pero NO escribe y devuelve el resumen.  ?cuenta=VLL → solo esa cuenta.
 import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4';
 import postgres from 'npm:postgres@3.4.4';
@@ -186,10 +188,14 @@ async function leer(ut: string, n: string): Promise<Ptto | null> {
   return null;
 }
 
-type Resumen = { cuenta: string; ok: boolean; servicios: number; leidos: number; fallidos: string[]; estados: Record<string, number>; cambios: string[]; error?: string };
+type Resumen = { cuenta: string; ok: boolean; servicios: number; leidos: number; guardados: number; fallidos: string[]; estados: Record<string, number>; cambios: string[]; error?: string };
+
+// Huella del presupuesto para saber si ha cambiado (independiente del orden de claves que devuelve jsonb)
+// deno-lint-ignore no-explicit-any
+const huellaLineas = (l: any) => (Array.isArray(l) ? l : []).map((x: PttoLinea) => [x.baremo, x.descripcion, x.unidades, x.estado, x.fecha ?? ''].join('|')).join('\n');
 
 async function revisarCuenta(admin: SupabaseClient, ciaId: number, cuenta: string, usuario: string, clave: string, prueba: boolean, r: Resumen) {
-  const { data, error } = await admin.from('partes').select('id, numero_servicio, sigma_ptto_estado')
+  const { data, error } = await admin.from('partes').select('id, numero_servicio, sigma_ptto_estado, sigma_ptto_motivo, sigma_ptto_fecha, sigma_ptto_lineas')
     .eq('compania_id', ciaId).eq('sigma_cuenta', cuenta).eq('sigma_en_curso', true).in('sigma_gremio', GREMIOS_PTTO)
     .not('estado', 'in', '(cerrado,anulado)').order('sigma_ptto_revisado_en', { ascending: true, nullsFirst: true });
   if (error) throw error;
@@ -209,6 +215,9 @@ async function revisarCuenta(admin: SupabaseClient, ciaId: number, cuenta: strin
       if (!res) { r.fallidos.push(p.numero_servicio); continue; }
       r.leidos++;
       r.estados[res.estado] = (r.estados[res.estado] || 0) + 1;
+      const igual = p.sigma_ptto_estado === res.estado && (p.sigma_ptto_motivo ?? null) === res.motivo
+        && (p.sigma_ptto_fecha ?? null) === res.fecha && huellaLineas(p.sigma_ptto_lineas) === huellaLineas(res.lineas);
+      if (igual) continue; // sin cambios: no se escribe nada
       const ahora = new Date().toISOString();
       const d: Record<string, unknown> = {
         sigma_ptto_estado: res.estado, sigma_ptto_motivo: res.motivo, sigma_ptto_lineas: res.lineas,
@@ -221,6 +230,7 @@ async function revisarCuenta(admin: SupabaseClient, ciaId: number, cuenta: strin
       if (prueba) continue;
       const { error: e } = await admin.from('partes').update(d).eq('id', p.id);
       if (e) console.error('guardar', p.numero_servicio, e.message);
+      else r.guardados++;
     }
   }));
   r.ok = true;
@@ -251,7 +261,7 @@ Deno.serve(async (req) => {
   const resultados: Resumen[] = [];
   for (const c of CUENTAS) {
     if (solo && solo !== c.id) continue;
-    const r: Resumen = { cuenta: c.id, ok: false, servicios: 0, leidos: 0, fallidos: [], estados: {}, cambios: [] };
+    const r: Resumen = { cuenta: c.id, ok: false, servicios: 0, leidos: 0, guardados: 0, fallidos: [], estados: {}, cambios: [] };
     const usuario = Deno.env.get(`SIGMA_${c.id}_USUARIO`);
     const clave = Deno.env.get(`SIGMA_${c.id}_CLAVE`);
     try {
@@ -263,6 +273,6 @@ Deno.serve(async (req) => {
     }
     resultados.push(r);
   }
-  console.log('presupuestos', JSON.stringify(resultados.map((x) => ({ cuenta: x.cuenta, ok: x.ok, servicios: x.servicios, leidos: x.leidos, fallidos: x.fallidos.length, estados: x.estados, cambios: x.cambios.length, error: x.error }))));
+  console.log('presupuestos', JSON.stringify(resultados.map((x) => ({ cuenta: x.cuenta, ok: x.ok, servicios: x.servicios, leidos: x.leidos, guardados: x.guardados, fallidos: x.fallidos.length, estados: x.estados, cambios: x.cambios.length, error: x.error }))));
   return new Response(JSON.stringify({ prueba, resultados }), { headers: { 'Content-Type': 'application/json' } });
 });
