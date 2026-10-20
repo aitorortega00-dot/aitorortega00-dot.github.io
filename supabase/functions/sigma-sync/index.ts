@@ -460,9 +460,24 @@ const CODIGOS_REPASO: Record<string, string> = {
   TXT_GENERICERROR: 'Error genérico del portal',
   // (20/10/2026) Vistos en envíos reales
   '3057': 'El servicio está cerrado en SIGMA: ya no admite Repaso',
-  '4106': 'SIGMA no acepta esa fecha/hora de la siguiente acción (normalmente porque ya ha pasado): pon una fecha y hora futuras y reintenta',
+  '4106': 'Hora incorrecta de la siguiente acción (suele ser una hora ya pasada): pon una fecha y hora futuras y reintenta',
+  '4108': 'La fecha/hora de contacto con el cliente no puede ser posterior a la actual: corrígela y reintenta',
+  '1213': 'SIGMA avisa de que el servicio se ha aplazado tres o más veces (posible penalización si no hay causa justificada): hazlo a mano en el portal',
   'Aplazamiento Pte. Cia./Perito': 'Servicio en «Aplazamiento Pte. Cia./Perito»: SIGMA no deja hacer Repaso hasta que responda la compañía o el perito',
 };
+// Textos oficiales de los errores del Repaso (los mismos que muestra el portal): GET /translations?module=REVIEW&lang=es → error{código: texto}
+let TEXTOS_REPASO: Record<string, string> | null = null;
+async function cargarTextosRepaso() {
+  if (TEXTOS_REPASO) return;
+  try {
+    const r = await fetch(`${API_REPASO}/translations?module=REVIEW&lang=es`, {
+      signal: AbortSignal.timeout(10000), headers: { Version: '3.0.0', 'User-Agent': UA, Origin: 'https://web.multiasistencia.com' },
+    });
+    const j = r.ok ? await r.json() : null;
+    const err = j?.error ?? j?.data?.error;
+    if (err && typeof err === 'object') TEXTOS_REPASO = err as Record<string, string>;
+  } catch (err) { console.error('textos Repaso', (err as Error).message); }
+}
 function traducirCodigos(codes: Record<string, unknown>[] | undefined, extra?: unknown) {
   const lista = (codes || []).filter((x) => x && typeof x === 'object');
   const textoExtra = typeof extra === 'string' && extra.trim() ? extra.trim() : '';
@@ -470,6 +485,7 @@ function traducirCodigos(codes: Record<string, unknown>[] | undefined, extra?: u
   return lista.map((x) => {
     const code = String(x.code ?? '');
     if (CODIGOS_REPASO[code]) return CODIGOS_REPASO[code];
+    if (TEXTOS_REPASO?.[code]) return `${TEXTOS_REPASO[code]} (código ${code} de SIGMA)`;
     // El portal a veces manda el motivo del bloqueo como texto en «code» (p. ej. el estado del servicio)
     if (/[a-záéíóúñ]{3,}\s/i.test(code)) return `SIGMA no deja hacer el Repaso: ${code}`;
     const textos = Object.entries(x).filter(([k, v]) => k !== 'code' && typeof v === 'string' && v.trim()).map(([, v]) => String(v).trim());
@@ -516,6 +532,7 @@ async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
   if (!e.comentario.trim()) throw new Error('Falta el comentario');
   const ut = await paseRepaso(s, n);
   if (!ut) throw new Error('No se pudo abrir la pestaña Repaso de este servicio');
+  await cargarTextosRepaso();
   // Un 50x, un corte o un tiempo agotado en review-update es DUDOSO: el portal pudo guardar el cambio
   // aunque no contestara. Se marca como Dudoso para comprobarlo en la ficha antes de repetir nada.
   const api = async (ruta: string, cuerpo: unknown) => {
@@ -598,10 +615,11 @@ async function guardarRepaso(s: Sesion, e: Envio, n: string, ini: any, api: (rut
   if (d.dates?.clientContact) {
     if (!e.contacto_en) throw new Error('SIGMA pide la fecha y hora en que se contactó con el cliente (servicio sin primer contacto): rellénala en el envío y reintenta');
     const cuando = new Date(e.contacto_en);
-    if (cuando.getTime() > Date.now() + 5 * 60000) throw new Error('La fecha de contacto con el cliente no puede ser futura');
+    if (cuando.getTime() > Date.now()) throw new Error(CODIGOS_REPASO['4108']);
     const pz = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
       .formatToParts(cuando).map((x) => [x.type, x.value]));
     const hh = pz.hour.padStart(2, '0'), mi = pz.minute.padStart(2, '0');
+    if (Number(hh) < 8) throw new Error('La hora de contacto con el cliente debe estar entre las 08:00 y las 24:00');
     contacto = { day: String(Number(pz.day)), month: String(Number(pz.month)), year: pz.year, hourRaw: String(3600 * Number(hh) + 60 * Number(mi)), hour: hh, minute: mi };
   }
   const cmd: Record<string, unknown> = {

@@ -280,7 +280,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.20 (Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.21 (contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -628,7 +628,8 @@ function validarEnvio(e) {
     // Servicio sin primer contacto (estado 15): SIGMA exige la fecha y hora en que se contactó con el cliente
     if (e.parte && String(e.parte.sigma_estado) === '15') {
       if (!e.contacto_en) return 'Falta la fecha y hora en que contactasteis con el cliente (SIGMA la exige en servicios sin primer contacto)';
-      if (new Date(e.contacto_en).getTime() > Date.now() + 5 * 60000) return 'La fecha de contacto con el cliente no puede ser futura';
+      if (new Date(e.contacto_en).getTime() > Date.now()) return 'La fecha y hora de contacto con el cliente no puede ser posterior a ahora';
+      if (new Date(e.contacto_en).getHours() < 8) return 'La hora de contacto con el cliente debe estar entre las 08:00 y las 24:00';
     }
   } else {
     if (!RESOLUCIONES[e.resolucion]) return 'Elige la resolución';
