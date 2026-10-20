@@ -280,7 +280,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.19 (Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.20 (Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -1365,10 +1365,12 @@ function catalogoPueblos(lista) {
 }
 let cachePueblos = null;
 async function cargarPueblos() {
-  const { data, error } = await sb.from('partes').select('id, codigo_postal, poblacion, sigma_cuenta, sigma_gremio, gremio').in('estado', ABIERTOS);
+  const { data, error } = await sb.from('partes').select('id, compania_id, codigo_postal, poblacion, sigma_cuenta, sigma_gremio, gremio').in('estado', ABIERTOS);
   if (error) throw error;
   const cat = catalogoPueblos(data || []);
-  cachePueblos = { cat, abiertos: (data || []).map((p) => ({ ...p, ciudad: ciudadDe(p), gremioClave: claveGremio(p) })) };
+  const puebloDe = new Map();
+  cat.forEach((v, k) => v.ids.forEach((id) => puebloDe.set(id, k)));
+  cachePueblos = { cat, abiertos: (data || []).map((p) => ({ ...p, ciudad: ciudadDe(p), pueblo: puebloDe.get(p.id) || '', gremioClave: claveGremio(p) })) };
 }
 // ---------- Gremio: código SIGMA + nombre ("02A ELECTRICISTA"); los partes manuales, por su texto ----------
 function claveGremio(p) {
@@ -1382,30 +1384,55 @@ function textoGremio(k) {
   if (k.startsWith('S:')) { const c = k.slice(2); return (c + ' ' + (codigo('gremio', c) || '')).trim().toUpperCase(); }
   return k.slice(2);
 }
+// Contadores de los filtros (servicios abiertos). Cada desplegable cuenta con los demás filtros
+// de lugar, gremio y compañía aplicados, pero no con el suyo: así se ve cuántos hay en cada opción.
+function abiertosSin(excepto) {
+  const f = filtroPartes;
+  return (cachePueblos?.abiertos || []).filter((p) =>
+    (excepto === 'gremio' || !f.gremio || p.gremioClave === f.gremio) &&
+    (excepto === 'cia' || !f.cia || String(p.compania_id) === String(f.cia)) &&
+    (excepto === 'ciudad' || excepto === 'pueblo' || !f.ciudad || p.ciudad === f.ciudad) &&
+    (excepto === 'ciudad' || excepto === 'pueblo' || !f.pueblo || p.pueblo === f.pueblo));
+}
+function contarPor(lista, campo) {
+  const m = new Map();
+  lista.forEach((p) => m.set(p[campo], (m.get(p[campo]) || 0) + 1));
+  return m;
+}
 function pintarFiltrosLugar() {
   const cat = cachePueblos?.cat || new Map();
+  const hay = !!cachePueblos;
+  const n = (x) => (hay ? ` (${x})` : '');
+  // Compañía
+  const lCia = abiertosSin('cia'), porCia = contarPor(lCia, 'compania_id');
+  $('#fp-cia').innerHTML = `<option value="">Todas las compañías${n(lCia.length)}</option>` +
+    cache.companias.map((c) => `<option value="${c.id}">${esc(c.nombre)}${n(porCia.get(c.id) || 0)}</option>`).join('');
+  $('#fp-cia').value = filtroPartes.cia;
+  // Provincia
   const ciudades = [...new Set([...cat.values()].map((v) => v.ciudad))].sort((a, b) => (a === 'Otras') - (b === 'Otras') || a.localeCompare(b));
   if (filtroPartes.ciudad && !ciudades.includes(filtroPartes.ciudad)) filtroPartes.ciudad = '';
-  $('#fp-ciudad').innerHTML = '<option value="">Todas las provincias</option>' + ciudades.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  const lProv = abiertosSin('ciudad'), porProv = contarPor(lProv, 'ciudad');
+  $('#fp-ciudad').innerHTML = `<option value="">Todas las provincias${n(lProv.length)}</option>` +
+    ciudades.map((c) => `<option value="${esc(c)}">${esc(c)}${n(porProv.get(c) || 0)}</option>`).join('');
   $('#fp-ciudad').value = filtroPartes.ciudad;
-  const pueblos = [...cat.entries()].filter(([, v]) => !filtroPartes.ciudad || v.ciudad === filtroPartes.ciudad)
+  // Pueblo (solo tras elegir provincia); con gremio o compañía, solo los pueblos que tienen alguno
+  const lPue = abiertosSin('pueblo').filter((p) => !filtroPartes.ciudad || p.ciudad === filtroPartes.ciudad);
+  const porPue = contarPor(lPue, 'pueblo');
+  const pueblos = [...cat.entries()].filter(([k, v]) => (!filtroPartes.ciudad || v.ciudad === filtroPartes.ciudad) && (porPue.get(k) || k === filtroPartes.pueblo))
     .sort(([, a], [, b]) => b.etiqueta.endsWith('(capital)') - a.etiqueta.endsWith('(capital)') || a.ciudad.localeCompare(b.ciudad) || a.etiqueta.localeCompare(b.etiqueta, 'es'));
   if (filtroPartes.pueblo && !pueblos.some(([k]) => k === filtroPartes.pueblo)) filtroPartes.pueblo = '';
-  // El pueblo solo se puede elegir después de elegir una provincia
   const sinProv = !filtroPartes.ciudad;
   if (sinProv) filtroPartes.pueblo = '';
-  $('#fp-pueblo').innerHTML = (sinProv ? '<option value="">Todos los pueblos (elige provincia)</option>' : '<option value="">Todos los pueblos</option>')
-    + (sinProv ? '' : pueblos.map(([k, v]) => `<option value="${esc(k)}">${esc(v.etiqueta)} (${v.ids.length})</option>`).join(''));
+  $('#fp-pueblo').innerHTML = (sinProv ? '<option value="">Todos los pueblos (elige provincia)</option>' : `<option value="">Todos los pueblos${n(lPue.length)}</option>`)
+    + (sinProv ? '' : pueblos.map(([k, v]) => `<option value="${esc(k)}">${esc(v.etiqueta)}${n(porPue.get(k) || 0)}</option>`).join(''));
   $('#fp-pueblo').value = filtroPartes.pueblo;
   $('#fp-pueblo').disabled = sinProv;
   $('#fp-pueblo').title = sinProv ? 'Elige primero una provincia' : '';
-  // Gremio: código y nombre con nº de servicios abiertos (de la provincia elegida)
-  const cuenta = new Map();
-  (cachePueblos?.abiertos || []).filter((p) => !filtroPartes.ciudad || p.ciudad === filtroPartes.ciudad)
-    .forEach((p) => cuenta.set(p.gremioClave, (cuenta.get(p.gremioClave) || 0) + 1));
+  // Gremio: código y nombre con nº de servicios abiertos (con provincia, pueblo y compañía elegidos)
+  const lGre = abiertosSin('gremio'), cuenta = contarPor(lGre, 'gremioClave');
   if (filtroPartes.gremio && !cuenta.has(filtroPartes.gremio)) cuenta.set(filtroPartes.gremio, 0);
   const gremios = [...cuenta.entries()].sort(([a], [b]) => (a === 'SIN') - (b === 'SIN') || a.startsWith('T:') - b.startsWith('T:') || a.localeCompare(b, 'es'));
-  $('#fp-gremio').innerHTML = '<option value="">Todos los gremios</option>' + gremios.map(([k, n]) => `<option value="${esc(k)}">${esc(textoGremio(k))} (${n})</option>`).join('');
+  $('#fp-gremio').innerHTML = `<option value="">Todos los gremios${n(lGre.length)}</option>` + gremios.map(([k, c]) => `<option value="${esc(k)}">${esc(textoGremio(k))} (${c})</option>`).join('');
   $('#fp-gremio').value = filtroPartes.gremio;
 }
 
@@ -1434,13 +1461,13 @@ async function montarPartes(destino) {
   $('#fp-nuevos').value = filtroPartes.nuevos;
   $('#fp-nuevos').onchange = (e) => { filtroPartes.nuevos = e.target.value; cargarPartes(); };
   $('#fp-ciudad').onchange = (e) => { filtroPartes.ciudad = e.target.value; filtroPartes.pueblo = ''; pintarFiltrosLugar(); cargarPartes(); };
-  $('#fp-pueblo').onchange = (e) => { filtroPartes.pueblo = e.target.value; cargarPartes(); };
-  $('#fp-gremio').onchange = (e) => { filtroPartes.gremio = e.target.value; cargarPartes(); };
+  $('#fp-pueblo').onchange = (e) => { filtroPartes.pueblo = e.target.value; pintarFiltrosLugar(); cargarPartes(); };
+  $('#fp-gremio').onchange = (e) => { filtroPartes.gremio = e.target.value; pintarFiltrosLugar(); cargarPartes(); };
   try { await cargarPueblos(); } catch (e) { cachePueblos = null; }
   pintarFiltrosLugar();
   let t; $('#fp-texto').oninput = (e) => { clearTimeout(t); t = setTimeout(() => { filtroPartes.texto = e.target.value.trim(); cargarPartes(); }, 300); };
   $('#fp-estado').onchange = (e) => { filtroPartes.estado = e.target.value; cargarPartes(); };
-  $('#fp-cia').onchange = (e) => { filtroPartes.cia = e.target.value; cargarPartes(); };
+  $('#fp-cia').onchange = (e) => { filtroPartes.cia = e.target.value; pintarFiltrosLugar(); cargarPartes(); };
   await cargarPartes();
 }
 
