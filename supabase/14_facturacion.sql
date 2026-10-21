@@ -316,3 +316,20 @@ begin
   where f.parte_id = new.id and not f.liquidado;
   return null;
 end; $$;
+
+-- 14e · 21/10: servicios ABIERTOS de los demás gremios (no 11A/77A/30A/10A/76A): sigma-importes?abiertos=1 cada hora
+--      (minuto 52) mira su presupuesto; si está aceptado entran en Facturación con el importe (manda el último).
+create or replace function privado.lanzar_importes_abiertos()
+returns bigint language plpgsql security definer set search_path = public, privado, extensions as $$
+declare s text; r bigint;
+begin
+  select valor into s from privado.ajustes where clave = 'notif_secreto';
+  select net.http_post(
+    url := 'https://hytmotuhdxbzpustnlzx.supabase.co/functions/v1/sigma-importes?abiertos=1',
+    body := '{}'::jsonb,
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-kubel-secreto', s),
+    timeout_milliseconds := 150000) into r;
+  return r;
+end; $$;
+revoke execute on function privado.lanzar_importes_abiertos() from public, anon, authenticated;
+select cron.schedule('kubel-sigma-importes-abiertos', '52 5-19 * * *', 'select privado.lanzar_importes_abiertos()');

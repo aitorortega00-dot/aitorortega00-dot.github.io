@@ -5,8 +5,12 @@
 //       - sin importe → se anota;  - igual → OK;  - distinto → se pone el de SIGMA (manda el último) con aviso
 //         «Cambió al cerrar: de X a Y».   Queda comprobado.
 //   · pendientes / rechazadas / sin presupuesto → nota para revisar y se vuelve a mirar cada 6 h (30 días como mucho).
-// (Con el servicio abierto, el importe lo pone el disparador partes_facturacion_ptto al quedar ACEPTADO.)
+// (Con el servicio abierto, en los gremios 11A, 77A, 30A, 10A, 76A el importe lo pone el disparador partes_facturacion_ptto
+//  al quedar ACEPTADO; el resto de gremios los revisa este robot con ?abiertos=1, ver abajo.)
 // Lo llama pg_cron (minutos 12 y 42) con la cabecera secreta x-kubel-secreto.
+// ?abiertos=1 (pg_cron cada hora, minuto 52) → servicios SIGMA ABIERTOS de los DEMÁS gremios: si el presupuesto ya está
+//   aceptado (sin partidas pendientes) el servicio entra en Facturación con ese importe (fecha y operario de la visita;
+//   sin visita en KUBEL, la fecha de la aceptación). Si cambia, manda el último. No toca partes ni la página Presupuestos.
 // ?ver=29339818,29426060&cuenta=VLL → devuelve la respuesta del portal tal cual (para revisar).
 import postgres from 'npm:postgres@3.4.4';
 const BASE = 'https://web.multiasistencia.com/w3multi/';
@@ -79,6 +83,60 @@ function decidir(j: any): { importe: number | null; nota: string | null } {
   return { importe: null, nota: 'Presupuesto rechazado' };
 }
 
+const GREMIOS_PTTO = ['11A', '77A', '30A', '10A', '76A']; // estos los vigila sigma-presupuestos
+const PARALELO = 3;
+// Fecha de la última aceptación de las partidas («dd/mm/aaaa» → aaaa-mm-dd)
+// deno-lint-ignore no-explicit-any
+function fechaAceptacion(j: any): string | null {
+  let m: string | null = null;
+  for (const l of j?.data?.budgetLinesList || []) {
+    const x = String(l.statusDate || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (x && /ACEPTAD/i.test(String(l.status || ''))) { const f = `${x[3]}-${x[2]}-${x[1]}`; if (!m || f > m) m = f; }
+  }
+  return m;
+}
+// deno-lint-ignore no-explicit-any
+async function revisarAbiertos(sql: any, resumen: Record<string, unknown>[]) {
+  const lista = await sql`
+    select p.id, p.numero_servicio, p.sigma_cuenta from public.partes p join public.companias c on c.id = p.compania_id
+     where c.nombre = 'SIGMA' and p.sigma_en_curso and p.estado not in ('cerrado', 'anulado') and p.sigma_cuenta is not null
+       and coalesce(p.sigma_gremio, '') <> all(${GREMIOS_PTTO})
+       and not exists (select 1 from public.facturacion f where f.parte_id = p.id and f.liquidado)`;
+  for (const cuenta of ['VLL', 'PAL']) {
+    // deno-lint-ignore no-explicit-any
+    const mias = lista.filter((x: any) => x.sigma_cuenta === cuenta);
+    const r = { cuenta, servicios: mias.length, aceptados: 0, cambios: 0, fallidos: 0, error: null as string | null };
+    resumen.push(r);
+    if (!mias.length) continue;
+    try {
+      const s = new Sesion();
+      await entrar(s, Deno.env.get(`SIGMA_${cuenta}_USUARIO`)!, Deno.env.get(`SIGMA_${cuenta}_CLAVE`)!);
+      const ut = await pase(s, mias[0].numero_servicio);
+      if (!ut) throw new Error('No se pudo abrir la pestaña Presupuesto');
+      let i = 0;
+      await Promise.all(Array.from({ length: PARALELO }, async () => {
+        while (i < mias.length) {
+          const p = mias[i++];
+          const j = await leer(ut, p.numero_servicio);
+          if (!j) { r.fallidos++; continue; }
+          const d = decidir(j);
+          if (d.importe == null) continue; // sin aceptar todavía: no entra
+          r.aceptados++;
+          await sql`select public.facturacion_alta(${p.id}::uuid, ${fechaAceptacion(j)}::date, null)`;
+          const [f] = await sql`select id, importe from public.facturacion where parte_id = ${p.id} and not liquidado`;
+          if (!f) continue;
+          const antes = f.importe == null ? null : Number(f.importe);
+          if (antes != null && Math.abs(antes - d.importe) < 0.01) continue; // sin cambios
+          const nota = antes == null ? d.nota : `Presupuesto cambiado en SIGMA: de ${euros(antes)} a ${euros(d.importe)}`;
+          await sql`update public.facturacion set importe = ${d.importe}::numeric, importe_origen = 'presupuesto', importe_nota = ${nota},
+                      importe_leido_en = now() where id = ${f.id}`;
+          r.cambios++;
+        }
+      }));
+    } catch (err) { r.error = (err as Error).message; console.error(cuenta, err); }
+  }
+}
+
 Deno.serve(async (req) => {
   const sec = await leerSecreto();
   if (!sec || req.headers.get('x-kubel-secreto') !== sec) return new Response('no', { status: 401 });
@@ -95,6 +153,11 @@ Deno.serve(async (req) => {
   }
   const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
   const resumen: Record<string, unknown>[] = [];
+  if (url.searchParams.get('abiertos') === '1') {
+    try { await revisarAbiertos(sql, resumen); } finally { await sql.end(); }
+    console.log('importes abiertos', JSON.stringify(resumen));
+    return new Response(JSON.stringify({ abiertos: true, resultados: resumen }), { headers: { 'Content-Type': 'application/json' } });
+  }
   try {
     const filas = await sql`
       select f.id, f.importe, f.importe_origen, p.numero_servicio, p.sigma_cuenta from public.facturacion f join public.partes p on p.id = f.parte_id
