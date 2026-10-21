@@ -1,9 +1,12 @@
 // KUBEL — Importe de los servicios cerrados para Facturación (panel admin) · 21/10/2026
-// Para cada fila de facturación SIN importe de un servicio SIGMA cerrado, lee la pestaña «Presupuesto» del portal
-// (servicio JSON valuations-initial-data, SOLO LECTURA) y, si todas las partidas están ACEPTADAS, anota el importe
-// total de la valoración (totals.totSubtotalP, el «importe total» que muestra el portal al final de la pestaña).
-// Si hay partidas pendientes o rechazadas no anota nada y deja una nota para revisar; se vuelve a mirar cada 6 h.
-// Nunca pisa un importe ya escrito. Lo llama pg_cron (minutos 12 y 42) con la cabecera secreta x-kubel-secreto.
+// Comprobación AL CERRARSE: para cada fila de facturación de un servicio SIGMA ya cerrado y aún sin comprobar
+// (importe_cierre_en vacío), lee la pestaña «Presupuesto» del portal (valuations-initial-data, SOLO LECTURA):
+//   · todas las partidas ACEPTADAS → importe total de la valoración (totals.totSubtotalP, el que muestra el portal):
+//       - sin importe → se anota;  - igual → OK;  - distinto y lo había puesto el robot → se actualiza con aviso;
+//       - distinto y escrito a mano / Excel → no se toca, solo aviso «SIGMA dice …».   Queda comprobado.
+//   · pendientes / rechazadas / sin presupuesto → nota para revisar y se vuelve a mirar cada 6 h (30 días como mucho).
+// (Con el servicio abierto, el importe lo pone el disparador partes_facturacion_ptto al quedar ACEPTADO.)
+// Lo llama pg_cron (minutos 12 y 42) con la cabecera secreta x-kubel-secreto.
 // ?ver=29339818,29426060&cuenta=VLL → devuelve la respuesta del portal tal cual (para revisar).
 import postgres from 'npm:postgres@3.4.4';
 const BASE = 'https://web.multiasistencia.com/w3multi/';
@@ -69,9 +72,10 @@ function decidir(j: any): { importe: number | null; nota: string | null } {
   const total = num(j?.data?.totals?.totSubtotalP);
   if (!lineas.length) return { importe: null, nota: 'Sin presupuesto en SIGMA' };
   const est = lineas.map((l) => String(l.status || ''));
-  if (est.every((e) => /ACEPTAD/i.test(e)) && total != null && total > 0) return { importe: total, nota: null };
   if (est.some((e) => /^pendiente/i.test(e))) return { importe: null, nota: 'Presupuesto pendiente de aceptar' + (total ? ` (${euros(total)})` : '') };
-  if (est.some((e) => /ACEPTAD/i.test(e))) return { importe: null, nota: `Partidas rechazadas: revisar (SIGMA ${euros(total ?? 0)})` };
+  // Con partidas rechazadas el total del portal solo suma las aceptadas (comprobado con 29412780): se anota con aviso
+  const acep = est.filter((e) => /ACEPTAD/i.test(e)).length;
+  if (acep && total != null && total > 0) return { importe: total, nota: acep < est.length ? 'Tiene partidas rechazadas: comprueba el importe' : null };
   return { importe: null, nota: 'Presupuesto rechazado' };
 }
 
@@ -93,8 +97,9 @@ Deno.serve(async (req) => {
   const resumen: Record<string, unknown>[] = [];
   try {
     const filas = await sql`
-      select f.id, p.numero_servicio, p.sigma_cuenta from public.facturacion f join public.partes p on p.id = f.parte_id
-       where f.importe is null and upper(coalesce(f.compania, '')) = 'SIGMA' and p.sigma_cuenta is not null and p.estado = 'cerrado'
+      select f.id, f.importe, f.importe_origen, p.numero_servicio, p.sigma_cuenta from public.facturacion f join public.partes p on p.id = f.parte_id
+       where f.importe_cierre_en is null and not f.liquidado and upper(coalesce(f.compania, '')) = 'SIGMA'
+         and p.sigma_cuenta is not null and p.estado = 'cerrado' and f.creado_en > now() - interval '30 days'
          and (f.importe_leido_en is null or f.importe_leido_en < now() - interval '6 hours')
        order by f.importe_leido_en nulls first limit 60`;
     for (const cuenta of ['VLL', 'PAL']) {
@@ -109,13 +114,23 @@ Deno.serve(async (req) => {
         if (!ut) throw new Error('No se pudo abrir la pestaña Presupuesto');
         for (const f of mias) {
           const j = await leer(ut, f.numero_servicio);
-          if (!j) { r.fallidos++; continue; }
+          if (!j) { r.fallidos++; await sql`update public.facturacion set importe_leido_en = now() where id = ${f.id}`; continue; }
           const d = decidir(j);
-          // Nunca pisa un importe escrito entretanto a mano
-          await sql`update public.facturacion set importe = coalesce(importe, ${d.importe}::numeric),
-                      importe_origen = case when importe is null and ${d.importe}::numeric is not null then 'presupuesto' else importe_origen end,
-                      importe_nota = ${d.nota}, importe_leido_en = now() where id = ${f.id}`;
-          if (d.importe != null) r.anotados++; else r.notas++;
+          const antes = f.importe == null ? null : Number(f.importe);
+          if (d.importe == null) {
+            // Aún sin aceptar: no se toca el importe; se vuelve a mirar
+            await sql`update public.facturacion set importe_nota = ${antes == null ? d.nota : 'Al cerrar: ' + d.nota}, importe_leido_en = now() where id = ${f.id}`;
+            r.notas++; continue;
+          }
+          let importe = antes, origen = f.importe_origen, nota: string | null = d.nota;
+          if (antes == null) { importe = d.importe; origen = 'presupuesto'; }
+          else if (Math.abs(antes - d.importe) >= 0.01) {
+            if (f.importe_origen === 'presupuesto') { importe = d.importe; nota = `Cambió al cerrar: de ${euros(antes)} a ${euros(d.importe)}`; }
+            else nota = `SIGMA dice ${euros(d.importe)}`;
+          }
+          await sql`update public.facturacion set importe = ${importe}::numeric, importe_origen = ${origen}, importe_nota = ${nota},
+                      importe_leido_en = now(), importe_cierre_en = now() where id = ${f.id} and not liquidado`;
+          r.anotados++;
         }
       } catch (err) { r.error = (err as Error).message; console.error(cuenta, err); }
     }

@@ -12,6 +12,8 @@
 // sigma-sync, que dura < 2 min) con la cabecera secreta x-kubel-secreto.
 // Solo guarda un servicio cuando cambia su presupuesto (estado, partidas, motivo o fecha de decisión): así no se toca
 // partes.actualizado_en («modificado» en la ficha) ni se avisa en directo a la oficina sin motivo (21/10/2026).
+// También guarda el «importe total» (partes.sigma_ptto_total): al quedar ACEPTADO, el servicio entra en Facturación con
+// ese importe (disparador partes_facturacion_ptto) aunque aún no esté cerrado (21/10/2026).
 // ?prueba=1 → lee el portal pero NO escribe y devuelve el resumen.  ?cuenta=VLL → solo esa cuenta.
 import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4';
 import postgres from 'npm:postgres@3.4.4';
@@ -121,7 +123,9 @@ async function entrar(s: Sesion, usuario: string, clave: string) {
 
 // ---------------------------------------------------------------- pestaña Presupuesto
 type PttoLinea = { baremo: string; descripcion: string; unidades: string; estado: string; fecha: string | null };
-type Ptto = { estado: 'aceptado' | 'rechazado' | 'enviado' | 'sin_valorar' | 'bloqueado'; lineas: PttoLinea[]; fecha: string | null; motivo: string | null };
+type Ptto = { estado: 'aceptado' | 'rechazado' | 'enviado' | 'sin_valorar' | 'bloqueado'; lineas: PttoLinea[]; fecha: string | null; motivo: string | null; total: number | null };
+// «Importe total» que muestra el portal al final de la pestaña (totals.totSubtotalP, «1.241,80»)
+const aNum = (t: unknown) => { const v = parseFloat(String(t ?? '').replace(/\./g, '').replace(',', '.')); return isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : null; };
 
 // Pase del componente de la pestaña (ut, JWT del usuario: vale para todos los servicios de la cuenta)
 async function pasePresupuesto(s: Sesion, n: string) {
@@ -165,22 +169,23 @@ function clasificar(j: any): Ptto | null {
       return null;
     }
     const motivo = codes.map((c) => TEXTOS?.[c] || BLOQUEOS_CONOCIDOS[c]).join(' · ');
-    return { estado: 'bloqueado', lineas: [], fecha: null, motivo };
+    return { estado: 'bloqueado', lineas: [], fecha: null, motivo, total: null };
   }
   // deno-lint-ignore no-explicit-any
   const lineas: PttoLinea[] = (j.data?.budgetLinesList || []).map((l: any) => ({
     baremo: String(l.scaleCode ?? ''), descripcion: limpio(String(l.scaleDescription ?? '')), unidades: String(l.units ?? ''),
     estado: limpio(String(l.status ?? '')), fecha: fechaDMA(l.statusDate),
   }));
-  if (!lineas.length) return { estado: 'sin_valorar', lineas, fecha: null, motivo: null };
+  const total = aNum(j.data?.totals?.totSubtotalP);
+  if (!lineas.length) return { estado: 'sin_valorar', lineas, fecha: null, motivo: null, total: null };
   const decididas = lineas.filter((l) => /ACEPTAD|RECHAZAD/i.test(l.estado) && l.fecha);
   const ultima = decididas.reduce<string | null>((m, l) => (!m || l.fecha! > m ? l.fecha : m), null);
-  if (lineas.some((l) => /^pendiente/i.test(l.estado))) return { estado: 'enviado', lineas, fecha: ultima, motivo: null };
+  if (lineas.some((l) => /^pendiente/i.test(l.estado))) return { estado: 'enviado', lineas, fecha: ultima, motivo: null, total };
   const deUltima = decididas.filter((l) => l.fecha === ultima);
-  if (deUltima.some((l) => /ACEPTAD/i.test(l.estado))) return { estado: 'aceptado', lineas, fecha: ultima, motivo: null };
-  if (deUltima.some((l) => /RECHAZAD/i.test(l.estado))) return { estado: 'rechazado', lineas, fecha: ultima, motivo: null };
+  if (deUltima.some((l) => /ACEPTAD/i.test(l.estado))) return { estado: 'aceptado', lineas, fecha: ultima, motivo: null, total };
+  if (deUltima.some((l) => /RECHAZAD/i.test(l.estado))) return { estado: 'rechazado', lineas, fecha: ultima, motivo: null, total };
   console.warn('estados no reconocidos', [...new Set(lineas.map((l) => l.estado))].join(' | '));
-  return { estado: 'enviado', lineas, fecha: ultima, motivo: null }; // estado desconocido: aún sin decisión
+  return { estado: 'enviado', lineas, fecha: ultima, motivo: null, total }; // estado desconocido: aún sin decisión
 }
 
 async function leer(ut: string, n: string): Promise<Ptto | null> {
@@ -208,7 +213,7 @@ type Resumen = { cuenta: string; ok: boolean; servicios: number; leidos: number;
 const huellaLineas = (l: any) => (Array.isArray(l) ? l : []).map((x: PttoLinea) => [x.baremo, x.descripcion, x.unidades, x.estado, x.fecha ?? ''].join('|')).join('\n');
 
 async function revisarCuenta(admin: SupabaseClient, ciaId: number, cuenta: string, usuario: string, clave: string, prueba: boolean, r: Resumen) {
-  const { data, error } = await admin.from('partes').select('id, numero_servicio, sigma_ptto_estado, sigma_ptto_motivo, sigma_ptto_fecha, sigma_ptto_lineas')
+  const { data, error } = await admin.from('partes').select('id, numero_servicio, sigma_ptto_estado, sigma_ptto_motivo, sigma_ptto_fecha, sigma_ptto_lineas, sigma_ptto_total')
     .eq('compania_id', ciaId).eq('sigma_cuenta', cuenta).eq('sigma_en_curso', true).in('sigma_gremio', GREMIOS_PTTO)
     .not('estado', 'in', '(cerrado,anulado)').order('sigma_ptto_revisado_en', { ascending: true, nullsFirst: true });
   if (error) throw error;
@@ -229,12 +234,12 @@ async function revisarCuenta(admin: SupabaseClient, ciaId: number, cuenta: strin
       r.leidos++;
       r.estados[res.estado] = (r.estados[res.estado] || 0) + 1;
       const igual = p.sigma_ptto_estado === res.estado && (p.sigma_ptto_motivo ?? null) === res.motivo
-        && (p.sigma_ptto_fecha ?? null) === res.fecha && huellaLineas(p.sigma_ptto_lineas) === huellaLineas(res.lineas);
+        && (p.sigma_ptto_fecha ?? null) === res.fecha && (p.sigma_ptto_total == null ? null : Number(p.sigma_ptto_total)) === res.total && huellaLineas(p.sigma_ptto_lineas) === huellaLineas(res.lineas);
       if (igual) continue; // sin cambios: no se escribe nada
       const ahora = new Date().toISOString();
       const d: Record<string, unknown> = {
         sigma_ptto_estado: res.estado, sigma_ptto_motivo: res.motivo, sigma_ptto_lineas: res.lineas,
-        sigma_ptto_fecha: res.fecha, sigma_ptto_revisado_en: ahora,
+        sigma_ptto_fecha: res.fecha, sigma_ptto_total: res.total, sigma_ptto_revisado_en: ahora,
       };
       if (p.sigma_ptto_estado !== res.estado) {
         d.sigma_ptto_desde = ahora;

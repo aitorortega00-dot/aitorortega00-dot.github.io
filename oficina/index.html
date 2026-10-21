@@ -290,7 +290,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.25.1 (Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.26 (Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -1197,12 +1197,18 @@ function resumenPtto(p) {
   }
   return `${l.length} partida${l.length > 1 ? 's' : ''} · ${partes.join(' · ')}`;
 }
+// «Importe total» que muestra el portal al final de la pestaña Presupuesto (sin IVA)
+function totalPtto(p, largo) {
+  if (p.sigma_ptto_total == null) return '';
+  const v = Number(p.sigma_ptto_total).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  return largo ? ` · Importe total <b>${v}</b>` : ` <b style="white-space:nowrap" title="Importe total del presupuesto en SIGMA (sin IVA)">${v}</b>`;
+}
 function bloquePresupuesto(p) {
   if (!p.sigma_ptto_estado) return '';
   const l = p.sigma_ptto_lineas || [];
   const g = grupoPtto(p.sigma_ptto_estado);
   return `<details ${g === 'rechazado' ? 'open' : ''}><summary>Presupuesto en el portal <span class="et pt p-${g}">${TXT_PTTO[p.sigma_ptto_estado]}</span></summary>
-    <div class="ptto-res">${resumenPtto(p)}</div>
+    <div class="ptto-res">${resumenPtto(p)}${totalPtto(p, true)}</div>
     ${l.length ? `<table class="ptto-lineas"><thead><tr><th>Baremo</th><th>Descripción</th><th>Uds.</th><th>Estado</th><th>Fecha</th></tr></thead><tbody>
       ${l.map((x) => `<tr><td><b>${esc(x.baremo)}</b></td><td>${esc(x.descripcion)}</td><td>${esc(x.unidades)}</td>
         <td style="color:${/ACEPTAD/i.test(x.estado) ? 'var(--ok)' : /RECHAZAD/i.test(x.estado) ? 'var(--peligro)' : 'var(--azul)'};font-weight:600">${esc(x.estado)}</td><td>${esc(fDMA(x.fecha) || '—')}</td></tr>`).join('')}
@@ -1226,7 +1232,7 @@ async function vistaPresupuestos() {
     $('#ptto-cuenta').onchange = (e) => { filtroPttoCuenta = e.target.value; pintarPresupuestos(); };
     $('#ptto-gremio').onchange = (e) => { filtroPttoGremio = e.target.value; pintarPresupuestos(); };
   }
-  const { data, error } = await consultaPtto(`id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, gremio, urgente, estado, sigma_cuenta, sigma_alerta, sigma_en_curso, sigma_gremio, sigma_ptto_estado, sigma_ptto_motivo, sigma_ptto_lineas, sigma_ptto_fecha, sigma_ptto_desde, sigma_ptto_revisado_en, ${SEL_ASIG}`);
+  const { data, error } = await consultaPtto(`id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, gremio, urgente, estado, sigma_cuenta, sigma_alerta, sigma_en_curso, sigma_gremio, sigma_ptto_estado, sigma_ptto_motivo, sigma_ptto_lineas, sigma_ptto_fecha, sigma_ptto_total, sigma_ptto_desde, sigma_ptto_revisado_en, ${SEL_ASIG}`);
   if (error) return fallo(error);
   datosPtto = data || [];
   pintarPresupuestos();
@@ -1260,7 +1266,7 @@ function pintarPresupuestos() {
         <td>${esc(p.asegurado || '—')}${tels.slice(0, 1).map((t) => `<br><a href="tel:${esc(t)}" onclick="event.stopPropagation()">${esc(t)}</a>`).join('')}</td>
         <td>${esc(p.direccion)}${p.poblacion ? '<br><small style="color:var(--suave)">' + esc(p.poblacion) + '</small>' : ''}</td>
         <td class="opc"><b>${esc(p.sigma_gremio)}</b><br><small style="color:var(--suave)">${esc(codigo('gremio', p.sigma_gremio) || p.gremio || '')}</small></td>
-        <td><span class="et pt p-${grupoPtto(p.sigma_ptto_estado)}">${TXT_PTTO[p.sigma_ptto_estado]}</span><div class="ptto-res">${resumenPtto(p)}</div></td>
+        <td><span class="et pt p-${grupoPtto(p.sigma_ptto_estado)}">${TXT_PTTO[p.sigma_ptto_estado]}</span>${totalPtto(p)}<div class="ptto-res">${resumenPtto(p)}</div></td>
         <td>${p.sigma_ptto_desde ? hace(p.sigma_ptto_desde) : '—'}</td>
         <td onclick="event.stopPropagation()"><a class="mini" href="${portal(p.numero_servicio)}" target="_blank" rel="noopener" title="Abrir la pestaña Presupuesto en el portal">Portal ↗</a></td>
       </tr>`;

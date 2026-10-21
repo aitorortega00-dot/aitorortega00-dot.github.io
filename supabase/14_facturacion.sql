@@ -227,3 +227,69 @@ revoke execute on function privado.lanzar_importes() from public, anon, authenti
 select cron.schedule('kubel-sigma-importes', '12,42 5-19 * * *', 'select privado.lanzar_importes()');
 
 -- Histórico: 420 filas importadas del «EXCEL DE SERVICIOS» (origen 'excel') el 21/10/2026.
+
+-- =====================================================================
+--  14c · 21/10 (decisión del usuario): el servicio entra en Facturación AL ACEPTARSE el presupuesto,
+--  aunque no esté cerrado (gremios del robot de Presupuestos: 11A, 77A, 30A, 10A, 76A), y se vuelve
+--  a comprobar el importe AL CERRARSE (función sigma-importes). El resto de gremios entra al cerrarse.
+--   · partes.sigma_ptto_total = «importe total» de la pestaña Presupuesto (lo guarda sigma-presupuestos).
+--   · Con partidas rechazadas el total del portal solo suma las aceptadas (29412780): se anota con aviso.
+--   · Al aceptarse sin visita en KUBEL, la fecha es la de la aceptación en SIGMA (sigma_ptto_fecha).
+-- =====================================================================
+alter table public.partes add column if not exists sigma_ptto_total numeric(10,2);
+alter table public.facturacion add column if not exists importe_cierre_en timestamptz;
+
+create or replace function public.euros(v numeric) returns text language sql immutable as $$
+  select replace(to_char(v, 'FM9999990.00'), '.', ',') || ' €';
+$$;
+
+create or replace function public.ptto_importe(p_lineas jsonb, p_total numeric, out importe numeric, out nota text)
+language plpgsql immutable as $$
+declare n int; acep int; pend int;
+begin
+  select count(*), count(*) filter (where x->>'estado' ~* 'ACEPTAD'), count(*) filter (where x->>'estado' ~* '^pendiente')
+    into n, acep, pend from jsonb_array_elements(coalesce(p_lineas, '[]'::jsonb)) x;
+  if n = 0 then nota := 'Sin presupuesto en SIGMA';
+  elsif pend > 0 then nota := 'Presupuesto pendiente de aceptar' || coalesce(' (' || public.euros(p_total) || ')', '');
+  elsif acep > 0 and coalesce(p_total, 0) > 0 then
+    importe := p_total;
+    if acep < n then nota := 'Tiene partidas rechazadas: comprueba el importe'; end if;
+  else nota := 'Presupuesto rechazado';
+  end if;
+end; $$;
+
+create or replace function public.facturacion_por_ptto()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_imp numeric; v_nota text;
+begin
+  if new.sigma_ptto_estado is distinct from 'aceptado' or new.estado = 'anulado' then return null; end if;
+  if old.sigma_ptto_estado is not distinct from new.sigma_ptto_estado
+     and old.sigma_ptto_total is not distinct from new.sigma_ptto_total
+     and old.sigma_ptto_lineas is not distinct from new.sigma_ptto_lineas then return null; end if;
+  perform public.facturacion_alta(new.id, new.sigma_ptto_fecha, null);
+  select importe, nota into v_imp, v_nota from public.ptto_importe(new.sigma_ptto_lineas, new.sigma_ptto_total);
+  update public.facturacion f set
+    importe = case when v_imp is not null and (f.importe is null or f.importe_origen = 'presupuesto') then v_imp else f.importe end,
+    importe_origen = case when v_imp is not null and f.importe is null then 'presupuesto' else f.importe_origen end,
+    importe_nota = case
+      when v_imp is null then v_nota
+      when f.importe is null or f.importe = v_imp then v_nota
+      when f.importe_origen = 'presupuesto' then 'Presupuesto cambiado en SIGMA: de ' || public.euros(f.importe) || ' a ' || public.euros(v_imp)
+      else 'SIGMA dice ' || public.euros(v_imp) end,
+    importe_leido_en = now()
+  where f.parte_id = new.id and not f.liquidado;
+  return null;
+end; $$;
+revoke execute on function public.facturacion_por_ptto() from public, anon, authenticated;
+create trigger partes_facturacion_ptto after update of sigma_ptto_estado, sigma_ptto_total, sigma_ptto_lineas on public.partes
+  for each row execute function public.facturacion_por_ptto();
+
+create or replace function public.facturacion_por_cierre()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.estado = 'cerrado' and old.estado is distinct from 'cerrado' then
+    perform public.facturacion_alta(new.id, public.fecha_cierre_sigma(new.sigma_ficha), null);
+    update public.facturacion set importe_leido_en = null where parte_id = new.id and importe_cierre_en is null and not liquidado;
+  end if;
+  return null;
+end; $$;
