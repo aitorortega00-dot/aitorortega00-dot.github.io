@@ -290,7 +290,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.25 (Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.25.1 (Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -555,6 +555,10 @@ const RESOLUCIONES = {
 };
 const TXT_ENVIO = { borrador: 'Por revisar', aprobado: 'Aprobado', enviando: 'Enviando…', enviado: 'Enviado', error: 'Error', descartado: 'Descartado' };
 const HORAS_SIGMA = [...Array(28)].map((_, i) => `${dos(8 + Math.floor(i / 2))}:${i % 2 ? '30' : '00'}`);
+// Desplegable de hora con las mismas opciones que admite SIGMA (en punto o y media, 08:00–21:30)
+function opcionesHora(actual) {
+  return `<option value="">Sin hora</option>${HORAS_SIGMA.map((h) => `<option ${h === actual ? 'selected' : ''}>${h}</option>`).join('')}${actual && !HORAS_SIGMA.includes(actual) ? `<option selected value="${actual}">${actual} (no válida en SIGMA)</option>` : ''}`;
+}
 const fDMA = (iso) => (iso ? iso.split('-').reverse().join('/') : '');
 // Cita presencial marcada en SIGMA con un Repaso (motivo 2 «Visita al Cliente» u 86 «Visita de instalación»):
 // el estado del portal la trae como «Visita al Cliente (21/10/2026 - 16:00) …». Devuelve { fecha, hora } o null.
@@ -1378,7 +1382,7 @@ async function modalAsignar({ parteId = '', operarioId = '', fecha = '' } = {}) 
       <div><label>Día</label><input id="as-fecha" type="date" value="${fecha || hoyISO()}"></div>
     </div>
     <div class="tres">
-      <div><label>Hora (opcional)</label><input id="as-hora" type="time"></div>
+      <div><label>Hora (opcional)</label><select id="as-hora">${opcionesHora('')}</select></div>
       <div><label>Orden en la ruta</label><input id="as-orden" type="number" min="0" value="1"></div>
       <div><label>Tipo</label><select id="as-tipo"><option value="visita">Visita</option><option value="repaso">Repaso</option></select></div>
     </div>
@@ -1411,7 +1415,7 @@ async function modalAsignacion(id) {
       <div><label>Día</label><input id="ae-fecha" type="date" value="${a.fecha}"></div>
     </div>
     <div class="tres">
-      <div><label>Hora</label><input id="ae-hora" type="time" value="${hCorta(a.hora)}"></div>
+      <div><label>Hora</label><select id="ae-hora">${opcionesHora(hCorta(a.hora))}</select></div>
       <div><label>Orden</label><input id="ae-orden" type="number" min="0" value="${a.orden}"></div>
       <div><label>Tipo</label><select id="ae-tipo"><option value="visita" ${a.tipo === 'visita' ? 'selected' : ''}>Visita</option><option value="repaso" ${a.tipo === 'repaso' ? 'selected' : ''}>Repaso</option></select></div>
     </div>
