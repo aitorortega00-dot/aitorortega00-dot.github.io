@@ -335,3 +335,15 @@ revoke execute on function privado.lanzar_importes_abiertos() from public, anon,
 select cron.schedule('kubel-sigma-importes-abiertos', '52 5-19 * * *', 'select privado.lanzar_importes_abiertos()');
 -- 14f · facturacion_alta: se ignora una fecha de aceptación de hace más de un año (SIGMA da a veces fechas
 --      erróneas, p. ej. 05/09/2018): v_fecha := coalesce(v_fecha, case when p_fecha > current_date - 365 then p_fecha end, hoy)
+
+-- 14g · 21/10 (usuario): un presupuesto aceptado SIN visita de operario no es facturación real → no entra.
+--      Al aceptarse solo entra si public.tiene_visita (visita en KUBEL ya pasada y no «no realizada»);
+--      sigma-importes?abiertos=1 revisa todos los gremios pero solo servicios con visita. El cierre sigue dando de alta.
+create or replace function public.tiene_visita(p_parte uuid) returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.asignaciones a where a.parte_id = p_parte and a.fecha <= (now() at time zone 'Europe/Madrid')::date and a.estado <> 'no_realizado');
+$$;
+revoke execute on function public.tiene_visita(uuid) from public, anon;
+-- facturacion_por_ptto: «if not exists fila then if not tiene_visita then return; alta(...)» (resto igual que 14d)
+-- Limpieza hecha a mano (SQL Editor) de las filas que entraron sin visita:
+-- delete from public.facturacion f using public.partes p where p.id = f.parte_id and f.origen = 'auto' and not f.liquidado
+--   and p.estado not in ('cerrado', 'anulado') and not public.tiene_visita(p.id);

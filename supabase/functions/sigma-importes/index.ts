@@ -5,12 +5,13 @@
 //       - sin importe → se anota;  - igual → OK;  - distinto → se pone el de SIGMA (manda el último) con aviso
 //         «Cambió al cerrar: de X a Y».   Queda comprobado.
 //   · pendientes / rechazadas / sin presupuesto → nota para revisar y se vuelve a mirar cada 6 h (30 días como mucho).
-// (Con el servicio abierto, en los gremios 11A, 77A, 30A, 10A, 76A el importe lo pone el disparador partes_facturacion_ptto
-//  al quedar ACEPTADO; el resto de gremios los revisa este robot con ?abiertos=1, ver abajo.)
+// (Con el servicio abierto, el importe lo pone al quedar ACEPTADO el disparador partes_facturacion_ptto en los gremios
+//  11A, 77A, 30A, 10A, 76A, y este robot con ?abiertos=1 en todos; en ambos casos SOLO si un operario ha tenido visita.)
 // Lo llama pg_cron (minutos 12 y 42) con la cabecera secreta x-kubel-secreto.
-// ?abiertos=1 (pg_cron cada hora, minuto 52) → servicios SIGMA ABIERTOS de los DEMÁS gremios: si el presupuesto ya está
-//   aceptado (sin partidas pendientes) el servicio entra en Facturación con ese importe (fecha y operario de la visita;
-//   sin visita en KUBEL, la fecha de la aceptación). Si cambia, manda el último. No toca partes ni la página Presupuestos.
+// ?abiertos=1 (pg_cron cada hora, minuto 52) → servicios SIGMA ABIERTOS (todos los gremios) en los que un operario ya ha
+//   tenido visita en KUBEL (public.tiene_visita): si el presupuesto está aceptado (sin partidas pendientes) el servicio
+//   entra en Facturación con ese importe (fecha y operario de la visita). Si cambia, manda el último.
+//   Un presupuesto aceptado SIN visita no es facturación real: no entra (decisión del usuario 21/10).
 // ?ver=29339818,29426060&cuenta=VLL → devuelve la respuesta del portal tal cual (para revisar).
 import postgres from 'npm:postgres@3.4.4';
 const BASE = 'https://web.multiasistencia.com/w3multi/';
@@ -83,7 +84,6 @@ function decidir(j: any): { importe: number | null; nota: string | null } {
   return { importe: null, nota: 'Presupuesto rechazado' };
 }
 
-const GREMIOS_PTTO = ['11A', '77A', '30A', '10A', '76A']; // estos los vigila sigma-presupuestos
 const PARALELO = 4; // por cuenta
 const TOPE_MS = 110_000; // las funciones se cortan a los 150 s: lo que no dé tiempo, en la siguiente pasada
 // Fecha de la última aceptación de las partidas («dd/mm/aaaa» → aaaa-mm-dd)
@@ -101,7 +101,7 @@ async function revisarAbiertos(sql: any, resumen: Record<string, unknown>[]) {
   const lista = await sql`
     select p.id, p.numero_servicio, p.sigma_cuenta from public.partes p join public.companias c on c.id = p.compania_id
      where c.nombre = 'SIGMA' and p.sigma_en_curso and p.estado not in ('cerrado', 'anulado') and p.sigma_cuenta is not null
-       and coalesce(p.sigma_gremio, '') <> all(${GREMIOS_PTTO})
+       and public.tiene_visita(p.id)
        and not exists (select 1 from public.facturacion f where f.parte_id = p.id and f.liquidado)
      order by random()`; // orden al azar: si no da tiempo a todos, en las siguientes pasadas les toca a los demás
   const inicio = Date.now();
