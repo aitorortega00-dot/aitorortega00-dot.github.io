@@ -702,7 +702,7 @@ async function guardarRepaso(s: Sesion, e: Envio, n: string, ini: any, api: (rut
   throw new Error('El portal pidió demasiados pasos seguidos: revisa el servicio en el portal');
 }
 
-// Cita genérica que el robot informa solo antes de un Repaso (decisión del usuario 19/10/2026)
+// Cita genérica que el robot informa solo antes de un Repaso (decisión del usuario 19/10/2026; desde 21/10 también citas futuras)
 const CITA_GENERICA = { resolucion: 'V', motivo: '609', comentario: 'OK' };
 const RES_CITA: Record<string, string> = { V: 'Visita realizada', I: 'Visita cancelada', C: 'Cita cancelada' };
 
@@ -725,13 +725,9 @@ async function informarCitasPendientes(s: Sesion, n: string, resolucion: string,
   if (!actual.filas.length) throw new Error('El portal no tiene ninguna cita pendiente de informar en este servicio');
   for (let i = 0; i < 5 && actual.filas.length; i++) {
     const { doc } = actual;
-    // En modo automático (todas) solo citas ya pasadas: nunca se da por realizada una cita futura
-    const ahora = minutoMadrid();
-    const filas = todas ? actual.filas.filter((f) => f.fecha && `${f.fecha} ${f.hora ?? '00:00'}` <= ahora) : actual.filas;
-    if (!filas.length) {
-      if (hechas.length) break;
-      throw new Error('La cita pendiente del portal aún no ha pasado (o no se ve su fecha): infórmala a mano en «Informar citas»');
-    }
+    // En modo automático (todas) se informan TODAS las pendientes, pasadas o futuras (decisión del usuario 21/10/2026:
+    // al hacer un Repaso, la cita anterior se da siempre por «Visita realizada · Finalizado · OK» con su fecha/hora citada)
+    const filas = actual.filas;
     const fila = (!todas && citaFecha ? filas.find((f) => f.fecha === citaFecha) : null) ?? filas[0];
     const form = doc.querySelector('form[name="datos_cita"]') as Element | null;
     if (!form) throw new Error('No se encontró el formulario de Informar citas');
