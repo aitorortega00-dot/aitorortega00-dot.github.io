@@ -57,13 +57,13 @@ async function pase(s: Sesion, n: string) {
   return (html.match(/<multiasistencia-valoraciones[^>]*\sut="([^"]+)"/i) || [])[1] || null;
 }
 // deno-lint-ignore no-explicit-any
-async function leer(ut: string, n: string): Promise<any> {
-  for (let i = 0; i < 2; i++) {
+async function leer(ut: string, n: string, intentos = 2): Promise<any> {
+  for (let i = 0; i < intentos; i++) {
     try {
       const r = await fetch(`${API}/valuations-initial-data`, { method: 'POST', signal: AbortSignal.timeout(20000), body: JSON.stringify({ reparation: n }), headers: cab(ut) });
       if (r.ok) { const j = await r.json(); if (j?.success) return j; } else await r.body?.cancel();
     } catch (_) { /* reintento */ }
-    await new Promise((res) => setTimeout(res, 4000));
+    if (i + 1 < intentos) await new Promise((res) => setTimeout(res, 4000));
   }
   return null;
 }
@@ -84,7 +84,8 @@ function decidir(j: any): { importe: number | null; nota: string | null } {
 }
 
 const GREMIOS_PTTO = ['11A', '77A', '30A', '10A', '76A']; // estos los vigila sigma-presupuestos
-const PARALELO = 3;
+const PARALELO = 4; // por cuenta
+const TOPE_MS = 110_000; // las funciones se cortan a los 150 s: lo que no dé tiempo, en la siguiente pasada
 // Fecha de la última aceptación de las partidas («dd/mm/aaaa» → aaaa-mm-dd)
 // deno-lint-ignore no-explicit-any
 function fechaAceptacion(j: any): string | null {
@@ -101,13 +102,16 @@ async function revisarAbiertos(sql: any, resumen: Record<string, unknown>[]) {
     select p.id, p.numero_servicio, p.sigma_cuenta from public.partes p join public.companias c on c.id = p.compania_id
      where c.nombre = 'SIGMA' and p.sigma_en_curso and p.estado not in ('cerrado', 'anulado') and p.sigma_cuenta is not null
        and coalesce(p.sigma_gremio, '') <> all(${GREMIOS_PTTO})
-       and not exists (select 1 from public.facturacion f where f.parte_id = p.id and f.liquidado)`;
-  for (const cuenta of ['VLL', 'PAL']) {
+       and not exists (select 1 from public.facturacion f where f.parte_id = p.id and f.liquidado)
+     order by random()`; // orden al azar: si no da tiempo a todos, en las siguientes pasadas les toca a los demás
+  const inicio = Date.now();
+  // Las dos cuentas a la vez (cada una con su sesión), para que a Palencia también le dé tiempo
+  await Promise.all(['VLL', 'PAL'].map(async (cuenta) => {
     // deno-lint-ignore no-explicit-any
     const mias = lista.filter((x: any) => x.sigma_cuenta === cuenta);
-    const r = { cuenta, servicios: mias.length, aceptados: 0, cambios: 0, fallidos: 0, error: null as string | null };
+    const r = { cuenta, servicios: mias.length, leidos: 0, aceptados: 0, cambios: 0, fallidos: 0, error: null as string | null };
     resumen.push(r);
-    if (!mias.length) continue;
+    if (!mias.length) return;
     try {
       const s = new Sesion();
       await entrar(s, Deno.env.get(`SIGMA_${cuenta}_USUARIO`)!, Deno.env.get(`SIGMA_${cuenta}_CLAVE`)!);
@@ -115,9 +119,10 @@ async function revisarAbiertos(sql: any, resumen: Record<string, unknown>[]) {
       if (!ut) throw new Error('No se pudo abrir la pestaña Presupuesto');
       let i = 0;
       await Promise.all(Array.from({ length: PARALELO }, async () => {
-        while (i < mias.length) {
+        while (i < mias.length && Date.now() - inicio < TOPE_MS) {
           const p = mias[i++];
-          const j = await leer(ut, p.numero_servicio);
+          const j = await leer(ut, p.numero_servicio, 1);
+          r.leidos++;
           if (!j) { r.fallidos++; continue; }
           const d = decidir(j);
           if (d.importe == null) continue; // sin aceptar todavía: no entra
@@ -134,7 +139,7 @@ async function revisarAbiertos(sql: any, resumen: Record<string, unknown>[]) {
         }
       }));
     } catch (err) { r.error = (err as Error).message; console.error(cuenta, err); }
-  }
+  }));
 }
 
 Deno.serve(async (req) => {
