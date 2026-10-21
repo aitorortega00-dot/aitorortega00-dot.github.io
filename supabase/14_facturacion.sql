@@ -333,3 +333,5 @@ begin
 end; $$;
 revoke execute on function privado.lanzar_importes_abiertos() from public, anon, authenticated;
 select cron.schedule('kubel-sigma-importes-abiertos', '52 5-19 * * *', 'select privado.lanzar_importes_abiertos()');
+-- 14f · facturacion_alta: se ignora una fecha de aceptación de hace más de un año (SIGMA da a veces fechas
+--      erróneas, p. ej. 05/09/2018): v_fecha := coalesce(v_fecha, case when p_fecha > current_date - 365 then p_fecha end, hoy)
