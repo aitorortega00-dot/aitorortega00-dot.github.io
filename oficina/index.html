@@ -289,7 +289,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.28 (Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.29 (Informes: botón «⬇ Fotos» descarga todas las fotos del informe en un ZIP; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -1797,7 +1797,7 @@ async function borrarVisitaPrueba(id, parteId, nInf) {
 //  INFORMES
 // =====================================================================
 let filtroInformes = { parte: null, soloNuevos: false };
-let fotosVisor = [], idxVisor = 0;
+let fotosVisor = [], idxVisor = 0, fotosInforme = {};
 
 async function vistaInformes() {
   const f = filtroInformes;
@@ -1824,7 +1824,8 @@ async function vistaInformes() {
     (firmadas || []).forEach((x) => { if (x.signedUrl) urls[x.path] = x.signedUrl; });
   }
   const orden = { antes: 0, despues: 1, factura: 2 };
-  fotosVisor = [];
+  fotosVisor = []; fotosInforme = {};
+  data.forEach((i) => { fotosInforme[i.id] = { servicio: i.parte.numero_servicio, fecha: i.creado_en, fotos: [...i.fotos].sort((a, b) => orden[a.tipo] - orden[b.tipo]).map((x) => ({ ruta: x.ruta, tipo: x.tipo })) }; });
   $('#lista-inf').innerHTML = data.map((i) => `
     <div class="tarjeta informe ${i.revisado ? '' : 'sin-revisar'}">
       <div class="cab">
@@ -1836,6 +1837,7 @@ async function vistaInformes() {
         ${i.importe_gastos ? `<span class="et">Factura ${euros(i.importe_gastos)}</span>` : ''}
         <span class="esp"></span>
         ${i.necesita_repaso ? `<button class="mini acento" onclick="modalAsignar({parteId:'${i.parte.id}'})">Programar repaso</button>` : ''}
+        ${i.fotos.length ? `<button class="mini" onclick="descargarFotos('${i.id}', this)" title="Descargar las ${i.fotos.length} fotos en un ZIP">⬇ Fotos (${i.fotos.length})</button>` : ''}
         ${i.revisado ? `<span class="et revisado">✓ Revisado</span>` : `<button class="mini" onclick="marcarRevisado('${i.id}')">Marcar revisado</button>`}
       </div>
       <div class="txt">${esc(i.texto)}</div>
@@ -1844,6 +1846,40 @@ async function vistaInformes() {
         return `<a href="#" onclick="abrirVisor(${n});return false"><img loading="lazy" src="${urls[x.ruta] || ''}" alt=""><span>${x.tipo === 'despues' ? 'después' : x.tipo}</span></a>`;
       }).join('')}</div>` : ''}
     </div>`).join('');
+}
+function cargarScript(src) {
+  return new Promise((ok, ko) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar ' + src)); document.head.appendChild(s); });
+}
+// Descarga todas las fotos de un informe en un ZIP: <servicio>_<aaaa-mm-dd>/<tipo>_<n>.jpg
+async function descargarFotos(id, boton) {
+  const inf = fotosInforme[id]; if (!inf?.fotos.length) return;
+  const txt = boton.textContent; boton.disabled = true; boton.textContent = 'Preparando…';
+  try {
+    if (!window.JSZip) await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    const { data: firmadas, error } = await sb.storage.from('fotos').createSignedUrls(inf.fotos.map((x) => x.ruta), 600);
+    if (error) throw error;
+    const zip = new JSZip(), cuenta = {}, fallidas = [];
+    const nombreTipo = { antes: 'antes', despues: 'despues', factura: 'factura' };
+    for (const [k, x] of inf.fotos.entries()) {
+      boton.textContent = `Descargando ${k + 1}/${inf.fotos.length}…`;
+      const url = firmadas?.find((f) => f.path === x.ruta)?.signedUrl;
+      try {
+        if (!url) throw new Error('sin enlace');
+        const res = await fetch(url); if (!res.ok) throw new Error(res.status);
+        const ext = (x.ruta.split('.').pop() || 'jpg').toLowerCase().slice(0, 5);
+        const t = nombreTipo[x.tipo] || 'foto'; cuenta[t] = (cuenta[t] || 0) + 1;
+        zip.file(`${t}_${cuenta[t]}.${ext}`, await res.blob());
+      } catch (e) { fallidas.push(x.ruta); }
+    }
+    if (fallidas.length === inf.fotos.length) throw new Error('No se pudo descargar ninguna foto');
+    boton.textContent = 'Comprimiendo…';
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const nombre = `${String(inf.servicio || 'servicio').replace(/[^\w-]+/g, '_')}_${String(inf.fecha).slice(0, 10)}_fotos.zip`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    aviso(fallidas.length ? `Descargadas ${inf.fotos.length - fallidas.length} de ${inf.fotos.length} fotos` : `Descargadas ${inf.fotos.length} fotos`);
+  } catch (e) { fallo(e); }
+  finally { boton.disabled = false; boton.textContent = txt; }
 }
 async function marcarRevisado(id) {
   const { error } = await sb.from('informes').update({ revisado: true }).eq('id', id);
