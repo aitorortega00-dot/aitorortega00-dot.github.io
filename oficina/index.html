@@ -1834,7 +1834,7 @@ async function vistaInformes() {
         <span style="color:var(--suave)">· ${esc(i.parte.compania?.nombre || '')} · ${esc(nombreDe(i.operario_id))} · ${fHora(i.creado_en)}</span>
         ${i.trabajo_terminado ? '<span class="et terminado">Terminado</span>' : '<span class="et en_curso">Sin terminar</span>'}
         ${i.necesita_repaso ? '<span class="et pendiente">Necesita repaso</span>' : ''}
-        ${i.importe_gastos ? `<span class="et">Gastos ${euros(i.importe_gastos)}</span>` : ''}
+        ${i.importe_gastos ? `<span class="et">Factura ${euros(i.importe_gastos)}</span>` : ''}
         <span class="esp"></span>
         ${i.necesita_repaso ? `<button class="mini acento" onclick="modalAsignar({parteId:'${i.parte.id}'});setTimeout(()=>{if($('#as-tipo'))$('#as-tipo').value='repaso'},50)">Programar repaso</button>` : ''}
         ${i.revisado ? `<span class="et revisado">✓ Revisado</span>` : `<button class="mini" onclick="marcarRevisado('${i.id}')">Marcar revisado</button>`}

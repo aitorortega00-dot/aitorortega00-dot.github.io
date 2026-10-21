@@ -435,7 +435,7 @@ async function pintarParte() {
   if (infs.length) {
     $('#txt-inf').textContent = 'Añadir otro informe';
     $('#mis-informes').innerHTML = `<div class="seccion"><h4>Mis informes de este parte (${infs.length})</h4>${infs.map((i) => `
-      <div class="informe-prev"><div class="suave">${fHora(i.creado_en)} · ${i.fotos?.[0]?.count ?? 0} foto(s)${i.trabajo_terminado ? ' · Terminado' : ''}${i.necesita_repaso ? ' · Necesita repaso' : ''}${i.importe_gastos ? ' · Gastos ' + Number(i.importe_gastos).toFixed(2).replace('.', ',') + ' €' : ''}</div>
+      <div class="informe-prev"><div class="suave">${fHora(i.creado_en)} · ${i.fotos?.[0]?.count ?? 0} foto(s)${i.trabajo_terminado ? ' · Terminado' : ''}${i.necesita_repaso ? ' · Necesita repaso' : ''}${i.importe_gastos ? ' · Factura ' + Number(i.importe_gastos).toFixed(2).replace('.', ',') + ' €' : ''}</div>
       <div class="pre">${esc(i.texto)}</div></div>`).join('')}</div>`;
   }
 }
@@ -457,7 +457,7 @@ function informeConDatos() { return ($('#i-texto')?.value.trim() || '') !== '' |
 function guardarBorrador() {
   try {
     localStorage.setItem(claveBorrador(), JSON.stringify({
-      texto: $('#i-texto').value, terminado: $('#i-term').checked, repaso: $('#i-rep').checked, gastos: $('#i-gastos').value,
+      texto: $('#i-texto').value, terminado: $('#i-term').checked, gastos: $('#i-gastos').value,
     }));
   } catch {}
 }
@@ -473,11 +473,10 @@ function pintarInforme() {
       <div class="seccion"><h4>¿Qué se ha hecho?</h4>
         <textarea id="i-texto" placeholder="Trabajo realizado, materiales, causa de la avería, qué falta por hacer…">${esc(b.texto || '')}</textarea>
         <label class="interruptor"><span>Trabajo terminado</span><input type="checkbox" id="i-term" ${b.terminado ? 'checked' : ''}><span class="sw"></span></label>
-        <label class="interruptor"><span>Hace falta volver (repaso)</span><input type="checkbox" id="i-rep" ${b.repaso ? 'checked' : ''}><span class="sw"></span></label>
       </div>
       ${bloqueFotos('antes', 'Fotos ANTES')}
       ${bloqueFotos('despues', 'Fotos DESPUÉS')}
-      <div class="seccion"><h4>Gastos (si compraste material)</h4>
+      <div class="seccion"><h4>IMPORTE TOTAL DE LA FACTURA</h4>
         <label style="margin-top:0" class="suave">Importe total en €</label>
         <input id="i-gastos" inputmode="decimal" placeholder="0,00" value="${esc(b.gastos || '')}"></div>
       ${bloqueFotos('factura', 'Fotos de FACTURAS / TICKETS')}
@@ -487,7 +486,7 @@ function pintarInforme() {
       <input type="file" id="i-gal" accept="image/*" multiple class="oculto">
     </div>`;
   ['i-texto', 'i-gastos'].forEach((id) => $('#' + id).addEventListener('input', guardarBorrador));
-  ['i-term', 'i-rep'].forEach((id) => $('#' + id).addEventListener('change', guardarBorrador));
+  ['i-term'].forEach((id) => $('#' + id).addEventListener('change', guardarBorrador));
   $('#i-cam').onchange = (e) => anadirFotos(e.target);
   $('#i-gal').onchange = (e) => anadirFotos(e.target);
 }
@@ -563,7 +562,7 @@ async function enviarInforme() {
   const importe = g ? Number(g.replace(',', '.')) : null;
   if (!texto) return informar('Falta el informe', 'Escribe qué se ha hecho en la visita.');
   if (importe !== null && (isNaN(importe) || importe < 0)) return informar('Importe no válido', 'Escribe solo números, p. ej. 25,50');
-  if (importe && !fotos.some((f) => f.tipo === 'factura')) return informar('Falta la factura', 'Has puesto gastos: añade la foto de la factura o ticket.');
+  if (importe && !fotos.some((f) => f.tipo === 'factura')) return informar('Falta la factura', 'Has puesto el importe de la factura: añade la foto de la factura o ticket.');
   if (!navigator.onLine) return informar('Sin conexión', 'No tienes internet ahora mismo. El texto queda guardado; envíalo cuando tengas cobertura (no cierres esta pantalla para no perder las fotos).');
 
   const btn = $('#i-enviar'); btn.disabled = true;
@@ -587,7 +586,7 @@ async function enviarInforme() {
     progreso('Guardando informe…', 92);
     const { error: e1 } = await sb.from('informes').insert({
       id: informeId, asignacion_id: a.id, parte_id: parteId, operario_id: yo.id,
-      texto, trabajo_terminado: $('#i-term').checked, necesita_repaso: $('#i-rep').checked, importe_gastos: importe,
+      texto, trabajo_terminado: $('#i-term').checked, necesita_repaso: !$('#i-term').checked, importe_gastos: importe,
     });
     if (e1) throw e1;
     if (subidas.length) {
