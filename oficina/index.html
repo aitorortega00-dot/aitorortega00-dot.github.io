@@ -290,7 +290,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.26 (Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.27 (Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -1387,10 +1387,9 @@ async function modalAsignar({ parteId = '', operarioId = '', fecha = '' } = {}) 
       <div><label>Operario</label><select id="as-op">${cache.operarios.map((o) => `<option value="${o.id}" ${o.id === operarioId ? 'selected' : ''}>${esc(o.nombre)}</option>`).join('')}</select></div>
       <div><label>Día</label><input id="as-fecha" type="date" value="${fecha || hoyISO()}"></div>
     </div>
-    <div class="tres">
+    <div class="dos">
       <div><label>Hora (opcional)</label><select id="as-hora">${opcionesHora('')}</select></div>
-      <div><label>Orden en la ruta</label><input id="as-orden" type="number" min="0" value="1"></div>
-      <div><label>Tipo</label><select id="as-tipo"><option value="visita">Visita</option><option value="repaso">Repaso</option></select></div>
+      <div><label>Servicio Número</label><input id="as-orden" type="number" min="0" value="1"></div>
     </div>
     <label>Notas para el operario</label><textarea id="as-notas" placeholder="Llevar escalera, llaves en portería…"></textarea>
     <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button onclick="guardarAsignar()">Asignar</button></div>`);
@@ -1400,7 +1399,7 @@ async function guardarAsignar() {
   if (!$('#as-parte')) return;
   const fila = {
     parte_id: val('as-parte'), operario_id: val('as-op'), fecha: val('as-fecha'),
-    hora: val('as-hora') || null, orden: Number(val('as-orden') || 0), tipo: val('as-tipo'), notas: val('as-notas') || null,
+    hora: val('as-hora') || null, orden: Number(val('as-orden') || 0), tipo: 'visita', notas: val('as-notas') || null,
   };
   if (!fila.operario_id || !fila.fecha) return alert('Elige operario y día.');
   const { error } = await sb.from('asignaciones').insert(fila);
@@ -1713,8 +1712,8 @@ async function modalParte(id) {
       ${p.sigma_cuenta ? `<label>Envíos a SIGMA</label>
         ${(p.sigma_envios || []).sort((a, b) => b.creado_en.localeCompare(a.creado_en)).map((e) => `<div><a href="#" onclick="cerrarModal();modalEnvio('${e.id}');return false">${esc(tituloEnvio(e))}</a> <span class="et ${e.estado}">${TXT_ENVIO[e.estado]}</span>${e.resultado ? ` <small style="color:var(--suave)">${esc(e.resultado)}</small>` : ''}</div>`).join('') || '<div style="color:var(--suave)">Ninguno.</div>'}
         ${ivaBloq(p) ? `<div class="aviso-bloq">🔒 ${esc(txtBloq(p))}${ultimaTramitacion(p) ? `<div style="font-size:12px;margin-top:4px">${esc(ultimaTramitacion(p))}</div>` : ''}</div>
-        <a href="#" onclick="cerrarModal();nuevaTramitacion('${p.id}');return false">+ Enviar mensaje a tramitación</a>`
-        : `<a href="#" onclick="cerrarModal();nuevoEnvio('${p.id}');return false">+ Nuevo envío a SIGMA (Repaso)</a> · <a href="#" onclick="cerrarModal();nuevaTramitacion('${p.id}');return false">Mensaje a tramitación</a>`}` : ''}`;
+`
+        : ''}` : ''}`;
   }
   abrirModal(`
     <h3>${id ? 'Servicio ' + esc(p.numero_servicio) : 'Nuevo servicio'}</h3>
@@ -1754,6 +1753,8 @@ async function modalParte(id) {
     ${historial}
     <div class="acciones">
       ${id ? `<button class="sec" onclick="cerrarModal();modalAsignar({parteId:'${id}'})">Asignar visita</button>
+              ${p.sigma_cuenta && !ivaBloq(p) ? `<button class="sec" onclick="cerrarModal();nuevoEnvio('${id}')">Repaso</button>` : ''}
+              ${p.sigma_cuenta ? `<button class="sec" onclick="cerrarModal();nuevaTramitacion('${id}')">Mensaje a tramitación</button>` : ''}
               <button class="sec" onclick="window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent('${esc(dirCompleta(p)).replace(/'/g, '')}'),'_blank')">Mapa</button>` : ''}
       <span class="esp"></span>
       <button class="sec" onclick="cerrarModal()">Cancelar</button>
@@ -1836,7 +1837,7 @@ async function vistaInformes() {
         ${i.necesita_repaso ? '<span class="et pendiente">Necesita repaso</span>' : ''}
         ${i.importe_gastos ? `<span class="et">Factura ${euros(i.importe_gastos)}</span>` : ''}
         <span class="esp"></span>
-        ${i.necesita_repaso ? `<button class="mini acento" onclick="modalAsignar({parteId:'${i.parte.id}'});setTimeout(()=>{if($('#as-tipo'))$('#as-tipo').value='repaso'},50)">Programar repaso</button>` : ''}
+        ${i.necesita_repaso ? `<button class="mini acento" onclick="modalAsignar({parteId:'${i.parte.id}'})">Programar repaso</button>` : ''}
         ${i.revisado ? `<span class="et revisado">✓ Revisado</span>` : `<button class="mini" onclick="marcarRevisado('${i.id}')">Marcar revisado</button>`}
       </div>
       <div class="txt">${esc(i.texto)}</div>
