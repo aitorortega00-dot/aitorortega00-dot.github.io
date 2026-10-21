@@ -62,7 +62,7 @@
 
   .tarjetas{display:none}
   @media (max-width:760px){
-    table{display:none}
+    #lista table{display:none}
     .tarjetas{display:block}
     .tj{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:12px 14px;margin-bottom:10px}
     .tj .f1{display:flex;align-items:center;gap:8px}
@@ -84,6 +84,59 @@
   .acciones{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
   textarea{width:100%;min-height:110px;border:1px solid var(--borde);border-radius:8px;padding:8px 10px;font:inherit;background:#FAFAF8}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#2B2F36;color:#fff;padding:10px 16px;border-radius:10px;z-index:30;max-width:90vw}
+  header .menu{display:flex;gap:4px}
+  header .menu a{color:#C8CBD0;text-decoration:none;padding:8px 12px;border-radius:8px;font-weight:600;font-size:14px}
+  header .menu a.activo{background:rgba(255,255,255,.12);color:#fff}
+  main.ancha{max-width:1500px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+  .kpi{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:10px 14px}
+  .kpi b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+  .kpi span{font-size:12px;color:var(--suave);text-transform:uppercase;letter-spacing:.3px}
+  .kpi.aviso b{color:var(--acento)}
+  .filtros{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+  .filtros input,.filtros select{width:auto;min-width:150px;padding:7px 9px}
+  .filtros #ff-q{flex:1;min-width:200px}
+  .tabla-fac{overflow-x:auto;border:1px solid var(--borde);border-radius:12px;background:#fff}
+  .tabla-fac table{border:0;border-radius:0;font-size:13px}
+  .tabla-fac th,.tabla-fac td{padding:6px 8px;white-space:nowrap}
+  .tabla-fac td.dir{white-space:normal;min-width:180px;max-width:280px}
+  .tabla-fac td.num,.tabla-fac th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .tabla-fac input{padding:4px 6px;font-size:13px;border-radius:6px;background:#fff}
+  .tabla-fac input.imp{width:90px;text-align:right}
+  .tabla-fac input.fac{width:110px}
+  .tabla-fac input.com{width:150px}
+  .tabla-fac tr.sin-imp td{background:#FFF8EC}
+  .tabla-fac tr.liq td{color:#5F6770}
+  .nota-imp{display:block;font-size:11px;color:#8A4B00;white-space:normal;max-width:160px}
+  .est{border:0;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;white-space:nowrap}
+  .est.si{background:#DDF0E4;color:var(--ok)}
+  .est.no{background:#FDEBD8;color:#9A4E0B}
+  .dif{display:inline-block;margin-left:4px;font-size:11px;font-weight:700;color:var(--peligro)}
+  .pie-tabla{color:var(--suave);font-size:12px;margin-top:6px}
+  .modal.grande{max-width:880px}
+  .cot h4{margin:16px 0 6px;font-size:14px;display:flex;gap:8px;align-items:center}
+  .cot table{font-size:12.5px;border-radius:8px}
+  .cot th,.cot td{padding:5px 8px}
+  .cot .resumen{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
+  .cot .resumen div{background:#FAFAF8;border:1px solid var(--borde);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--suave)}
+  .cot .resumen b{display:block;color:var(--texto);font-size:15px}
+  .chip{display:inline-block;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700}
+  .chip.ok{background:#DDF0E4;color:var(--ok)} .chip.mal{background:#F8DEDA;color:var(--peligro)} .chip.av{background:#FDEBD8;color:#9A4E0B} .chip.gr{background:#E7E8EA;color:#2B2F36}
+  @media (max-width:760px){
+    header{gap:8px;padding:0 12px}
+    header .logo small{display:none}
+    .tabla-fac{display:none}
+    .filtros input,.filtros select{flex:1 1 140px;min-width:0}
+    .tjf{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+    .tjf.sin-imp{background:#FFF8EC}
+    .tjf .f1{display:flex;gap:8px;align-items:center}
+    .tjf .f1 b{flex:1}
+    .tjf .c{color:var(--suave);font-size:12.5px;margin:3px 0 6px}
+    .tjf .f2{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    .tjf input{padding:5px 7px;font-size:13px}
+    .tjf input.imp{width:90px}
+  }
+  @media (min-width:761px){ .tarjetas-fac{display:none} }
 </style>
 </head>
 <body>
@@ -95,9 +148,13 @@
 <div id="v-app" class="oculto">
   <header>
     <div class="logo">KUBEL<small>ADMINISTRADOR</small></div>
+    <nav class="menu">
+      <a href="#usuarios" data-p="usuarios">Usuarios</a>
+      <a href="#facturacion" data-p="facturacion">Facturación</a>
+    </nav>
     <span class="esp"></span>
   </header>
-  <main>
+  <main id="p-usuarios" class="pagina">
     <div class="barra">
       <h2>Cuentas de usuario</h2>
       <span class="esp"></span>
@@ -118,6 +175,30 @@
       <input type="file" id="f-copia" accept=".json,.zip,application/json" style="display:none" onchange="abrirCopia(this)">
     </div>
     <div id="copia-res" style="margin-top:10px;color:var(--suave)"></div>
+  </main>
+
+  <main id="p-facturacion" class="pagina ancha oculto">
+    <div class="barra">
+      <h2>Facturación</h2>
+      <span class="esp"></span>
+      <button class="sec" onclick="$('#f-factura').click()">📄 Subir factura SIGMA</button>
+      <input type="file" id="f-factura" accept="application/pdf,.pdf" style="display:none" onchange="subirFactura(this)">
+      <button class="sec" onclick="descargarExcel()">⬇ Excel</button>
+      <button onclick="modalLinea()">+ Añadir línea</button>
+    </div>
+    <div id="fac-kpis" class="kpis"></div>
+    <div class="filtros">
+      <input id="ff-q" placeholder="Buscar servicio, dirección, factura…" oninput="pintarFac()">
+      <select id="ff-op" onchange="pintarFac()"></select>
+      <select id="ff-cia" onchange="pintarFac()"></select>
+      <select id="ff-est" onchange="pintarFac()"></select>
+      <select id="ff-mes" onchange="$('#ff-dia').value='';pintarFac()"></select>
+      <input id="ff-dia" type="date" title="Día" onchange="$('#ff-mes').value='';pintarFac()">
+      <button class="sec mini" onclick="limpiarFiltros()">Quitar filtros</button>
+    </div>
+    <div id="fac-lista"><p class="suave">Cargando…</p></div>
+    <div class="barra" style="margin-top:28px"><h2 style="font-size:17px">Facturas de compañía subidas</h2></div>
+    <div id="fac-facturas" class="suave">—</div>
   </main>
 </div>
 
@@ -175,7 +256,17 @@ async function alCambiarSesion(s) {
   yoId = id;
   mostrar('v-app');
   cargar();
+  irA();
 }
+// ---------- Páginas (Usuarios · Facturación) ----------
+const PAGINAS = ['usuarios', 'facturacion'];
+function irA() {
+  const p = PAGINAS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'usuarios';
+  PAGINAS.forEach((x) => $('#p-' + x).classList.toggle('oculto', x !== p));
+  document.querySelectorAll('header .menu a').forEach((a) => a.classList.toggle('activo', a.dataset.p === p));
+  if (p === 'facturacion') cargarFac();
+}
+window.addEventListener('hashchange', () => { if (yoId) irA(); });
 async function llamar(cuerpo) {
   const { data, error } = await sb.functions.invoke('usuarios', { body: cuerpo });
   if (error) {
@@ -308,6 +399,417 @@ async function abrirCopia(inp) {
     descargarJSON(d, f.name.replace(/\.json$/i, '') + '-abierta.json');
     $('#copia-res').textContent = `✅ Copia del ${fecha(d.fecha)} abierta y descargada (${resumenCopia(d)})`;
   } catch (e) { $('#copia-res').textContent = 'Error: ' + mensaje(e); }
+}
+
+// =====================================================================
+//  FACTURACIÓN (sustituye al «EXCEL DE SERVICIOS») · 21/10/2026
+//  · Cada servicio SIGMA que el robot pasa a Cerrado entra solo como NO LIQUIDADO (fecha y operario de la visita).
+//  · El importe (sin IVA) lo anota la función sigma-importes con el total del presupuesto aceptado; se puede corregir.
+//  · LIQUIDADO: a mano o al subir la factura PDF de SIGMA (cotejo).
+// =====================================================================
+const IVA = 1.21;
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+let filas = [], facturas = [], facCargada = false, canalFac = null;
+const eur = (v) => v == null || v === '' ? '' : Number(v).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+const r2 = (v) => Math.round(Number(v) * 100) / 100;
+const aNum = (t) => { if (t == null) return null; let s = String(t).trim().replace(/\s|€/g, ''); if (!s) return null;
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.'); const v = parseFloat(s); return isFinite(v) ? r2(v) : null; };
+const fechaCorta = (f) => f ? f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(2, 4) : '';
+const mesDe = (x) => x.mes || (x.fecha ? MESES[+x.fecha.slice(5, 7) - 1] : '');
+const claveMes = (x) => x.fecha ? x.fecha.slice(0, 7) : '';
+const nombreMes = (k) => k ? MESES[+k.slice(5, 7) - 1] + ' ' + k.slice(0, 4) : '';
+
+async function cargarFac(forzar) {
+  if (facCargada && !forzar) return pintarFac();
+  const [a, b] = await Promise.all([
+    sb.from('facturacion').select('*').order('fecha', { ascending: false }).order('creado_en', { ascending: false }).limit(5000),
+    sb.from('facturas').select('id, compania, numero, fecha, base, total, a_transferir, descuentos, resumen, subida_en, lineas').order('fecha', { ascending: false }),
+  ]);
+  if (a.error) { $('#fac-lista').innerHTML = `<p class="error">No se pudo cargar: ${esc(mensaje(a.error))}</p>`; return; }
+  filas = a.data; facturas = b.data || []; facCargada = true;
+  pintarFac(); pintarFacturas();
+  if (!canalFac) {
+    canalFac = sb.channel('admin-facturacion').on('postgres_changes', { event: '*', schema: 'public', table: 'facturacion' }, (ev) => {
+      if (ev.eventType === 'DELETE') filas = filas.filter((x) => x.id !== ev.old.id);
+      else { const i = filas.findIndex((x) => x.id === ev.new.id); if (i >= 0) filas[i] = ev.new; else filas.unshift(ev.new); }
+      if (!document.activeElement?.closest?.('#fac-lista')) pintarFac();
+    }).subscribe();
+  }
+}
+
+// ---------- Filtros (cruzados entre sí: cada lista cuenta con los demás filtros puestos) ----------
+const FILTROS = {
+  op: (x, v) => (x.operario || '—') === v,
+  cia: (x, v) => (x.compania || '—') === v,
+  est: (x, v) => v === 'liq' ? x.liquidado : v === 'no' ? !x.liquidado : v === 'sinimp' ? x.importe == null : true,
+  mes: (x, v) => claveMes(x) === v,
+  dia: (x, v) => x.fecha === v,
+};
+function valoresFiltro() {
+  return { op: $('#ff-op').value, cia: $('#ff-cia').value, est: $('#ff-est').value, mes: $('#ff-mes').value, dia: $('#ff-dia').value };
+}
+function pasa(x, f, salvo) {
+  for (const k of Object.keys(FILTROS)) if (k !== salvo && f[k] && !FILTROS[k](x, f[k])) return false;
+  const q = $('#ff-q').value.trim().toLowerCase();
+  if (q && ![x.servicio, x.direccion, x.factura, x.comentario, x.operario].some((t) => String(t || '').toLowerCase().includes(q))) return false;
+  return true;
+}
+function rellenarSelect(id, todos, opciones, valor) {
+  $(id).innerHTML = `<option value="">${todos}</option>` + opciones.map(([v, t, n]) => `<option value="${esc(v)}" ${v === valor ? 'selected' : ''}>${esc(t)} (${n})</option>`).join('');
+}
+function contar(lista, fn) { const m = new Map(); lista.forEach((x) => { const k = fn(x); m.set(k, (m.get(k) || 0) + 1); }); return m; }
+function limpiarFiltros() { ['#ff-q', '#ff-op', '#ff-cia', '#ff-est', '#ff-mes', '#ff-dia'].forEach((i) => ($(i).value = '')); pintarFac(); }
+
+function pintarFac() {
+  if (!facCargada) return;
+  const f = valoresFiltro();
+  // Opciones de cada filtro con su nº según los demás filtros
+  const ops = contar(filas.filter((x) => pasa(x, f, 'op')), (x) => x.operario || '—');
+  rellenarSelect('#ff-op', 'Todos los operarios', [...ops].sort((a, b) => a[0].localeCompare(b[0])).map(([k, n]) => [k, k, n]), f.op);
+  const cias = contar(filas.filter((x) => pasa(x, f, 'cia')), (x) => x.compania || '—');
+  rellenarSelect('#ff-cia', 'Todas las compañías', [...cias].sort((a, b) => b[1] - a[1]).map(([k, n]) => [k, k, n]), f.cia);
+  const be = filas.filter((x) => pasa(x, f, 'est'));
+  rellenarSelect('#ff-est', 'Liquidado y no liquidado', [['no', 'NO LIQUIDADO', be.filter((x) => !x.liquidado).length], ['liq', 'LIQUIDADO', be.filter((x) => x.liquidado).length], ['sinimp', 'Sin importe', be.filter((x) => x.importe == null).length]], f.est);
+  const meses = contar(filas.filter((x) => pasa(x, f, 'mes')), claveMes);
+  rellenarSelect('#ff-mes', 'Todos los meses', [...meses].filter(([k]) => k).sort((a, b) => b[0].localeCompare(a[0])).map(([k, n]) => [k, nombreMes(k), n]), f.mes);
+
+  const ver = filas.filter((x) => pasa(x, f));
+  const suma = (l) => r2(l.reduce((t, x) => t + (Number(x.importe) || 0), 0));
+  const pend = ver.filter((x) => !x.liquidado), sinImp = ver.filter((x) => x.importe == null);
+  $('#fac-kpis').innerHTML = `
+    <div class="kpi"><b>${ver.length}</b><span>Servicios</span></div>
+    <div class="kpi"><b>${eur(suma(ver))}</b><span>Facturación sin IVA</span></div>
+    <div class="kpi"><b>${eur(r2(suma(ver) * IVA))}</b><span>Con IVA</span></div>
+    <div class="kpi aviso"><b>${eur(suma(pend))}</b><span>No liquidado (${pend.length})</span></div>
+    <div class="kpi"><b>${eur(suma(ver) - suma(pend))}</b><span>Liquidado (${ver.length - pend.length})</span></div>
+    ${sinImp.length ? `<div class="kpi aviso"><b>${sinImp.length}</b><span>Sin importe</span></div>` : ''}`;
+
+  if (!ver.length) { $('#fac-lista').innerHTML = '<p class="suave">Ningún servicio con estos filtros.</p>'; return; }
+  const MAX = 600, lista = ver.slice(0, MAX);
+  const dif = (x) => x.factura_importe != null && x.importe != null && Math.abs(x.factura_importe - x.importe) > 0.009
+    ? `<span class="dif" title="La factura de compañía dice ${eur(x.factura_importe)}">≠ ${eur(x.factura_importe)}</span>` : '';
+  const nota = (x) => x.importe == null && x.importe_nota ? `<span class="nota-imp">${esc(x.importe_nota)}</span>` : '';
+  const est = (x) => `<button class="est ${x.liquidado ? 'si' : 'no'}" onclick="cambiarLiq('${x.id}')" title="Cambiar estado">${x.liquidado ? 'LIQUIDADO' : 'NO LIQUIDADO'}</button>`;
+  const inp = (x, campo, cls, ph) => `<input class="${cls}" value="${esc(campo === 'importe' ? (x.importe == null ? '' : String(x.importe).replace('.', ',')) : x[campo] ?? '')}" placeholder="${ph}" onchange="guardarCampo('${x.id}','${campo}',this)" onkeydown="if(event.key==='Enter')this.blur()">`;
+  $('#fac-lista').innerHTML = `
+    <div class="tabla-fac"><table><thead><tr>
+      <th>Fecha</th><th>Mes</th><th>Servicio</th><th>Dirección</th><th>Provincia</th><th>Operario</th><th>Compañía</th>
+      <th class="num">Importe</th><th class="num">Con IVA</th><th>Factura</th><th>Comentario</th><th>Estado</th><th></th></tr></thead><tbody>
+    ${lista.map((x) => `<tr class="${x.importe == null ? 'sin-imp' : ''} ${x.liquidado ? 'liq' : ''}">
+      <td>${fechaCorta(x.fecha)}</td><td>${esc(mesDe(x))}</td><td><b>${esc(x.servicio)}</b></td>
+      <td class="dir">${esc(x.direccion)}</td><td>${esc(x.provincia)}</td><td>${esc(x.operario)}</td><td>${esc(x.compania)}</td>
+      <td class="num">${inp(x, 'importe', 'imp', '0,00')}${dif(x)}${nota(x)}</td>
+      <td class="num">${x.importe != null ? eur(r2(x.importe * IVA)) : ''}</td>
+      <td>${inp(x, 'factura', 'fac', '')}</td><td>${inp(x, 'comentario', 'com', '')}</td>
+      <td>${est(x)}</td><td><button class="mini sec" onclick="modalLinea('${x.id}')">⋯</button></td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="tarjetas-fac">${lista.map((x) => `<div class="tjf ${x.importe == null ? 'sin-imp' : ''}">
+      <div class="f1"><b>${esc(x.servicio)}</b>${est(x)}</div>
+      <div class="c">${fechaCorta(x.fecha)} · ${esc(x.operario || '—')} · ${esc(x.compania || '')}<br>${esc(x.direccion || '')}${x.provincia ? ' · ' + esc(x.provincia) : ''}</div>
+      <div class="f2">${inp(x, 'importe', 'imp', 'Importe')}<span class="suave">${x.importe != null ? 'con IVA ' + eur(r2(x.importe * IVA)) : ''}</span>${dif(x)}
+        <button class="mini sec" onclick="modalLinea('${x.id}')">Editar</button></div>${nota(x)}</div>`).join('')}</div>
+    <div class="pie-tabla">${ver.length > MAX ? `Se muestran ${MAX} de ${ver.length}: usa los filtros para acotar. ` : ''}Importe sin IVA. Lo anota el robot con el total del presupuesto aceptado en SIGMA; puedes corregirlo escribiendo encima.</div>`;
+}
+
+async function guardarCampo(id, campo, el) {
+  const x = filas.find((f) => f.id === id); if (!x) return;
+  let v = el.value.trim();
+  const cambios = {};
+  if (campo === 'importe') {
+    const n = v === '' ? null : aNum(v);
+    if (v !== '' && n == null) { aviso('Importe no válido'); el.value = x.importe == null ? '' : String(x.importe).replace('.', ','); return; }
+    if (n === (x.importe == null ? null : Number(x.importe))) return;
+    cambios.importe = n; cambios.importe_origen = n == null ? null : 'manual';
+  } else {
+    if ((x[campo] || '') === v) return;
+    cambios[campo] = v || null;
+  }
+  const { data, error } = await sb.from('facturacion').update(cambios).eq('id', id).select().single();
+  if (error) { aviso('No se guardó: ' + mensaje(error)); return; }
+  Object.assign(x, data); aviso('Guardado');
+  if (campo === 'importe') pintarFac();
+}
+async function cambiarLiq(id) {
+  const x = filas.find((f) => f.id === id); if (!x) return;
+  const { data, error } = await sb.from('facturacion').update({ liquidado: !x.liquidado }).eq('id', id).select().single();
+  if (error) return aviso('No se guardó: ' + mensaje(error));
+  Object.assign(x, data); pintarFac();
+}
+
+// ---------- Alta / edición completa de una línea ----------
+function modalLinea(id) {
+  const x = id ? filas.find((f) => f.id === id) : { fecha: hoyISO(), compania: 'SIGMA', liquidado: false };
+  const ops = [...new Set(filas.map((f) => f.operario).filter(Boolean))].sort();
+  const cias = [...new Set(['SIGMA', 'TASHO', 'YAVOI', ...filas.map((f) => f.compania).filter(Boolean)])];
+  abrirModal(`
+    <h3>${id ? 'Servicio ' + esc(x.servicio) : 'Nueva línea'}</h3>
+    ${id ? `<div class="sub">${x.origen === 'auto' ? 'Entró sola al cerrarse en SIGMA' : x.origen === 'excel' ? 'Del Excel antiguo' : x.origen === 'factura' ? 'Añadida desde una factura' : 'Añadida a mano'}${x.liquidado_en ? ' · liquidado el ' + fecha(x.liquidado_en) : ''}</div>` : ''}
+    <div class="dos"><div><label>Fecha</label><input type="date" id="l-fecha" value="${esc(x.fecha || '')}"></div>
+      <div><label>Servicio</label><input id="l-serv" value="${esc(x.servicio || '')}"></div></div>
+    <label>Dirección</label><input id="l-dir" value="${esc(x.direccion || '')}">
+    <div class="dos"><div><label>Provincia</label><select id="l-prov">${['', 'VALLADOLID', 'PALENCIA'].map((p) => `<option ${p === (x.provincia || '') ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
+      <div><label>Operario</label><input id="l-op" list="l-ops" value="${esc(x.operario || '')}"><datalist id="l-ops">${ops.map((o) => `<option value="${esc(o)}">`).join('')}</datalist></div></div>
+    <div class="dos"><div><label>Compañía</label><input id="l-cia" list="l-cias" value="${esc(x.compania || '')}"><datalist id="l-cias">${cias.map((o) => `<option value="${esc(o)}">`).join('')}</datalist></div>
+      <div><label>Importe sin IVA</label><input id="l-imp" inputmode="decimal" value="${x.importe == null ? '' : String(x.importe).replace('.', ',')}"></div></div>
+    <div class="dos"><div><label>Gasto real</label><input id="l-gasto" inputmode="decimal" value="${x.gasto_real == null ? '' : String(x.gasto_real).replace('.', ',')}"></div>
+      <div><label>Factura</label><input id="l-fac" value="${esc(x.factura || '')}"></div></div>
+    <label>Comentario</label><input id="l-com" value="${esc(x.comentario || '')}">
+    <div class="check"><input type="checkbox" id="l-liq" ${x.liquidado ? 'checked' : ''}><span>LIQUIDADO</span></div>
+    ${x.factura_importe != null ? `<p class="sub">Importe en la factura de compañía: <b>${eur(x.factura_importe)}</b></p>` : ''}
+    <div id="m-error" class="error"></div>
+    <div class="acciones">${id ? `<button class="sec" style="border-color:var(--peligro);color:var(--peligro);margin-right:auto" onclick="borrarLinea('${id}')">Borrar</button>` : ''}
+      <button class="sec" onclick="cerrarModal()">Cancelar</button><button onclick="guardarLinea(${id ? `'${id}'` : ''})">${id ? 'Guardar' : 'Añadir'}</button></div>`);
+}
+async function guardarLinea(id) {
+  const imp = $('#l-imp').value.trim(), gasto = $('#l-gasto').value.trim();
+  const d = {
+    fecha: $('#l-fecha').value || null, servicio: $('#l-serv').value.trim(), direccion: $('#l-dir').value.trim().toUpperCase() || null,
+    provincia: $('#l-prov').value || null, operario: $('#l-op').value.trim().toUpperCase() || null, compania: $('#l-cia').value.trim().toUpperCase() || null,
+    importe: imp ? aNum(imp) : null, gasto_real: gasto ? aNum(gasto) : null, factura: $('#l-fac').value.trim() || null,
+    comentario: $('#l-com').value.trim() || null, liquidado: $('#l-liq').checked,
+  };
+  if (!d.servicio) return ($('#m-error').textContent = 'Falta el nº de servicio.');
+  if ((imp && d.importe == null) || (gasto && d.gasto_real == null)) return ($('#m-error').textContent = 'Importe no válido.');
+  const x = id ? filas.find((f) => f.id === id) : null;
+  if (!x || Number(x.importe) !== d.importe) d.importe_origen = d.importe == null ? null : 'manual';
+  const q = id ? sb.from('facturacion').update(d).eq('id', id) : sb.from('facturacion').insert({ ...d, origen: 'manual' });
+  const { data, error } = await q.select().single();
+  if (error) return ($('#m-error').textContent = mensaje(error));
+  if (x) Object.assign(x, data); else filas.unshift(data);
+  cerrarModal(); pintarFac(); aviso(id ? 'Guardado' : 'Línea añadida');
+}
+async function borrarLinea(id) {
+  if (!confirm('¿Borrar esta línea de facturación?')) return;
+  const { error } = await sb.from('facturacion').delete().eq('id', id);
+  if (error) return aviso('No se borró: ' + mensaje(error));
+  filas = filas.filter((f) => f.id !== id); cerrarModal(); pintarFac();
+}
+
+// ---------- Excel (lo que se ve con los filtros) ----------
+function cargarScript(src) {
+  return new Promise((ok, ko) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => ko(new Error('No se pudo cargar ' + src)); document.head.appendChild(s); });
+}
+async function descargarExcel() {
+  try {
+    if (!window.XLSX) await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    const f = valoresFiltro(), ver = filas.filter((x) => pasa(x, f));
+    const cab = ['FECHA', 'MES', 'SERVICIO', 'DIRECCION', 'PROVINCIA', 'OPERARIO', 'COMPAÑÍA', 'GASTO REAL', 'FACTURACION', 'CON IVA', 'FACTURA', 'COMENTARIO', 'ESTADO'];
+    const datos = ver.map((x) => [x.fecha ? new Date(x.fecha + 'T00:00:00') : '', mesDe(x), /^\d+$/.test(x.servicio) ? Number(x.servicio) : x.servicio, x.direccion || '', x.provincia || '', x.operario || '', x.compania || '',
+      x.gasto_real == null ? '' : Number(x.gasto_real), x.importe == null ? '' : Number(x.importe), x.importe == null ? '' : r2(x.importe * IVA),
+      x.factura || '', x.comentario || '', x.liquidado ? 'LIQUIDADO' : 'NO LIQUIDADO']);
+    const tot = (i) => r2(datos.reduce((t, r) => t + (Number(r[i]) || 0), 0));
+    datos.push(['', '', 'Total', '', '', '', '', tot(7), tot(8), tot(9), '', '', '']);
+    const ws = XLSX.utils.aoa_to_sheet([cab, ...datos], { cellDates: true, dateNF: 'dd/mm/yyyy' });
+    ws['!cols'] = [10, 10, 12, 34, 12, 13, 10, 10, 12, 12, 14, 18, 14].map((w) => ({ wch: w }));
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Servicios');
+    XLSX.writeFile(wb, `KUBEL-facturacion-${hoyISO()}.xlsx`);
+  } catch (e) { aviso('Error: ' + mensaje(e)); }
+}
+
+// ---------- Factura PDF de SIGMA: lectura y cotejo ----------
+async function textoPDF(file) {
+  if (!window.pdfjsLib) {
+    await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const lineas = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const tc = await (await pdf.getPage(n)).getTextContent();
+    const items = tc.items.filter((i) => i.str && i.str.trim()).map((i) => ({ t: i.str.trim(), x: i.transform[4], y: i.transform[5] }));
+    items.sort((a, b) => b.y - a.y || a.x - b.x);
+    const grupos = [];
+    for (const it of items) {
+      const g = grupos.find((g) => Math.abs(g.y - it.y) < 3);
+      if (g) g.items.push(it); else grupos.push({ y: it.y, items: [it] });
+    }
+    grupos.sort((a, b) => b.y - a.y).forEach((g) => lineas.push(g.items.sort((a, b) => a.x - b.x).map((i) => i.t).join('  ')));
+  }
+  return lineas;
+}
+const IMPORTE_RE = '-?\\d{1,3}(?:\\.\\d{3})*,\\d{1,2}|-?\\d+(?:,\\d{1,2})?';
+function leerFacturaSigma(lineas) {
+  const todo = lineas.join('\n');
+  const busca = (re) => (todo.match(re) || [])[1] || null;
+  const f = {
+    numero: busca(/N[ºo°]\s*Factura:?\s*([A-Z0-9\-\/]+)/i),
+    fecha: (() => { const m = todo.match(/Fecha:?\s*(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; })(),
+    base: aNum(busca(/Importe Base:?\s*([\d.,]+)/i)),
+    total: aNum(busca(/Importe total factura:?\s*([\d.,]+)/i)) ?? aNum(busca(/Total a Facturar\s*([\d.,]+)/i)),
+    a_transferir: aNum(busca(/Importe a Transferir\s*(-?[\d.,]+)/i)),
+    lineas: [], descuentos: [],
+  };
+  const reLinea = new RegExp(`^([A-Za-z]?\\d{6,9})\\s+(${IMPORTE_RE})(?:\\s+(${IMPORTE_RE}))?\\s+(.*)$`);
+  let enResumen = false;
+  for (let i = 0; i < lineas.length; i++) {
+    const l = lineas[i].replace(/\s+/g, ' ').trim();
+    const m = l.match(reLinea);
+    if (m && !enResumen) {
+      const resto = m[4] || '';
+      if (/^\d{8}$/.test(m[1])) {
+        const cm = resto.match(/^(\S+\s+Reparaci\S+\s+est\S+|\S+\s+\S+\s+\S+)\s+(.*)$/i);
+        f.lineas.push({ servicio: m[1], importe: aNum(m[2]), contado: m[3] ? aNum(m[3]) : null, concepto: cm ? cm[1] : resto, direccion: cm ? cm[2] : '' });
+      } else f.descuentos.push({ concepto: resto || m[1], referencia: m[1], importe: aNum(m[2]) });
+      continue;
+    }
+    if (/^Total a Facturar/i.test(l)) { enResumen = true; continue; }
+    if (!enResumen || /Importe a Transferir|Contado Cobrado/i.test(l)) continue;
+    // Bloque de deducciones: «Concepto  importe» o concepto en una línea y el importe sola en la siguiente
+    const d = l.match(/^(.*?[A-Za-zÁÉÍÓÚÑáéíóúñ.].*?)\s+(-?[\d.]*\d(?:,\d{1,2})?)$/);
+    if (d && aNum(d[2])) { f.descuentos.push({ concepto: d[1].trim(), importe: aNum(d[2]) }); continue; }
+    const sig = (lineas[i + 1] || '').trim();
+    if (/[A-Za-z]/.test(l) && /^-?[\d.]*\d,\d{1,2}$/.test(sig) && aNum(sig)) { f.descuentos.push({ concepto: l, importe: aNum(sig) }); i++; }
+  }
+  // La fianza ya va como línea («COBRO FIANZA»): no se repite desde el resumen
+  const vistos = new Set();
+  f.descuentos = f.descuentos.filter((d) => { const k = d.importe + '|' + (/fianza/i.test(d.concepto) ? 'fianza' : d.concepto); if (vistos.has(k)) return false; vistos.add(k); return true; });
+  return f;
+}
+// Distancia entre dos nº de servicio (para sugerir errores al apuntar: 293135710 ↔ 29313570)
+function distancia(a, b) {
+  const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
+}
+let cotejo = null;
+async function subirFactura(inp) {
+  const file = inp.files?.[0]; inp.value = ''; if (!file) return;
+  abrirModal('<h3>Leyendo la factura…</h3><p class="sub">Un momento.</p>');
+  try {
+    await cargarFac();
+    const f = leerFacturaSigma(await textoPDF(file));
+    if (!f.numero || !f.lineas.length) throw new Error('No parece una factura de SIGMA (no se encontró el nº de factura o las líneas de servicios).');
+    cotejo = cotejar(f);
+    pintarCotejo();
+  } catch (e) { abrirModal(`<h3>No se pudo leer</h3><p class="error">${esc(mensaje(e))}</p><div class="acciones"><button onclick="cerrarModal()">Cerrar</button></div>`); }
+}
+function cotejar(f) {
+  const usadas = new Set();
+  const sigma = filas.filter((x) => (x.compania || '').toUpperCase() === 'SIGMA');
+  const res = { f, cuadran: [], distintos: [], yaLiq: [], nuevos: [], pendientes: [] };
+  for (const l of f.lineas) {
+    const mismas = sigma.filter((x) => x.servicio === l.servicio && !usadas.has(x.id));
+    const libres = mismas.filter((x) => !x.liquidado);
+    const fila = libres.find((x) => x.importe != null && Math.abs(x.importe - l.importe) < 0.01) || libres[0] || null;
+    if (fila) {
+      usadas.add(fila.id);
+      if (fila.importe != null && Math.abs(fila.importe - l.importe) < 0.01) res.cuadran.push({ l, fila, ok: true });
+      else res.distintos.push({ l, fila, ok: true });
+      continue;
+    }
+    const liq = mismas.find((x) => x.liquidado);
+    if (liq) { res.yaLiq.push({ l, fila: liq }); continue; }
+    // Sugerencias: nº parecido (errata al apuntar) o mismo importe sin liquidar
+    const cand = sigma.filter((x) => !x.liquidado && !usadas.has(x.id))
+      .map((x) => ({ x, d: /^\d+$/.test(x.servicio) ? distancia(x.servicio, l.servicio) : 9, igual: x.importe != null && Math.abs(x.importe - l.importe) < 0.01 }))
+      .filter((c) => c.d <= 2 || c.igual).sort((a, b) => a.d - b.d || (b.igual - a.igual)).slice(0, 3);
+    const k = cand.map((c) => ({ id: c.x.id, servicio: c.x.servicio, importe: c.x.importe, fecha: c.x.fecha, d: c.d, igual: c.igual }));
+    // Nº casi igual y mismo importe → casi seguro una errata al apuntarlo: se propone corregir esa fila
+    const seguro = k[0] && k[0].d <= 2 && k[0].igual ? k[0].id : null;
+    if (seguro) usadas.add(seguro);
+    res.nuevos.push({ l, cand: k, eleccion: seguro || 'nueva' });
+  }
+  const tope = f.fecha || hoyISO();
+  res.pendientes = sigma.filter((x) => !x.liquidado && !usadas.has(x.id) && (!x.fecha || x.fecha <= tope))
+    .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+  return res;
+}
+function pintarCotejo() {
+  const c = cotejo, f = c.f;
+  const ya = facturas.find((x) => x.numero === f.numero);
+  const sumaL = r2(f.lineas.reduce((t, l) => t + l.importe, 0));
+  const dias = (d) => d ? Math.round((new Date(f.fecha || hoyISO()) - new Date(d)) / 864e5) : '';
+  const fila = (x) => `${esc(x.servicio)}`;
+  const tabla = (cab, filasHtml) => `<div style="overflow-x:auto"><table><thead><tr>${cab.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${filasHtml}</tbody></table></div>`;
+  abrirModal(`<div class="cot">
+    <h3>Factura ${esc(f.numero)} · ${f.fecha ? fechaCorta(f.fecha) : ''}</h3>
+    ${ya ? `<p class="nota">Esta factura ya se subió el ${fecha(ya.subida_en)}. Si la aplicas otra vez solo se tocan las líneas que sigan pendientes.</p>` : ''}
+    <div class="resumen">
+      <div>Servicios<b>${f.lineas.length} · ${eur(sumaL)}</b></div>
+      <div>Base<b>${eur(f.base)}</b></div>
+      <div>Total con IVA<b>${eur(f.total)}</b></div>
+      <div>A transferir<b>${eur(f.a_transferir)}</b></div>
+    </div>
+    ${f.descuentos.length ? `<p class="sub">Descuentos: ${f.descuentos.map((d) => `${esc(d.concepto)} <b>${eur(d.importe)}</b>`).join(' · ')}</p>` : ''}
+
+    <h4><span class="chip ok">${c.cuadran.length}</span> Cuadran → pasan a LIQUIDADO</h4>
+    ${c.cuadran.length ? `<p class="sub">${c.cuadran.map((x) => fila(x.fila)).join(' · ')}</p>` : '<p class="sub">Ninguno.</p>'}
+
+    ${c.distintos.length ? `<h4><span class="chip mal">${c.distintos.length}</span> Importe distinto</h4>
+    ${tabla(['Liquidar', 'Servicio', 'Fecha', 'KUBEL', 'SIGMA paga', 'Diferencia'], c.distintos.map((x, i) => `<tr>
+      <td><input type="checkbox" ${x.ok ? 'checked' : ''} onchange="cotejo.distintos[${i}].ok=this.checked"></td>
+      <td><b>${esc(x.fila.servicio)}</b></td><td>${fechaCorta(x.fila.fecha)}</td><td>${x.fila.importe == null ? '<i>sin importe</i>' : eur(x.fila.importe)}</td>
+      <td>${eur(x.l.importe)}</td><td>${x.fila.importe == null ? '' : eur(r2(x.l.importe - x.fila.importe))}</td></tr>`).join(''))}
+    <p class="sub">Se marcan LIQUIDADO y se guarda lo que paga SIGMA aparte; tu importe no se cambia (sale con ≠ en la tabla). Si no tenían importe, se pone el de la factura.</p>` : ''}
+
+    ${c.nuevos.length ? `<h4><span class="chip av">${c.nuevos.length}</span> Pagados que no tenías apuntados</h4>
+    ${tabla(['Servicio', 'SIGMA paga', 'Dirección', '¿Qué hago?'], c.nuevos.map((x, i) => `<tr>
+      <td><b>${esc(x.l.servicio)}</b></td><td>${eur(x.l.importe)}</td><td style="white-space:normal">${esc(x.l.direccion)}</td>
+      <td><select onchange="cotejo.nuevos[${i}].eleccion=this.value" style="min-width:240px">
+        <option value="nueva">Añadir línea nueva LIQUIDADA</option>
+        ${x.cand.map((k) => `<option value="${k.id}" ${x.eleccion === k.id ? 'selected' : ''}>Es la fila ${esc(k.servicio)} (${fechaCorta(k.fecha)}, ${k.importe == null ? 'sin importe' : eur(k.importe)}) → corregir nº</option>`).join('')}
+        <option value="nada">No hacer nada</option></select>
+        ${x.cand.length ? `<div class="sub" style="font-size:11px">Parecida${x.cand.length > 1 ? 's' : ''}: ${x.cand.map((k) => esc(k.servicio) + (k.igual ? ' (mismo importe)' : '') + (k.d <= 2 ? ' (nº parecido)' : '')).join(', ')}</div>` : ''}</td></tr>`).join(''))}` : ''}
+
+    ${c.yaLiq.length ? `<h4><span class="chip gr">${c.yaLiq.length}</span> Ya estaban liquidados</h4>
+    <p class="sub">${c.yaLiq.map((x) => `${esc(x.l.servicio)} (${esc(x.fila.factura || 'sin factura')})`).join(' · ')}</p>` : ''}
+
+    <h4><span class="chip av">${c.pendientes.length}</span> Siguen sin cobrar de SIGMA (hasta el ${fechaCorta(f.fecha)})</h4>
+    ${c.pendientes.length ? tabla(['Servicio', 'Fecha', 'Días', 'Operario', 'Importe', 'Nota'], c.pendientes.map((x) => `<tr>
+      <td><b>${esc(x.servicio)}</b></td><td>${fechaCorta(x.fecha)}</td><td>${dias(x.fecha)}</td><td>${esc(x.operario || '')}</td>
+      <td>${x.importe == null ? '<i>sin importe</i>' : eur(x.importe)}</td><td style="white-space:normal">${esc(x.comentario || x.importe_nota || '')}</td></tr>`).join('')) : '<p class="sub">Ninguno 🎉</p>'}
+
+    <div id="m-error" class="error"></div>
+    <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button id="btn-aplicar" onclick="aplicarCotejo()">Aplicar y liquidar</button></div>
+  </div>`);
+  $('#modal .modal').classList.add('grande');
+}
+async function aplicarCotejo() {
+  const c = cotejo, f = c.f, num = f.numero;
+  $('#btn-aplicar').disabled = true;
+  try {
+    const ahora = new Date().toISOString();
+    const ops = [];
+    for (const x of c.cuadran) ops.push(sb.from('facturacion').update({ liquidado: true, factura: num, factura_importe: x.l.importe, liquidado_en: ahora }).eq('id', x.fila.id));
+    for (const x of c.distintos.filter((d) => d.ok)) {
+      const d = { liquidado: true, factura: num, factura_importe: x.l.importe, liquidado_en: ahora };
+      if (x.fila.importe == null) Object.assign(d, { importe: x.l.importe, importe_origen: 'factura' });
+      ops.push(sb.from('facturacion').update(d).eq('id', x.fila.id));
+    }
+    for (const x of c.nuevos) {
+      if (x.eleccion === 'nada') continue;
+      if (x.eleccion === 'nueva') {
+        ops.push(sb.from('facturacion').insert({ servicio: x.l.servicio, fecha: f.fecha, compania: 'SIGMA', direccion: x.l.direccion || null,
+          provincia: /\(34/.test(x.l.direccion) ? 'PALENCIA' : /\(47/.test(x.l.direccion) ? 'VALLADOLID' : null,
+          importe: x.l.importe, importe_origen: 'factura', factura_importe: x.l.importe, liquidado: true, factura: num, liquidado_en: ahora, origen: 'factura' }));
+      } else {
+        const fila = filas.find((y) => y.id === x.eleccion);
+        const d = { servicio: x.l.servicio, liquidado: true, factura: num, factura_importe: x.l.importe, liquidado_en: ahora,
+          comentario: [fila?.comentario, `nº corregido (antes ${fila?.servicio})`].filter(Boolean).join(' · ') };
+        if (fila?.importe == null) Object.assign(d, { importe: x.l.importe, importe_origen: 'factura' });
+        ops.push(sb.from('facturacion').update(d).eq('id', x.eleccion));
+      }
+    }
+    const rs = await Promise.all(ops);
+    const err = rs.find((r) => r.error);
+    if (err) throw err.error;
+    const resumen = { cuadran: c.cuadran.length, distintos: c.distintos.filter((d) => d.ok).length, nuevos: c.nuevos.filter((x) => x.eleccion !== 'nada').length,
+      ya_liquidados: c.yaLiq.length, pendientes: c.pendientes.length, aplicada_en: ahora };
+    const { error: e2 } = await sb.from('facturas').upsert({ compania: 'SIGMA', numero: num, fecha: f.fecha, base: f.base, total: f.total, a_transferir: f.a_transferir,
+      lineas: f.lineas, descuentos: f.descuentos, resumen }, { onConflict: 'compania,numero' });
+    if (e2) throw e2;
+    cerrarModal();
+    aviso(`Factura ${num}: ${resumen.cuadran + resumen.distintos + resumen.nuevos} servicios liquidados`);
+    await cargarFac(true);
+  } catch (e) { $('#m-error').textContent = 'Error: ' + mensaje(e); $('#btn-aplicar').disabled = false; }
+}
+function pintarFacturas() {
+  if (!facturas.length) { $('#fac-facturas').innerHTML = '<p class="suave">Aún no se ha subido ninguna. Usa «Subir factura SIGMA» con el PDF que manda SIGMA.</p>'; return; }
+  $('#fac-facturas').innerHTML = `<div class="tabla-fac" style="display:block"><table><thead><tr><th>Factura</th><th>Fecha</th><th class="num">Servicios</th><th class="num">Base</th><th class="num">Total</th><th class="num">A transferir</th><th>Cotejo</th></tr></thead><tbody>
+    ${facturas.map((x) => `<tr><td><b>${esc(x.numero)}</b></td><td>${fechaCorta(x.fecha)}</td><td class="num">${(x.lineas || []).length}</td><td class="num">${eur(x.base)}</td><td class="num">${eur(x.total)}</td><td class="num">${eur(x.a_transferir)}</td>
+      <td>${x.resumen ? `<span class="chip ok">${x.resumen.cuadran} cuadran</span> ${x.resumen.distintos ? `<span class="chip mal">${x.resumen.distintos} distintos</span>` : ''} ${x.resumen.nuevos ? `<span class="chip av">${x.resumen.nuevos} no apuntados</span>` : ''}` : ''}
+      <button class="mini sec" onclick="$('#ff-q').value='${esc(x.numero)}';pintarFac();scrollTo(0,0)">Ver</button></td></tr>`).join('')}</tbody></table></div>`;
 }
 </script>
 </body>
