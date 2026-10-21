@@ -293,3 +293,26 @@ begin
   end if;
   return null;
 end; $$;
+
+-- 14d · 21/10: manda siempre el ÚLTIMO importe de SIGMA (al aceptarse y al cerrarse), con aviso del anterior.
+create or replace function public.facturacion_por_ptto()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_imp numeric; v_nota text;
+begin
+  if new.sigma_ptto_estado is distinct from 'aceptado' or new.estado = 'anulado' then return null; end if;
+  if old.sigma_ptto_estado is not distinct from new.sigma_ptto_estado
+     and old.sigma_ptto_total is not distinct from new.sigma_ptto_total
+     and old.sigma_ptto_lineas is not distinct from new.sigma_ptto_lineas then return null; end if;
+  perform public.facturacion_alta(new.id, new.sigma_ptto_fecha, null);
+  select importe, nota into v_imp, v_nota from public.ptto_importe(new.sigma_ptto_lineas, new.sigma_ptto_total);
+  update public.facturacion f set
+    importe = coalesce(v_imp, f.importe),
+    importe_origen = case when v_imp is not null then 'presupuesto' else f.importe_origen end,
+    importe_nota = case
+      when v_imp is not null and f.importe is not null and f.importe <> v_imp
+        then 'Presupuesto cambiado en SIGMA: de ' || public.euros(f.importe) || ' a ' || public.euros(v_imp)
+      else v_nota end,
+    importe_leido_en = now()
+  where f.parte_id = new.id and not f.liquidado;
+  return null;
+end; $$;

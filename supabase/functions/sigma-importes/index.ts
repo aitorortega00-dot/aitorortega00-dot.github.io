@@ -2,8 +2,8 @@
 // Comprobación AL CERRARSE: para cada fila de facturación de un servicio SIGMA ya cerrado y aún sin comprobar
 // (importe_cierre_en vacío), lee la pestaña «Presupuesto» del portal (valuations-initial-data, SOLO LECTURA):
 //   · todas las partidas ACEPTADAS → importe total de la valoración (totals.totSubtotalP, el que muestra el portal):
-//       - sin importe → se anota;  - igual → OK;  - distinto y lo había puesto el robot → se actualiza con aviso;
-//       - distinto y escrito a mano / Excel → no se toca, solo aviso «SIGMA dice …».   Queda comprobado.
+//       - sin importe → se anota;  - igual → OK;  - distinto → se pone el de SIGMA (manda el último) con aviso
+//         «Cambió al cerrar: de X a Y».   Queda comprobado.
 //   · pendientes / rechazadas / sin presupuesto → nota para revisar y se vuelve a mirar cada 6 h (30 días como mucho).
 // (Con el servicio abierto, el importe lo pone el disparador partes_facturacion_ptto al quedar ACEPTADO.)
 // Lo llama pg_cron (minutos 12 y 42) con la cabecera secreta x-kubel-secreto.
@@ -125,8 +125,8 @@ Deno.serve(async (req) => {
           let importe = antes, origen = f.importe_origen, nota: string | null = d.nota;
           if (antes == null) { importe = d.importe; origen = 'presupuesto'; }
           else if (Math.abs(antes - d.importe) >= 0.01) {
-            if (f.importe_origen === 'presupuesto') { importe = d.importe; nota = `Cambió al cerrar: de ${euros(antes)} a ${euros(d.importe)}`; }
-            else nota = `SIGMA dice ${euros(d.importe)}`;
+            // Al cerrar manda SIEMPRE el último importe de SIGMA (decisión del usuario 21/10); se avisa del anterior
+            importe = d.importe; origen = 'presupuesto'; nota = `Cambió al cerrar: de ${euros(antes)} a ${euros(d.importe)}`;
           }
           await sql`update public.facturacion set importe = ${importe}::numeric, importe_origen = ${origen}, importe_nota = ${nota},
                       importe_leido_en = now(), importe_cierre_en = now() where id = ${f.id} and not liquidado`;
