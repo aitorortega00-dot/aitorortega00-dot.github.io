@@ -55,7 +55,6 @@
   .pre{white-space:pre-wrap}
   .et{display:inline-block;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:700;background:#ECEAE4;color:#4A5058}
   .et.pendiente{background:#ECEAE4;color:#4A5058}
-  .et.en_camino{background:#DCEBF7;color:var(--azul)}
   .et.hecho{background:#DDF0E3;color:var(--ok)}
   .et.no_realizado,.et.urg{background:#F8DEDA;color:#A33224}
   .et.repaso{background:#FDEBD8;color:#9A4E0B}
@@ -158,7 +157,7 @@ const fRel = (iso) => { const h = hoyISO(); return iso === h ? 'Hoy' : iso === s
 const hCorta = (h) => (h ? h.slice(0, 5) : '');
 const fHora = (ts) => { const d = new Date(ts); return `${dos(d.getDate())}/${dos(d.getMonth() + 1)} ${dos(d.getHours())}:${dos(d.getMinutes())}`; };
 const dirCompleta = (p) => [p?.direccion, p?.codigo_postal, p?.poblacion].filter(Boolean).join(', ');
-const EST = { pendiente: 'Pendiente', en_camino: 'En camino', hecho: 'Hecho', no_realizado: 'No realizado' };
+const EST = { pendiente: 'Pendiente', hecho: 'Hecho', no_realizado: 'No realizado' };
 const SELECT_ASIG = `id, fecha, hora, orden, tipo, estado, notas,
   parte:partes!asignaciones_parte_id_fkey(id, numero_servicio, asegurado, telefono, telefono2, direccion, poblacion, codigo_postal, gremio, descripcion, urgente, estado, notas_oficina, aseguradora, poliza)`;
 const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -368,7 +367,7 @@ async function cargarDia(lunes) {
   }
   listaDia = r.data || [];
   if (!listaDia.length) { cont.innerHTML = '<div class="vacio"><b>Sin servicios este día</b>Cuando la oficina te asigne algo aparecerá aquí solo.</div>'; return; }
-  const pend = listaDia.filter((a) => a.estado === 'pendiente' || a.estado === 'en_camino');
+  const pend = listaDia.filter((a) => a.estado === 'pendiente');
   const hechos = listaDia.filter((a) => a.estado === 'hecho').length;
   cont.innerHTML = `
     <div class="resumen">${listaDia.length} ${listaDia.length === 1 ? 'servicio' : 'servicios'} · ${hechos} hecho${hechos === 1 ? '' : 's'}</div>
@@ -389,7 +388,7 @@ function abrirParte(i) { ir('parte', listaDia[i]); }
 
 function abrirMapa(url) { window.open(url, '_blank', 'noopener'); }
 function abrirRuta() {
-  let dirs = listaDia.filter((a) => a.estado === 'pendiente' || a.estado === 'en_camino').map((a) => dirCompleta(a.parte));
+  let dirs = listaDia.filter((a) => a.estado === 'pendiente').map((a) => dirCompleta(a.parte));
   if (!dirs.length) return;
   if (dirs.length > 10) { aviso('Google Maps admite 10 paradas: se abren las 10 primeras'); dirs = dirs.slice(0, 10); }
   let url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dirs[dirs.length - 1])}&travelmode=driving`;
@@ -418,9 +417,8 @@ async function pintarParte() {
       ${p.descripcion ? `<div class="seccion"><h4>Descripción del trabajo</h4><div class="pre">${esc(p.descripcion)}</div></div>` : ''}
       ${a.notas || p.notas_oficina ? `<div class="seccion"><h4>Notas de la oficina</h4>${a.notas ? `<div class="pre">${esc(a.notas)}</div>` : ''}${p.notas_oficina ? `<div class="pre" style="${a.notas ? 'margin-top:8px' : ''}">${esc(p.notas_oficina)}</div>` : ''}</div>` : ''}
       <div class="pila" style="margin-top:4px">
-        ${a.estado === 'pendiente' ? `<button class="boton sec" onclick="cambiarEstado('en_camino')">🚐&nbsp; Voy en camino</button>` : ''}
         <button class="boton acento" onclick="ir('informe')">📝&nbsp; <span id="txt-inf">Hacer informe y fotos</span></button>
-        ${a.estado === 'pendiente' || a.estado === 'en_camino' ? `<button class="boton peligro" onclick="noRealizado()">No se pudo realizar</button>` : ''}
+        ${a.estado === 'pendiente' ? `<button class="boton peligro" onclick="noRealizado()">No se pudo realizar</button>` : ''}
       </div>
       <div id="mis-informes" style="margin-top:20px"></div>
     </div>`;
@@ -443,7 +441,7 @@ async function cambiarEstado(nuevo) {
   const { error } = await sb.from('asignaciones').update({ estado: nuevo }).eq('id', estado.asig.id);
   if (error) return informar('No se pudo guardar', mensaje(error));
   estado.asig = { ...estado.asig, estado: nuevo };
-  aviso(nuevo === 'en_camino' ? 'La oficina ya sabe que vas en camino' : 'Guardado');
+  aviso('Guardado');
   pintarParte();
 }
 async function noRealizado() {
