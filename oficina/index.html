@@ -289,7 +289,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.29 (Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.30 (Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -1287,6 +1287,15 @@ function verRuta(dirs) {
 // =====================================================================
 let semana = lunesDe(hoyISO());
 let arrastrando = null;
+// Evita guardar dos veces lo mismo (doble clic o pulsar otra vez mientras tarda)
+let guardandoVisita = false;
+async function sinRepetir(fn) {
+  if (guardandoVisita) return;
+  guardandoVisita = true;
+  const botones = [...document.querySelectorAll('.modal .acciones button')];
+  botones.forEach((b) => (b.disabled = true));
+  try { await fn(); } finally { guardandoVisita = false; botones.forEach((b) => (b.disabled = false)); }
+}
 
 async function vistaPlan() {
   const dias = [...Array(7)].map((_, i) => sumar(semana, i));
@@ -1361,7 +1370,10 @@ async function vistaPlan() {
 
 async function soltar(ev, td) {
   ev.preventDefault(); td.classList.remove('sobre');
-  if (!arrastrando) return;
+  if (!arrastrando || guardandoVisita) return;
+  return sinRepetir(() => soltarGuardar(td));
+}
+async function soltarGuardar(td) {
   const operario_id = td.dataset.op, fecha = td.dataset.f;
   const orden = td.querySelectorAll('.chip').length + 1;
   const a = arrastrando; arrastrando = null;
@@ -1393,7 +1405,8 @@ async function modalAsignar({ parteId = '', operarioId = '', fecha = '' } = {}) 
     <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button onclick="guardarAsignar()">Asignar</button></div>`);
   if (!partes?.length) $('#as-parte').outerHTML = '<div class="nota">No hay servicios abiertos. Crea uno con «+ Nuevo servicio» en Inicio.</div>';
 }
-async function guardarAsignar() {
+function guardarAsignar() { return sinRepetir(guardarAsignarYa); }
+async function guardarAsignarYa() {
   if (!$('#as-parte')) return;
   const fila = {
     parte_id: val('as-parte'), operario_id: val('as-op'), fecha: val('as-fecha'),
@@ -1432,7 +1445,8 @@ async function modalAsignacion(id) {
       <button onclick="guardarAsignacion('${a.id}')">Guardar</button>
     </div>`);
 }
-async function guardarAsignacion(id) {
+function guardarAsignacion(id) { return sinRepetir(() => guardarAsignacionYa(id)); }
+async function guardarAsignacionYa(id) {
   const { error } = await sb.from('asignaciones').update({
     operario_id: val('ae-op'), fecha: val('ae-fecha'), hora: val('ae-hora') || null,
     orden: Number(val('ae-orden') || 0), tipo: val('ae-tipo'), estado: val('ae-estado'), notas: val('ae-notas') || null,
