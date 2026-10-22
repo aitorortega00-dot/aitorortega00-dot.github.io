@@ -61,3 +61,21 @@ end; $$;
 drop trigger if exists asignaciones_sigma_quitar on public.asignaciones;
 create trigger asignaciones_sigma_quitar before delete on public.asignaciones
   for each row execute function public.sigma_borrador_al_quitar_visita();
+
+-- c) Quitar una visita cuyo Repaso ya se mandó a SIGMA daba «Este envío ya se ha mandado…»:
+--    la BD desengancha el envío (asignacion_id → null) y la protección lo bloqueaba.
+--    Ahora en un envío enviado solo se permite desenganchar la visita o el informe.
+create or replace function public.proteger_envio_sigma()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if old.estado in ('enviado', 'enviando') and auth.uid() is not null then
+    if (to_jsonb(new) - 'asignacion_id' - 'informe_id' - 'actualizado_en')
+       is distinct from (to_jsonb(old) - 'asignacion_id' - 'informe_id' - 'actualizado_en') then
+      raise exception 'Este envío ya se ha mandado a SIGMA y no se puede modificar';
+    end if;
+  end if;
+  if new.estado = 'aprobado' and old.estado is distinct from 'aprobado' and auth.uid() is not null then
+    new.aprobado_por := auth.uid(); new.aprobado_en := now();
+  end if;
+  return new;
+end; $$;
