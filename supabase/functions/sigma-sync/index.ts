@@ -849,8 +849,16 @@ async function estadoConfirmacion(ut: string, n: string): Promise<EstadoConfir> 
   if (ini?.success && d) {
     if (String(d.confirmed) === '1') return { estado: 'confirmado' };
     const c = d.confirmationData || {};
+    // Datos del siniestro más completos (garantía, descripción, nº de siniestro): solo lectura, si el portal los da
+    let fc: Record<string, unknown> = {}, sn: Record<string, unknown> = {};
+    try {
+      const f = await apiFnol(ut, 'fasttrack-initial-data', { reparation: n });
+      if (f?.success && f.data) { fc = f.data.confirmationData || {}; sn = f.data.sinisterData || {}; }
+    } catch { /* sin datos extra */ }
     return { estado: 'completa', datos: {
-      causa: c.cause ?? null, garantia: c.warranty || null, descripcion: c.description || null, limite: d.limitValue ?? c.limitValue ?? null,
+      grupo_causa: fc.gCause ?? sn.causesGroup ?? null, causa: c.cause ?? fc.cause ?? null, garantia: c.warranty || fc.warranty || null,
+      descripcion: c.description || fc.description || null, siniestro: sn.sinisterNumber ?? null, ocurrencia: sn.dateOccurrence ?? null,
+      limite: d.limitValue ?? c.limitValue ?? null,
       pide_contacto: String(d.clientContact) === '1', pide_primera_visita: String(d.firstVisit) === '1', leido_en: new Date().toISOString(),
     } };
   }
