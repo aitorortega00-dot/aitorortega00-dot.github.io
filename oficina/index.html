@@ -146,6 +146,10 @@
   .velo{position:fixed;inset:0;background:rgba(20,25,30,.45);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:20}
   .modal{background:#fff;border-radius:14px;width:100%;max-width:640px;padding:22px}
   .modal.ancho{max-width:860px}
+  .modal{position:relative}
+  .cerrar-x{position:absolute;top:10px;right:10px;width:32px;height:32px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--suave);font-size:18px;line-height:32px;cursor:pointer}
+  .cerrar-x:hover{background:#EFECE6;color:var(--texto)}
+  .modal h3{padding-right:36px}
   .modal h3{margin:0 0 6px}
   .modal .acciones{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap}
   .modal .acciones .esp{flex:1}
@@ -289,7 +293,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.32 (Las ventanas (Nueva línea, ficha, Asignar visita…) ya no se cierran al pulsar fuera ni al soltar el ratón fuera mientras se selecciona texto: solo con Cancelar/Cerrar o Esc; v2.31: Asignar visita: si el servicio ya tiene una visita pendiente, avisa y deja elegir «Cambiar esa visita» (operario, día, hora) o «Añadir otra visita»; v2.30: Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.33 (Ventanas: botón ✕ arriba a la derecha en lugar de Cancelar/Cerrar; v2.32: Las ventanas (Nueva línea, ficha, Asignar visita…) ya no se cierran al pulsar fuera ni al soltar el ratón fuera mientras se selecciona texto: solo con Cancelar/Cerrar o Esc; v2.31: Asignar visita: si el servicio ya tiene una visita pendiente, avisa y deja elegir «Cambiar esa visita» (operario, día, hora) o «Añadir otra visita»; v2.30: Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -329,9 +333,9 @@ function mensaje(e) {
   return m;
 }
 function fallo(e) { console.error(e); alert('Error: ' + mensaje(e)); }
-function cerrarModal() { $('#modal').innerHTML = ''; }
+function cerrarModal() { $('#modal').innerHTML = ''; if (typeof asigEnEspera !== 'undefined') asigEnEspera = null; }
 function abrirModal(html, ancho) {
-  $('#modal').innerHTML = `<div class="velo"><div class="modal ${ancho ? 'ancho' : ''}">${html}</div></div>`;
+  $('#modal').innerHTML = `<div class="velo"><div class="modal ${ancho ? 'ancho' : ''}"><button class="cerrar-x" onclick="cerrarModal()" title="Cerrar (Esc)" aria-label="Cerrar">✕</button>${html}</div></div>`;
 }
 function val(id) { return $('#' + id).value.trim(); }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if ($('#visor').innerHTML) cerrarVisor(); else cerrarModal(); } });
@@ -486,8 +490,7 @@ function modalSigma() {
         <div style="font-size:12px;color:var(--suave);margin-top:4px">${s ? (s.ok ? 'Leído ' + hace(s.fin) : '⚠️ ' + esc(s.error || 'Error')) : 'Sin datos todavía'}</div></div>`;
     }).join('')}</div>
     <div style="overflow-x:auto"><table class="lista" style="font-size:12px"><thead><tr><th>Hora</th><th>Cuenta</th><th>Resultado</th><th>En curso</th><th>Nuevos</th><th>Aceptados</th><th>Cambios</th><th>Ya no en curso</th><th>Error</th></tr></thead>
-    <tbody>${cache.sinc.slice(0, 20).map(fila).join('') || '<tr><td colspan="9" class="vacio">Sin pasadas todavía.</td></tr>'}</tbody></table></div>
-    <div class="acciones"><button onclick="cerrarModal()">Cerrar</button></div>`, true);
+    <tbody>${cache.sinc.slice(0, 20).map(fila).join('') || '<tr><td colspan="9" class="vacio">Sin pasadas todavía.</td></tr>'}</tbody></table></div>`, true);
 }
 // Teléfonos: un campo puede llevar varios «000000000 - 000000000»
 function listaTels(...vals) {
@@ -783,12 +786,11 @@ async function modalEnvio(id) {
     <label>${e.tipo === 'tramitacion' ? 'Mensaje para tramitación' : 'Comentario (es lo que verá SIGMA)'}</label><textarea id="en-com" ${dis} style="min-height:${e.tipo === 'tramitacion' ? 80 : 120}px">${esc(e.comentario || '')}</textarea>
     <div class="acciones">
       ${editable && !esNuevo ? `<button class="peligro" onclick="cambiarEnvio('${e.id}','descartado')">Descartar</button>` : ''}
-      ${esNuevo ? '<button class="sec" onclick="cerrarModal()">Cancelar</button>' : ''}
       <span class="esp"></span>
       <button class="sec" onclick="cerrarModal();modalParte('${e.parte.id}')">Ver servicio</button>
-      ${editable && e.tipo === 'repaso' && ivaBloq(e.parte) ? '<button onclick="cerrarModal()">Cerrar</button>'
+      ${editable && e.tipo === 'repaso' && ivaBloq(e.parte) ? ''
         : editable && e.tipo === 'tramitacion' && esNuevo ? `<button onclick="guardarEnvio('nuevo',true)">Enviar a tramitación</button>`
-        : editable ? `<button class="sec" onclick="guardarEnvio('${e.id}',false)">Guardar</button><button onclick="guardarEnvio('${e.id}',true)">${e.estado === 'error' ? 'Guardar y reintentar' : 'Aprobar y enviar'}</button>` : '<button onclick="cerrarModal()">Cerrar</button>'}
+        : editable ? `<button class="sec" onclick="guardarEnvio('${e.id}',false)">Guardar</button><button onclick="guardarEnvio('${e.id}',true)">${e.estado === 'error' ? 'Guardar y reintentar' : 'Aprobar y enviar'}</button>` : ''}
     </div>`, true);
   if (e.tipo === 'informar_cita') rellenarMotivosCita();
 }
@@ -1402,7 +1404,7 @@ async function modalAsignar({ parteId = '', operarioId = '', fecha = '' } = {}) 
       <div><label>Servicio Número</label><input id="as-orden" type="number" min="0" value="1"></div>
     </div>
     <label>Notas para el operario</label><textarea id="as-notas" placeholder="Llevar escalera, llaves en portería…"></textarea>
-    <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button onclick="guardarAsignar()">Asignar</button></div>`);
+    <div class="acciones"><button onclick="guardarAsignar()">Asignar</button></div>`);
   if (!partes?.length) $('#as-parte').outerHTML = '<div class="nota">No hay servicios abiertos. Crea uno con «+ Nuevo servicio» en Inicio.</div>';
 }
 function guardarAsignar() { return sinRepetir(guardarAsignarYa); }
@@ -1439,7 +1441,6 @@ function preguntarVisitaPendiente(fila, pend) {
       </div>`).join('')}
     <div class="nota">«Cambiar esta visita» la pasa al operario, día y hora elegidos (no se crea otra). «Añadir otra visita» deja las dos.</div>
     <div class="acciones">
-      <button class="sec" onclick="asigEnEspera=null;cerrarModal()">Cancelar</button>
       <span class="esp"></span>
       <button class="sec" onclick="sinRepetir(() => insertarAsignacion(asigEnEspera))">Añadir otra visita</button>
     </div>`);
@@ -1804,7 +1805,7 @@ async function modalParte(id) {
               ${p.sigma_cuenta ? `<button class="sec" onclick="cerrarModal();nuevaTramitacion('${id}')">Mensaje a tramitación</button>` : ''}
               <button class="sec" onclick="window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent('${esc(dirCompleta(p)).replace(/'/g, '')}'),'_blank')">Mapa</button>` : ''}
       <span class="esp"></span>
-      <button class="sec" onclick="cerrarModal()">Cancelar</button>
+      
       <button onclick="guardarParte(${id ? `'${id}'` : ''})">${id ? 'Guardar' : 'Crear servicio'}</button>
     </div>`);
 }

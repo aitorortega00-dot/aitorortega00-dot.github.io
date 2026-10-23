@@ -114,6 +114,10 @@
   .dif{display:inline-block;margin-left:4px;font-size:11px;font-weight:700;color:var(--peligro)}
   .pie-tabla{color:var(--suave);font-size:12px;margin-top:6px}
   .modal.grande{max-width:880px}
+  .modal{position:relative}
+  .cerrar-x{position:absolute;top:10px;right:10px;width:32px;height:32px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--suave);font-size:18px;line-height:32px;cursor:pointer}
+  .cerrar-x:hover{background:#EFECE6;color:var(--texto)}
+  .modal h3{padding-right:36px}
   .cot h4{margin:16px 0 6px;font-size:14px;display:flex;gap:8px;align-items:center}
   .cot table{font-size:12.5px;border-radius:8px}
   .cot th,.cot td{padding:5px 8px}
@@ -225,7 +229,7 @@ function claveAleatoria() {
   crypto.getRandomValues(new Uint32Array(10)).forEach((n) => (s += c[n % c.length])); return s;
 }
 function mostrar(id) { ['v-carga', 'v-login', 'v-app'].forEach((v) => $('#' + v).classList.toggle('oculto', v !== id)); }
-function abrirModal(html) { $('#modal').innerHTML = `<div class="velo"><div class="modal">${html}</div></div>`; }
+function abrirModal(html) { $('#modal').innerHTML = `<div class="velo"><div class="modal"><button class="cerrar-x" onclick="cerrarModal()" title="Cerrar (Esc)" aria-label="Cerrar">✕</button>${html}</div></div>`; }
 function cerrarModal() { $('#modal').innerHTML = ''; }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarModal(); });
 
@@ -324,7 +328,7 @@ function modalCuenta(id) {
       <div class="check" style="margin-top:34px"><input type="checkbox" id="m-activo" ${c.activo ? 'checked' : ''} ${soyYo ? 'disabled' : ''}><span>Cuenta activa</span></div>
     </div>
     <div id="m-error" class="error"></div>
-    <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button id="m-btn" onclick="guardar(${id ? `'${id}'` : ''})">${id ? 'Guardar cambios' : 'Crear cuenta'}</button></div>`);
+    <div class="acciones"><button id="m-btn" onclick="guardar(${id ? `'${id}'` : ''})">${id ? 'Guardar cambios' : 'Crear cuenta'}</button></div>`);
 }
 async function guardar(id) {
   const c = id ? cuentas.find((x) => x.id === id) : null;
@@ -355,8 +359,7 @@ async function guardar(id) {
         <p class="sub">Datos de acceso para enviar a ${esc(nombre)}:</p>
         <textarea id="m-msg">${esc(msg)}</textarea>
         <div class="acciones"><button class="sec" onclick="navigator.clipboard?.writeText($('#m-msg').value).then(()=>aviso('Copiado'))">Copiar</button>
-        <button class="sec" onclick="window.open('https://wa.me/?text='+encodeURIComponent($('#m-msg').value),'_blank')">WhatsApp</button>
-        <button onclick="cerrarModal()">Hecho</button></div>`);
+        <button class="sec" onclick="window.open('https://wa.me/?text='+encodeURIComponent($('#m-msg').value),'_blank')">WhatsApp</button></div>`);
     } else { cerrarModal(); aviso('Cambios guardados'); }
   } catch (e) { $('#m-error').textContent = mensaje(e); $('#m-btn').disabled = false; }
 }
@@ -558,7 +561,7 @@ function modalLinea(id) {
     ${x.factura_importe != null ? `<p class="sub">Importe en la factura de compañía: <b>${eur(x.factura_importe)}</b></p>` : ''}
     <div id="m-error" class="error"></div>
     <div class="acciones">${id ? `<button class="sec" style="border-color:var(--peligro);color:var(--peligro);margin-right:auto" onclick="borrarLinea('${id}')">Borrar</button>` : ''}
-      <button class="sec" onclick="cerrarModal()">Cancelar</button><button onclick="guardarLinea(${id ? `'${id}'` : ''})">${id ? 'Guardar' : 'Añadir'}</button></div>`);
+      <button onclick="guardarLinea(${id ? `'${id}'` : ''})">${id ? 'Guardar' : 'Añadir'}</button></div>`);
 }
 async function guardarLinea(id) {
   const imp = $('#l-imp').value.trim(), gasto = $('#l-gasto').value.trim();
@@ -682,7 +685,7 @@ async function subirFactura(inp) {
     if (!f.numero || !f.lineas.length) throw new Error('No parece una factura de SIGMA (no se encontró el nº de factura o las líneas de servicios).');
     cotejo = cotejar(f);
     pintarCotejo();
-  } catch (e) { abrirModal(`<h3>No se pudo leer</h3><p class="error">${esc(mensaje(e))}</p><div class="acciones"><button onclick="cerrarModal()">Cerrar</button></div>`); }
+  } catch (e) { abrirModal(`<h3>No se pudo leer</h3><p class="error">${esc(mensaje(e))}</p>`); }
 }
 function cotejar(f) {
   const usadas = new Set();
@@ -761,7 +764,7 @@ function pintarCotejo() {
       <td>${x.importe == null ? '<i>sin importe</i>' : eur(x.importe)}</td><td style="white-space:normal">${esc(x.comentario || x.importe_nota || '')}</td></tr>`).join('')) : '<p class="sub">Ninguno 🎉</p>'}
 
     <div id="m-error" class="error"></div>
-    <div class="acciones"><button class="sec" onclick="cerrarModal()">Cancelar</button><button id="btn-aplicar" onclick="aplicarCotejo()">Aplicar y liquidar</button></div>
+    <div class="acciones"><button id="btn-aplicar" onclick="aplicarCotejo()">Aplicar y liquidar</button></div>
   </div>`);
   $('#modal .modal').classList.add('grande');
 }
