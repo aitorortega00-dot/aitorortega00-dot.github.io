@@ -225,7 +225,7 @@ function claveAleatoria() {
   crypto.getRandomValues(new Uint32Array(10)).forEach((n) => (s += c[n % c.length])); return s;
 }
 function mostrar(id) { ['v-carga', 'v-login', 'v-app'].forEach((v) => $('#' + v).classList.toggle('oculto', v !== id)); }
-function abrirModal(html) { $('#modal').innerHTML = `<div class="velo" onclick="if(event.target===this)cerrarModal()"><div class="modal">${html}</div></div>`; }
+function abrirModal(html) { $('#modal').innerHTML = `<div class="velo"><div class="modal">${html}</div></div>`; }
 function cerrarModal() { $('#modal').innerHTML = ''; }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarModal(); });
 
