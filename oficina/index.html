@@ -293,7 +293,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.33 (Ventanas: botón ✕ arriba a la derecha en lugar de Cancelar/Cerrar; v2.32: Las ventanas (Nueva línea, ficha, Asignar visita…) ya no se cierran al pulsar fuera ni al soltar el ratón fuera mientras se selecciona texto: solo con Cancelar/Cerrar o Esc; v2.31: Asignar visita: si el servicio ya tiene una visita pendiente, avisa y deja elegir «Cambiar esa visita» (operario, día, hora) o «Añadir otra visita»; v2.30: Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.34 (Sin parpadeos: al marcar revisado, guardar o recibir cambios de otro ordenador/del robot ya no se vacía y repinta la página entera ni se recargan las fotos; solo cambia lo que ha cambiado; v2.33: Ventanas: botón ✕ arriba a la derecha en lugar de Cancelar/Cerrar; v2.32: Las ventanas (Nueva línea, ficha, Asignar visita…) ya no se cierran al pulsar fuera ni al soltar el ratón fuera mientras se selecciona texto: solo con Cancelar/Cerrar o Esc; v2.31: Asignar visita: si el servicio ya tiene una visita pendiente, avisa y deja elegir «Cambiar esa visita» (operario, día, hora) o «Añadir otra visita»; v2.30: Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -338,6 +338,68 @@ function abrirModal(html, ancho) {
   $('#modal').innerHTML = `<div class="velo"><div class="modal ${ancho ? 'ancho' : ''}"><button class="cerrar-x" onclick="cerrarModal()" title="Cerrar (Esc)" aria-label="Cerrar">✕</button>${html}</div></div>`;
 }
 function val(id) { return $('#' + id).value.trim(); }
+
+// ---------- Repintado sin parpadeo (v2.34) ----------
+// Antes cada cambio (propio o de otro ordenador, por tiempo real) vaciaba la página con «Cargando…»
+// y la volvía a escribir entera, con enlaces de fotos nuevos → parpadeo y fotos recargadas.
+// Ahora: el armazón de cada página se reutiliza y las listas se «parchean»: solo cambia lo que cambia.
+function esqueleto(firma, html) {
+  const c = $('#contenido');
+  if (c.firstElementChild?.dataset.firma === firma && c.children.length === 1) return false;
+  c.innerHTML = `<div data-firma="${esc(firma)}">${html}</div>`;
+  return true;
+}
+function morfar(el, html) {
+  if (!el) return;
+  const t = document.createElement('template'); t.innerHTML = html;
+  parchearHijos(el, t.content);
+}
+const _compat = (x, y) => x.nodeType === y.nodeType && x.nodeName === y.nodeName && (x.nodeType !== 1 || (x.id === y.id && !x.dataset.k));
+function parchearHijos(a, b) {
+  const libres = new Map();
+  for (const n of a.childNodes) if (n.nodeType === 1 && n.dataset.k) libres.set(n.dataset.k, n);
+  let cur = a.firstChild;
+  for (const y of [...b.childNodes]) {
+    const k = y.nodeType === 1 ? y.dataset.k : null;
+    let x = null;
+    if (k) { x = libres.get(k) || null; libres.delete(k); }
+    else if (cur && _compat(cur, y)) x = cur;
+    if (!x && !k && cur && !(cur.nodeType === 1 && cur.dataset.k)) { const s = cur.nextSibling; a.replaceChild(y, cur); cur = s; continue; } // sustituye uno por otro
+    if (!x) { a.insertBefore(y, cur); continue; }
+    if (x === cur) cur = cur.nextSibling; else a.insertBefore(x, cur);
+    parchear(x, y);
+  }
+  while (cur) { const s = cur.nextSibling; cur.remove(); cur = s; }
+}
+function parchear(x, y) {
+  if (x.nodeType !== 1) { if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; return; }
+  for (const at of [...x.attributes]) if (!y.hasAttribute(at.name)) x.removeAttribute(at.name);
+  for (const at of y.attributes) if (x.getAttribute(at.name) !== at.value) x.setAttribute(at.name, at.value);
+  const tag = x.tagName;
+  if (tag === 'TEXTAREA') { if (x !== document.activeElement) x.value = y.textContent; return; }
+  if (tag === 'SELECT') {
+    if (x === document.activeElement) return;
+    if (x.innerHTML !== y.innerHTML) x.innerHTML = y.innerHTML;
+    const s = y.querySelector('option[selected]'); if (s) x.value = s.value;
+    return;
+  }
+  if (tag === 'INPUT') {
+    if (x !== document.activeElement) { if (x.type === 'checkbox' || x.type === 'radio') x.checked = y.hasAttribute('checked'); else x.value = y.getAttribute('value') ?? ''; }
+    return;
+  }
+  parchearHijos(x, y);
+}
+// Enlaces firmados de fotos: se reutilizan mientras les quede ≥ 10 min (si cambian, el navegador vuelve a bajar la foto)
+const _urlFotos = new Map();
+async function firmarFotos(rutas) {
+  const ahora = Date.now(), urls = {}, faltan = [];
+  for (const r of new Set(rutas)) { const c = _urlFotos.get(r); if (c && c.hasta - ahora > 600000) urls[r] = c.url; else faltan.push(r); }
+  if (faltan.length) {
+    const { data } = await sb.storage.from('fotos').createSignedUrls(faltan, 3600);
+    (data || []).forEach((x) => { if (x.signedUrl) { urls[x.path] = x.signedUrl; _urlFotos.set(x.path, { url: x.signedUrl, hasta: ahora + 3600000 }); } });
+  }
+  return urls;
+}
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if ($('#visor').innerHTML) cerrarVisor(); else cerrarModal(); } });
 
 // ---------- Conexión ----------
@@ -624,22 +686,22 @@ function alCambioEnvio(p) {
 async function vistaEnvios() {
   const grupos = { revisar: ['borrador', 'error'], cola: ['aprobado', 'enviando'], enviados: ['enviado'], descartados: ['descartado'] };
   const nombres = { revisar: 'Por revisar', cola: 'En cola', enviados: 'Enviados', descartados: 'Descartados' };
-  $('#contenido').innerHTML = `
+  esqueleto('envios:' + filtroEnvios, `
     <div class="barra"><h2>Envíos a SIGMA</h2>
       <div class="pest">${Object.keys(grupos).map((g) => `<button class="mini ${g === filtroEnvios ? 'activo' : ''}" onclick="filtroEnvios='${g}';vistaEnvios()">${nombres[g]}</button>`).join('')}</div>
       <span class="esp"></span>
       ${filtroEnvios === 'revisar' ? '<button class="sec" onclick="aprobarTodos()">Aprobar todos los correctos</button>' : ''}
     </div>
     <p style="color:var(--suave);margin-top:-6px">Se preparan solos al planificar visitas y al recibir informes. Revisa, corrige lo que quieras y pulsa <b>Aprobar y enviar</b>: el robot lo graba en el portal en ese momento. “Informar citas” usa siempre la fecha y hora citadas.</p>
-    <div id="lista-envios">Cargando…</div>`;
+    <div id="lista-envios">Cargando…</div>`);
   let q = sb.from('sigma_envios').select('*, parte:partes(id, numero_servicio, direccion, poblacion, estado, sigma_cuenta, sigma_alerta, sigma_estado, sigma_iva_pendiente)')
     .in('estado', grupos[filtroEnvios]).order('creado_en', { ascending: filtroEnvios === 'revisar' || filtroEnvios === 'cola' });
   if (filtroEnvios === 'enviados' || filtroEnvios === 'descartados') q = q.limit(60);
   const { data, error } = await q;
   if (error) return fallo(error);
-  $('#lista-envios').innerHTML = (data || []).map((e) => {
+  morfar($('#lista-envios'), (data || []).map((e) => {
     const problema = validarEnvio(e);
-    return `<div class="tarjeta envio" onclick="modalEnvio('${e.id}')">
+    return `<div class="tarjeta envio" data-k="${e.id}" onclick="modalEnvio('${e.id}')">
       <div class="d">
         <div class="t">${esc(e.parte?.numero_servicio)} ${etiquetaSigma(e.parte || {})} <span class="et ${e.estado}">${TXT_ENVIO[e.estado]}</span></div>
         <div>${esc(tituloEnvio(e))}</div>
@@ -652,7 +714,7 @@ async function vistaEnvios() {
         <button class="mini" ${problema ? 'disabled' : ''} onclick="cambiarEnvio('${e.id}','aprobado')">${e.estado === 'error' ? 'Reintentar' : 'Aprobar y enviar'}</button>
         <button class="mini peligro" onclick="cambiarEnvio('${e.id}','descartado')">Descartar</button></div>` : ''}
     </div>`;
-  }).join('') || '<div class="tarjeta vacio">No hay envíos aquí.</div>';
+  }).join('') || '<div class="tarjeta vacio">No hay envíos aquí.</div>');
 }
 // Fecha a formato de <input type="datetime-local"> (hora local del navegador)
 function aLocal(d) { const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`; }
@@ -885,13 +947,13 @@ async function vistaHoy() {
   const lista = asig.data || [];
   const hechas = lista.filter((a) => a.estado === 'hecho').length;
   const noReal = lista.filter((a) => a.estado === 'no_realizado').length;
-  $('#kpis').innerHTML = `
+  morfar($('#kpis'), `
     <a class="kpi" href="#inicio" title="Servicios abiertos (pendientes, asignados, en curso y terminados)" onclick="filtroPartes.estado='abiertos';if($('#fp-estado')){$('#fp-estado').value='abiertos';cargarPartes()}$('#inicio-partes')?.scrollIntoView({behavior:'smooth'});return false"><div class="n">${totalServ.count ?? 0}</div><div class="t">Total servicios</div></a>
     <a class="kpi ${nuevosHoy.count ? 'alerta' : ''}" href="#inicio" title="Servicios que SIGMA nos ha asignado hoy (desde las 00:00)" onclick="verNuevos();return false"><div class="n">${nuevosHoy.count ?? 0}</div><div class="t">Nuevos hoy</div></a>
     <a class="kpi" href="#plan"><div class="n">${hechas}/${lista.length}</div><div class="t">Visitas hechas hoy</div></a>
     <a class="kpi ${noReal ? 'mal' : ''}" href="#plan"><div class="n">${noReal}</div><div class="t">No realizadas hoy</div></a>
     <a class="kpi ${sinRev.count ? 'alerta' : ''}" href="#informes"><div class="n">${sinRev.count ?? 0}</div><div class="t">Informes sin revisar</div></a>
-    <a class="kpi ${urg.count ? 'mal' : ''}" href="#inicio" onclick="filtroPartes.estado='abiertos';$('#inicio-partes')?.scrollIntoView({behavior:'smooth'});return false"><div class="n">${urg.count ?? 0}</div><div class="t">Urgentes abiertos</div></a>`;
+    <a class="kpi ${urg.count ? 'mal' : ''}" href="#inicio" onclick="filtroPartes.estado='abiertos';$('#inicio-partes')?.scrollIntoView({behavior:'smooth'});return false"><div class="n">${urg.count ?? 0}</div><div class="t">Urgentes abiertos</div></a>`);
 }
 
 // =====================================================================
@@ -1015,7 +1077,7 @@ function tarjetaCad(p, carril) {
   }
   const salto = carrilAntes.has(p.id) && carrilAntes.get(p.id) !== carril;
   const bloq = ivaBloq(p) && carril !== 'resuelta';
-  return `<div class="cad ${salto ? 'salto' : ''} ${bloq ? 'bloq' : ''}" ${bloq ? `title="${esc(txtBloq(p))}"` : `onclick="modalParte('${p.id}')"`}>
+  return `<div class="cad ${salto ? 'salto' : ''} ${bloq ? 'bloq' : ''}" data-k="${p.id}" ${bloq ? `title="${esc(txtBloq(p))}"` : `onclick="modalParte('${p.id}')"`}>
     <div class="l1">${p.sigma_alerta ? `<span class="punto ${p.sigma_alerta}" title="Alerta ${p.sigma_alerta}"></span>` : ''}<b>${esc(p.numero_servicio)}</b>
       ${etiquetaAntig(p)} ${p.urgente ? '<span class="et urg">URG</span>' : ''}<span class="esp"></span>
       ${g ? `<span class="et gr g-${p.sigma_cad_grupo}">${g.nombre}</span>` : ''}<span class="et sigma">SIGMA ${p.sigma_cuenta === 'PAL' ? 'PALENCIA' : 'VALLADOLID'}</span></div>
@@ -1061,8 +1123,8 @@ function pintarTableroCad() {
     <div class="s">${ayuda}</div>
     <div class="progreso" title="${r.res} de ${r.tot} resueltas hoy"><div style="width:${r.tot ? Math.round((r.res / r.tot) * 100) : 0}%"></div></div>
     <div class="s">${r.res} de ${r.tot} resueltas hoy</div></button>`;
-  $('#cad-grupos').innerHTML = tile('todas', 'Todas', 'Caducadas o caducan hoy', resumen(todas))
-    + Object.entries(GRUPOS_CAD).map(([id, g]) => tile(id, g.nombre, g.ayuda, resumen(todas.filter((p) => p.sigma_cad_grupo === id)))).join('');
+  morfar($('#cad-grupos'), tile('todas', 'Todas', 'Caducadas o caducan hoy', resumen(todas))
+    + Object.entries(GRUPOS_CAD).map(([id, g]) => tile(id, g.nombre, g.ayuda, resumen(todas.filter((p) => p.sigma_cad_grupo === id)))).join(''));
 
   const ult = Object.values(ultimaSigma()).map((s) => s.fin).sort().pop();
   $('#cad-leido').textContent = ult ? `Portal leído ${hace(ult)} · se actualiza solo cada 15 min` : '';
@@ -1070,15 +1132,15 @@ function pintarTableroCad() {
   const lista = todas.filter((p) => !filtroCadGrupo || p.sigma_cad_grupo === filtroCadGrupo);
   const orden = { rojo: 0, amarillo: 1, verde: 2 };
   if (!todas.length) {
-    $('#cad-tablero').innerHTML = filtroAntig.startsWith('solo_') ? '<div class="tarjeta vacio">No hay servicios con este filtro.</div>' : '<div class="tarjeta vacio">No hay servicios caducados ni que caduquen hoy. 👍<br><small>Si acabas de activar esta vista, aparecerán tras la próxima lectura del portal.</small></div>';
+    morfar($('#cad-tablero'), filtroAntig.startsWith('solo_') ? '<div class="tarjeta vacio">No hay servicios con este filtro.</div>' : '<div class="tarjeta vacio">No hay servicios caducados ni que caduquen hoy. 👍<br><small>Si acabas de activar esta vista, aparecerán tras la próxima lectura del portal.</small></div>');
   } else {
-    $('#cad-tablero').innerHTML = `<div class="carriles">${CARRILES_CAD.map(([id, nombre, ayuda]) => {
+    morfar($('#cad-tablero'), `<div class="carriles">${CARRILES_CAD.map(([id, nombre, ayuda]) => {
       const en = lista.filter((p) => p.carril === id).sort(id === 'resuelta'
         ? (a, b) => b.sigma_cad_hasta.localeCompare(a.sigma_cad_hasta)
         : (a, b) => (ivaBloq(a) - ivaBloq(b)) || ordenAntig(a, b) || (b.urgente - a.urgente) || ((orden[a.sigma_alerta] ?? 3) - (orden[b.sigma_alerta] ?? 3)) || ((b.sigma_caducidad ?? -99) - (a.sigma_caducidad ?? -99)));
       return `<section class="carril c-${id}"><h3>${nombre}<span class="n">${en.length}</span></h3><p>${ayuda}</p>
         ${en.map((p) => tarjetaCad(p, id)).join('') || '<div class="vacio" style="padding:10px;font-size:12px">—</div>'}</section>`;
-    }).join('')}</div>`;
+    }).join('')}</div>`);
   }
   // Avisar de lo que acaba de cambiar de carril y recordar el carril de cada uno
   for (const p of todas) {
@@ -1130,14 +1192,14 @@ async function pintarSinContacto(destino) {
   const lista = filtrarAntig((data || []).map(conLocales).map((p) => ({ ...p, plazo: plazoContacto(p) })))
     .sort((a, b) => (ivaBloq(a) - ivaBloq(b)) || ordenAntig(a, b) || (b.urgente - a.urgente) || ((a.plazo?.getTime() ?? 9e15) - (b.plazo?.getTime() ?? 9e15)) || ((a.sigma_caducidad ?? 999) - (b.sigma_caducidad ?? 999)));
   const hoy = hoyISO();
-  $('#sc-lista').innerHTML = lista.length ? `
+  morfar($('#sc-lista'), lista.length ? `
     <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nº servicio</th><th>Cliente y teléfono</th><th>Dirección</th><th class="opc">Gremio</th><th>Plazo SIGMA</th><th>En la lista desde</th><th></th></tr></thead>
     <tbody>${lista.map((p) => {
       const tels = listaTels(p.telefono, p.telefono2);
       const pendEnvio = (p.sigma_envios || []).some((e) => e.tipo === 'repaso' && ['borrador', 'aprobado', 'enviando'].includes(e.estado));
       const prox = proximaVisita(p, hoy);
       const bloq = ivaBloq(p);
-      return `<tr class="${bloq ? 'bloq' : 'clic'}" ${bloq ? `title="${esc(txtBloq(p))}"` : `onclick="modalParte('${p.id}')"`}>
+      return `<tr data-k="${p.id}" class="${bloq ? 'bloq' : 'clic'}" ${bloq ? `title="${esc(txtBloq(p))}"` : `onclick="modalParte('${p.id}')"`}>
         <td><b>${esc(p.numero_servicio)}</b> ${etiquetaAntig(p)} ${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
         <td>${esc(p.asegurado || '—')}${tels.map((t) => `<br><a href="tel:${esc(t)}" onclick="event.stopPropagation()">${esc(t)}</a>`).join('')}</td>
         <td>${esc(p.direccion)}${p.poblacion ? '<br><small style="color:var(--suave)">' + esc(p.poblacion) + '</small>' : ''}</td>
@@ -1151,7 +1213,7 @@ async function pintarSinContacto(destino) {
       </tr>`;
     }).join('')}</tbody></table></div>
     <p style="color:var(--suave);font-size:12px">${lista.length} servicio(s) sin primer contacto</p>`
-    : filtroAntig.startsWith('solo_') ? '<div class="tarjeta vacio">No hay servicios con este filtro.</div>' : '<div class="tarjeta vacio">No hay servicios pendientes de primer contacto. 👍</div>';
+    : filtroAntig.startsWith('solo_') ? '<div class="tarjeta vacio">No hay servicios con este filtro.</div>' : '<div class="tarjeta vacio">No hay servicios pendientes de primer contacto. 👍</div>');
 }
 
 // =====================================================================
@@ -1244,12 +1306,12 @@ function pintarPresupuestos() {
   const base = datosPtto.filter((p) => (!filtroPttoCuenta || p.sigma_cuenta === filtroPttoCuenta) && (!filtroPttoGremio || p.sigma_gremio === filtroPttoGremio));
   const de = (f) => base.filter((p) => f.estados.includes(p.sigma_ptto_estado));
   const sinLeer = base.filter((p) => !p.sigma_ptto_estado).length;
-  $('#ptto-filtros').innerHTML = FILTROS_PTTO.map((f) => {
+  morfar($('#ptto-filtros'), FILTROS_PTTO.map((f) => {
     const n = de(f).length;
     const bloq = f.id === 'sin_valorar' ? de(f).filter((p) => p.sigma_ptto_estado === 'bloqueado').length : 0;
     return `<button class="cad-g p-${f.id} ${filtroPtto === f.id ? 'activo' : ''}" onclick="filtroPtto='${f.id}';pintarPresupuestos()">
       <div class="t">${f.nombre}</div><div class="n">${n}</div><div class="s">${f.ayuda}${bloq ? ` · ${bloq} bloqueado${bloq > 1 ? 's' : ''} por el portal` : ''}</div></button>`;
-  }).join('');
+  }).join(''));
   $('#ptto-leido').textContent = 'Se lee del portal cada 30 min';
   const f = FILTROS_PTTO.find((x) => x.id === filtroPtto) || FILTROS_PTTO[0];
   // Orden: rechazados y enviados por la fecha de la última decisión (los más viejos primero); el resto por antigüedad del servicio
@@ -1257,11 +1319,11 @@ function pintarPresupuestos() {
     || (f.id === 'sin_valorar' ? (a.sigma_ptto_estado === 'bloqueado') - (b.sigma_ptto_estado === 'bloqueado') : 0)
     || ((fechaAsig(a)?.getTime() ?? 0) - (fechaAsig(b)?.getTime() ?? 0)));
   const portal = (n) => `https://web.multiasistencia.com/w3multi/valprincipal.php?reparacion=${encodeURIComponent(n)}&modo=0`;
-  $('#ptto-lista').innerHTML = (lista.length ? `
+  morfar($('#ptto-lista'), (lista.length ? `
     <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nº servicio</th><th>Cliente</th><th>Dirección</th><th class="opc">Gremio</th><th>Presupuesto</th><th>En este estado</th><th></th></tr></thead>
     <tbody>${lista.map((p) => {
       const tels = listaTels(p.telefono, p.telefono2);
-      return `<tr class="clic p-${grupoPtto(p.sigma_ptto_estado)}" onclick="modalParte('${p.id}')">
+      return `<tr data-k="${p.id}" class="clic p-${grupoPtto(p.sigma_ptto_estado)}" onclick="modalParte('${p.id}')">
         <td><b>${esc(p.numero_servicio)}</b> ${etiquetaAntig(p)} ${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
         <td>${esc(p.asegurado || '—')}${tels.slice(0, 1).map((t) => `<br><a href="tel:${esc(t)}" onclick="event.stopPropagation()">${esc(t)}</a>`).join('')}</td>
         <td>${esc(p.direccion)}${p.poblacion ? '<br><small style="color:var(--suave)">' + esc(p.poblacion) + '</small>' : ''}</td>
@@ -1273,7 +1335,7 @@ function pintarPresupuestos() {
     }).join('')}</tbody></table></div>
     <p style="color:var(--suave);font-size:12px">${lista.length} servicio(s) · ${esc(f.nombre.toLowerCase())}</p>`
     : `<div class="tarjeta vacio">No hay servicios en «${esc(f.nombre)}» con estos filtros.</div>`)
-    + (sinLeer ? `<p style="color:var(--suave);font-size:12px">${sinLeer} servicio(s) de estos gremios aún sin leer del portal: aparecerán tras la próxima lectura.</p>` : '');
+    + (sinLeer ? `<p style="color:var(--suave);font-size:12px">${sinLeer} servicio(s) de estos gremios aún sin leer del portal: aparecerán tras la próxima lectura.</p>` : ''));
 }
 
 function verRuta(dirs) {
@@ -1302,7 +1364,7 @@ async function sinRepetir(fn) {
 async function vistaPlan() {
   const dias = [...Array(7)].map((_, i) => sumar(semana, i));
   const hoy = hoyISO();
-  $('#contenido').innerHTML = `
+  esqueleto('plan:' + semana + ':' + hoy, `
     <div class="barra">
       <h2>Planificación</h2>
       <button class="sec" onclick="semana=sumar(semana,-7);vistaPlan()">‹ Anterior</button>
@@ -1324,7 +1386,7 @@ async function vistaPlan() {
           <span style="--c:var(--ok)">Hecho</span><span style="--c:var(--peligro)">Urgente / No realizado</span>
         </div>
       </div>
-    </div>`;
+    </div>`);
 
   const [asig, sinPlan] = await Promise.all([
     sb.from('asignaciones')
@@ -1336,21 +1398,21 @@ async function vistaPlan() {
   ]);
   if (asig.error) return fallo(asig.error);
 
-  $('#sin-plan').innerHTML = (sinPlan.data || []).map((p) => `
-    <div class="chip ${p.urgente ? 'urgente' : ''}" draggable="true"
+  morfar($('#sin-plan'), (sinPlan.data || []).map((p) => `
+    <div class="chip ${p.urgente ? 'urgente' : ''}" data-k="${p.id}" draggable="true"
          ondragstart="arrastrando={tipo:'parte',id:'${p.id}'}" onclick="modalAsignar({parteId:'${p.id}'})">
       <b>${p.sigma_alerta ? `<span class="punto ${p.sigma_alerta}" title="Alerta SIGMA"></span>` : ''}${esc(p.numero_servicio)} ${p.urgente ? '· URGENTE' : ''}</b>
       <div class="dir">${esc(p.direccion)}${p.poblacion ? ', ' + esc(p.poblacion) : ''}</div>
       <div class="dir">${esc([p.compania?.nombre, p.gremio].filter(Boolean).join(' · '))}</div>
-    </div>`).join('') || '<div class="vacio">No hay servicios pendientes 🎉</div>';
+    </div>`).join('') || '<div class="vacio">No hay servicios pendientes 🎉</div>');
 
   if (!cache.operarios.length) {
-    $('#filas').innerHTML = `<tr><td colspan="8" class="vacio">No hay operarios todavía. Créalos en el panel de administrador.</td></tr>`;
+    morfar($('#filas'), `<tr><td colspan="8" class="vacio">No hay operarios todavía. Créalos en el panel de administrador.</td></tr>`);
     return;
   }
   const porCelda = {};
   (asig.data || []).forEach((a) => { (porCelda[a.operario_id + '|' + a.fecha] ??= []).push(a); });
-  $('#filas').innerHTML = cache.operarios.map((op) => `
+  morfar($('#filas'), cache.operarios.map((op) => `
     <tr><td class="op">${esc(op.nombre)}</td>
     ${dias.map((d) => {
       const lista = porCelda[op.id + '|' + d] || [];
@@ -1359,7 +1421,7 @@ async function vistaPlan() {
                  ondragleave="this.classList.remove('sobre')"
                  ondrop="soltar(event,this)">
         ${lista.map((a) => `
-          <div class="chip ${a.estado} ${a.parte?.urgente ? 'urgente' : ''}" draggable="true"
+          <div class="chip ${a.estado} ${a.parte?.urgente ? 'urgente' : ''}" data-k="${a.id}" draggable="true"
                ondragstart="arrastrando={tipo:'asig',id:'${a.id}'}" onclick="modalAsignacion('${a.id}')"
                title="${esc(a.parte?.direccion)}">
             <b>${hCorta(a.hora) ? hCorta(a.hora) + ' · ' : ''}${esc(a.parte?.numero_servicio)}${a.tipo === 'repaso' ? ' · R' : ''}</b>
@@ -1367,7 +1429,7 @@ async function vistaPlan() {
           </div>`).join('')}
         <button class="anadir" onclick="modalAsignar({operarioId:'${op.id}',fecha:'${d}'})">+</button>
       </td>`;
-    }).join('')}</tr>`).join('');
+    }).join('')}</tr>`).join(''));
 }
 
 async function soltar(ev, td) {
@@ -1715,12 +1777,12 @@ async function cargarPartes() {
   if (error) return fallo(error);
   ultimosPartes = data;
   const hoy = hoyISO();
-  $('#tabla-partes').innerHTML = data.length ? `
+  morfar($('#tabla-partes'), data.length ? `
     <div style="overflow-x:auto"><table class="lista"><thead><tr><th>Nº servicio</th><th class="opc">Compañía</th><th>Dirección</th><th class="opc">Cliente</th><th class="opc">Gremio</th><th>Estado</th><th>Próxima visita</th></tr></thead>
     <tbody>${data.map((p) => {
       const prox = proximaVisita(p, hoy);
       const nuevo = esNuevoHoy(p);
-      return `<tr class="clic${nuevo ? ' nuevo-hoy' : ''}" onclick="modalParte('${p.id}')">
+      return `<tr data-k="${p.id}" class="clic${nuevo ? ' nuevo-hoy' : ''}" onclick="modalParte('${p.id}')">
         <td><b>${esc(p.numero_servicio)}</b> ${nuevo ? `<span class="et nuevo" title="Asignado hoy a las ${horaAsignacion(p)}">NUEVO</span> ` : ''}${p.urgente ? '<span class="et urg">URG</span>' : ''}<br>${etiquetaSigma(p)}</td>
         <td class="opc">${esc(p.compania?.nombre)}</td>
         <td>${esc(p.direccion)}${p.poblacion ? '<br><small style="color:var(--suave)">' + esc(p.poblacion) + '</small>' : ''}</td>
@@ -1730,7 +1792,7 @@ async function cargarPartes() {
         <td>${prox ? fCorta(prox.fecha) + (prox.hora ? ' ' + prox.hora : '') + '<br><small style="color:var(--suave)">' + esc(quienProx(prox)) + '</small>' : '—'}</td>
       </tr>`;
     }).join('')}</tbody></table></div>
-    <p style="color:var(--suave);font-size:12px">${data.length} servicio(s)${data.length === 300 ? ' (máximo 300; afina la búsqueda)' : ''}</p>` : '<div class="tarjeta vacio">No hay servicios con ese filtro.</div>';
+    <p style="color:var(--suave);font-size:12px">${data.length} servicio(s)${data.length === 300 ? ' (máximo 300; afina la búsqueda)' : ''}</p>` : '<div class="tarjeta vacio">No hay servicios con ese filtro.</div>');
 }
 function exportarPartes() {
   const cols = ['compania', 'numero_servicio', 'estado', 'urgente', 'gremio', 'asegurado', 'telefono', 'telefono2', 'telefono_perjudicado', 'telefono_perjudicado2', 'direccion', 'codigo_postal', 'poblacion', 'descripcion', 'creado_en'];
@@ -1851,12 +1913,12 @@ let fotosVisor = [], idxVisor = 0, fotosInforme = {};
 
 async function vistaInformes() {
   const f = filtroInformes;
-  $('#contenido').innerHTML = `
+  esqueleto('informes:' + (f.parte || '') + ':' + f.soloNuevos, `
     <div class="barra"><h2>Informes de operarios</h2>
       ${f.parte ? `<button class="sec" onclick="filtroInformes={parte:null,soloNuevos:false};vistaInformes()">← Ver todos</button>` : `
         <label class="check" style="margin:0;text-transform:none;font-size:14px;color:var(--texto)"><input type="checkbox" id="fi-nuevos" ${f.soloNuevos ? 'checked' : ''}> Solo sin revisar</label>`}
       <span class="esp"></span><button class="sec" onclick="marcarTodosRevisados()">Marcar todos como revisados</button>
-    </div><div id="lista-inf">Cargando…</div>`;
+    </div><div id="lista-inf">Cargando…</div>`);
   if ($('#fi-nuevos')) $('#fi-nuevos').onchange = (e) => { filtroInformes.soloNuevos = e.target.checked; vistaInformes(); };
   let q = sb.from('informes')
     .select('*, parte:partes!informes_parte_id_fkey(id, numero_servicio, direccion, poblacion, compania:companias(nombre)), fotos!fotos_informe_id_fkey(id, tipo, ruta)')
@@ -1865,19 +1927,14 @@ async function vistaInformes() {
   else if (f.soloNuevos) q = q.eq('revisado', false);
   const { data, error } = await q;
   if (error) return fallo(error);
-  if (!data.length) { $('#lista-inf').innerHTML = `<div class="tarjeta vacio">${f.soloNuevos ? 'No hay informes sin revisar 👍' : 'Todavía no hay informes.'}</div>`; return; }
+  if (!data.length) { morfar($('#lista-inf'), `<div class="tarjeta vacio">${f.soloNuevos ? 'No hay informes sin revisar 👍' : 'Todavía no hay informes.'}</div>`); return; }
 
-  const rutas = data.flatMap((i) => i.fotos.map((x) => x.ruta));
-  const urls = {};
-  if (rutas.length) {
-    const { data: firmadas } = await sb.storage.from('fotos').createSignedUrls(rutas, 3600);
-    (firmadas || []).forEach((x) => { if (x.signedUrl) urls[x.path] = x.signedUrl; });
-  }
+  const urls = await firmarFotos(data.flatMap((i) => i.fotos.map((x) => x.ruta)));
   const orden = { antes: 0, despues: 1, factura: 2 };
   fotosVisor = []; fotosInforme = {};
   data.forEach((i) => { fotosInforme[i.id] = { servicio: i.parte.numero_servicio, fecha: i.creado_en, fotos: [...i.fotos].sort((a, b) => orden[a.tipo] - orden[b.tipo]).map((x) => ({ ruta: x.ruta, tipo: x.tipo })) }; });
-  $('#lista-inf').innerHTML = data.map((i) => `
-    <div class="tarjeta informe ${i.revisado ? '' : 'sin-revisar'}">
+  morfar($('#lista-inf'), data.map((i) => `
+    <div class="tarjeta informe ${i.revisado ? '' : 'sin-revisar'}" data-k="${i.id}">
       <div class="cab">
         <b><a href="#" onclick="modalParte('${i.parte.id}');return false">${esc(i.parte.numero_servicio)}</a></b>
         <span>${esc(i.parte.direccion)}${i.parte.poblacion ? ', ' + esc(i.parte.poblacion) : ''}</span>
@@ -1895,7 +1952,7 @@ async function vistaInformes() {
         const n = fotosVisor.push({ url: urls[x.ruta], tipo: x.tipo, parte: i.parte.numero_servicio }) - 1;
         return `<a href="#" onclick="abrirVisor(${n});return false"><img loading="lazy" src="${urls[x.ruta] || ''}" alt=""><span>${x.tipo === 'despues' ? 'después' : x.tipo}</span></a>`;
       }).join('')}</div>` : ''}
-    </div>`).join('');
+    </div>`).join(''));
 }
 // Descarga de golpe las fotos de un tipo (antes / despues) de un informe, como archivos sueltos:
 // <servicio>_<tipo>_<n>.jpg. Chrome pide una vez «Permitir descargas múltiples» para kubelapp.github.io.
@@ -1927,7 +1984,7 @@ async function descargarFotos(id, tipo, boton) {
 async function marcarRevisado(id) {
   const { error } = await sb.from('informes').update({ revisado: true }).eq('id', id);
   if (error) return fallo(error);
-  contarSinRevisar(); vistaInformes();
+  contarSinRevisar(); vistaInformes(); // solo cambia esa tarjeta (y el resto de ordenadores, por tiempo real)
 }
 async function marcarTodosRevisados() {
   if (!confirm('¿Marcar todos los informes como revisados?')) return;
