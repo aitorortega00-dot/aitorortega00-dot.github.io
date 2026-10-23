@@ -12,6 +12,9 @@
 // "La Reparación No Pertenece Al Profesional", pedida siempre con la cuenta del propio servicio). Los reabre si vuelven.
 // Lo llama pg_cron cada 15 minutos con la cabecera secreta x-kubel-secreto.
 // ?prueba=1  → lee el portal pero NO escribe ni acepta nada y devuelve un resumen.
+// CONFIRMACIÓN (v23, 23/10/2026): cada informe nuevo de un servicio SIGMA sin confirmar crea un borrador 'confirmacion'
+// (variante rápida = la manda el robot al aprobar; completa = la hace la oficina en el portal y el robot lo comprueba).
+// ?verconfir=N&cuenta=VLL → solo lectura: estado de la Confirmación de ese servicio.
 // ?cuenta=VLL → solo esa cuenta.  ?enviar=1 → solo manda a SIGMA los envíos aprobados (sin leer el listado).
 import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4';
 import postgres from 'npm:postgres@3.4.4';
@@ -456,9 +459,9 @@ const API_REPASO = 'https://mawmods.plataforma-smart.com/me';
 const HORAS_REPASO = Array.from({ length: 28 }, (_, i) => String(28800 + i * 1800)); // 08:00 … 21:30
 const MOTIVOS_CITA: Record<string, string[]> = { V: ['609', '611', '604', '601'], I: ['706', '707', '708'], C: ['213', '215', '212', '214'] };
 type Envio = {
-  id: string; parte_id: string; tipo: 'repaso' | 'informar_cita' | 'tramitacion'; motivo_codigo: string | null; motivo_texto: string | null;
+  id: string; parte_id: string; tipo: 'repaso' | 'informar_cita' | 'tramitacion' | 'confirmacion'; motivo_codigo: string | null; motivo_texto: string | null;
   fecha: string | null; hora: string | null; resolucion: string | null; resolucion_motivo: string | null;
-  cita_fecha: string | null; cita_hora: string | null; comentario: string; contacto_en?: string | null; parte: { numero_servicio: string; sigma_cuenta: string; estado?: string };
+  cita_fecha: string | null; cita_hora: string | null; comentario: string; contacto_en?: string | null; confir_variante?: 'rapida' | 'completa' | null; creado_en?: string; parte: { numero_servicio: string; sigma_cuenta: string; estado?: string };
 };
 
 // Traduce los códigos de error del servicio de Repaso. Si el código no es conocido (p. ej. "68"),
@@ -787,6 +790,183 @@ async function enviarTramitacion(s: Sesion, e: Envio): Promise<string> {
   return `Mensaje enviado a tramitación (${MOTIVOS_TRAMITACION[motivo]}): «${mensaje}»`;
 }
 
+// ---------------------------------------------------------------- Confirmación (pestaña «Confirmación», confirval.php)
+// Componente <multiasistencia-fnol> con el mismo servicio JSON y el mismo pase (ut) que el Repaso. Regla del usuario
+// (23/10/2026): solo se confirma cuando llega el informe del operario y lo aprueba la oficina.
+//  · POST fnol-initial-data {reparation}: success → variante COMPLETA (clasificador de daños + formulario);
+//    data.confirmed === '1' → ya confirmado. Si falla con el código «FASTTRACK» → variante RÁPIDA.
+//  · POST fasttrack-initial-data {reparation} → causa, garantía, descripción, siniestro; contactClient / firstVisit = '1'
+//    si SIGMA pide la fecha de contacto con el cliente / de primera visita.
+//  · POST fasttrack-confirm {infoConfirmation:'', reparation, clientContactDate?, firstVisitDate?}
+//    (fechas como en el Repaso: día y mes sin cero, hourRaw en segundos, hora y minuto con dos cifras). Éxito = CONFIRVALREDAZPOK.
+//  · La variante completa (clasificador externo de SIGMA, decide la cobertura) la hace la oficina en el portal.
+const MAX_CONFIR = 8; // informes por cuenta y pasada
+const CONFIR_OK = 'CONFIRVALREDAZPOK';
+let TEXTOS_FNOL: Record<string, string> | null = null;
+async function cargarTextosFnol() {
+  if (TEXTOS_FNOL) return;
+  try {
+    const r = await fetch(`${API_REPASO}/translations?module=FNOL&lang=es`, {
+      signal: AbortSignal.timeout(10000), headers: { Version: '3.0.0', 'User-Agent': UA, Origin: 'https://web.multiasistencia.com' },
+    });
+    const j = r.ok ? await r.json() : null;
+    const err = j?.error ?? j?.data?.error;
+    if (err && typeof err === 'object') TEXTOS_FNOL = err as Record<string, string>;
+  } catch (err) { console.error('textos Confirmación', (err as Error).message); }
+}
+function textoFnol(codes: { code?: unknown; append?: unknown }[] | undefined) {
+  const lista = (codes || []).flatMap((x) => (Array.isArray(x?.code) ? x.code : [x?.code])).filter(Boolean).map(String);
+  if (!lista.length) return 'El portal no aceptó la confirmación (sin detalle)';
+  return lista.map((c) => TEXTOS_FNOL?.[c] ? `${String(TEXTOS_FNOL[c]).replace(/\{\{STRING\}\}\.?/g, '').trim()} (código ${c} de SIGMA)` : `Código ${c} de SIGMA`).join(' · ');
+}
+async function paseConfirmacion(s: Sesion, n: string) {
+  const html = await s.pedir(`confirval.php?reparacion=${n}&modo=0`);
+  return (html.match(/<multiasistencia-fnol[^>]*\sut="([^"]+)"/i) || [])[1] || null;
+}
+// deno-lint-ignore no-explicit-any
+async function apiFnol(ut: string, ruta: string, cuerpo: unknown, envio = false): Promise<any> {
+  let r: Response;
+  try {
+    r = await fetch(`${API_REPASO}/${ruta}`, {
+      method: 'POST', signal: AbortSignal.timeout(envio ? 30000 : 20000), body: JSON.stringify(cuerpo),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ut}`, Version: '3.0.0', 'User-Agent': UA, Origin: 'https://web.multiasistencia.com', Referer: BASE + 'confirval.php' },
+    });
+  } catch (err) {
+    const que = (err as Error).name === 'TimeoutError' ? 'tiempo agotado' : 'conexión cortada';
+    if (envio) throw new Dudoso(`sin respuesta del servicio de Confirmación (${que})`);
+    throw new Error(`Sin respuesta del servicio de Confirmación (${que})`);
+  }
+  if (r.status >= 500) { await r.body?.cancel(); if (envio) throw new Dudoso(`el servicio de Confirmación respondió ${r.status}`); throw new Error(`El servicio de Confirmación respondió ${r.status}`); }
+  const t = await r.text();
+  try { return JSON.parse(t); } catch { throw new Error(`Respuesta rara del servicio de Confirmación (${r.status})`); }
+}
+type EstadoConfir = { estado: 'confirmado' } | { estado: 'rapida' | 'completa'; datos: Record<string, unknown> } | { estado: 'no_aplica'; motivo: string };
+// Solo lectura: ¿está confirmado el servicio en SIGMA? Si no, de qué variante es y qué muestra el portal
+async function estadoConfirmacion(ut: string, n: string): Promise<EstadoConfir> {
+  const ini = await apiFnol(ut, 'fnol-initial-data', { reparation: n });
+  const d = ini?.data;
+  const codigos = (ini?.metadata?.errorCodes || []) as { code?: unknown }[];
+  if (ini?.success && d) {
+    if (String(d.confirmed) === '1') return { estado: 'confirmado' };
+    const c = d.confirmationData || {};
+    return { estado: 'completa', datos: {
+      causa: c.cause ?? null, garantia: c.warranty || null, descripcion: c.description || null, limite: d.limitValue ?? c.limitValue ?? null,
+      pide_contacto: String(d.clientContact) === '1', pide_primera_visita: String(d.firstVisit) === '1', leido_en: new Date().toISOString(),
+    } };
+  }
+  if (codigos.some((x) => String(x?.code) === 'FASTTRACK')) {
+    const f = await apiFnol(ut, 'fasttrack-initial-data', { reparation: n });
+    if (!f?.success || !f?.data) return { estado: 'no_aplica', motivo: `fasttrack-initial-data: ${textoFnol(f?.metadata?.errorCodes)}` };
+    const fd = f.data, c = fd.confirmationData || {}, sn = fd.sinisterData || {};
+    return { estado: 'rapida', datos: {
+      grupo_causa: c.gCause ?? sn.causesGroup ?? null, causa: c.cause ?? null, garantia: c.warranty || null, descripcion: c.description || null,
+      siniestro: sn.sinisterNumber ?? null, ocurrencia: sn.dateOccurrence ?? null, aviso: fd.infoMessage || null,
+      pide_contacto: String(fd.contactClient) === '1', pide_primera_visita: String(fd.firstVisit) === '1', leido_en: new Date().toISOString(),
+    } };
+  }
+  return { estado: 'no_aplica', motivo: textoFnol(codigos) };
+}
+// Fecha de SIGMA a partir de "aaaa-mm-dd" + "hh:mm"
+function fechaSigma(fecha: string, hora: string) {
+  const [a, m, d] = fecha.split('-');
+  const [hh, mm] = hora.slice(0, 5).split(':');
+  return { day: String(Number(d)), month: String(Number(m)), year: a, hourRaw: String(3600 * Number(hh) + 60 * Number(mm)), hour: hh.padStart(2, '0'), minute: mm.padStart(2, '0') };
+}
+// Fecha/hora de Madrid "aaaa-mm-dd hh:mm" de un timestamptz
+const madrid = (iso: string) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso)).replace('T', ' ');
+
+async function enviarConfirmacion(s: Sesion, e: Envio): Promise<string> {
+  const n = e.parte.numero_servicio;
+  const ut = await paseConfirmacion(s, n);
+  if (!ut) throw new Error('No se pudo abrir la pestaña Confirmación de este servicio');
+  await cargarTextosFnol();
+  const est = await estadoConfirmacion(ut, n);
+  if (est.estado === 'confirmado') return e.confir_variante === 'completa' ? 'Confirmación hecha en el portal (comprobado)' : 'El servicio ya estaba confirmado en SIGMA: no se ha enviado nada';
+  if (est.estado === 'no_aplica') throw new Error(`El portal no deja confirmar ahora: ${est.motivo}`);
+  if (est.estado === 'completa') throw new Error('Confirmación completa: aún no está hecha en el portal. Hazla en la pestaña Confirmación y vuelve a aprobar');
+  // Variante rápida
+  const cuerpo: Record<string, unknown> = { infoConfirmation: '', reparation: n };
+  const ahora = minutoMadrid();
+  if (est.datos.pide_contacto) {
+    if (!e.contacto_en) throw new Error('SIGMA pide la fecha y hora de contacto con el cliente: rellénala y vuelve a aprobar');
+    const cc = madrid(e.contacto_en);
+    if (cc > ahora) throw new Error('La fecha de contacto con el cliente no puede ser posterior a ahora');
+    cuerpo.clientContactDate = fechaSigma(cc.slice(0, 10), cc.slice(11, 16));
+  }
+  if (est.datos.pide_primera_visita) {
+    if (!e.cita_fecha || !e.cita_hora) throw new Error('SIGMA pide la fecha y hora de la primera visita: rellénala y vuelve a aprobar');
+    const pv = `${e.cita_fecha} ${e.cita_hora.slice(0, 5)}`;
+    if (pv > ahora) throw new Error('La fecha de primera visita no puede ser posterior a ahora');
+    cuerpo.firstVisitDate = fechaSigma(e.cita_fecha, e.cita_hora);
+  }
+  const res = await apiFnol(ut, 'fasttrack-confirm', cuerpo, true);
+  const codigos = (res?.metadata?.errorCodes || []) as { code?: unknown }[];
+  if (codigos.some((x) => String(x?.code) === CONFIR_OK)) {
+    const extra = [cuerpo.clientContactDate ? `contacto ${madrid(e.contacto_en!).split(' ').map((x, i) => i ? x : x.split('-').reverse().join('/')).join(' ')}` : '',
+      cuerpo.firstVisitDate ? `primera visita ${e.cita_fecha!.split('-').reverse().join('/')} ${e.cita_hora!.slice(0, 5)}` : ''].filter(Boolean).join(' · ');
+    return `Siniestro confirmado en SIGMA${extra ? ` (${extra})` : ''}`;
+  }
+  console.error('fasttrack-confirm', n, JSON.stringify(res).slice(0, 1500));
+  throw new Error('Al confirmar: ' + textoFnol(codigos));
+}
+
+// Informes nuevos de servicios SIGMA: si el servicio está sin confirmar, borrador 'confirmacion' para la oficina.
+// Solo lectura en el portal. Un informe se mira una vez; si el portal no responde, se vuelve a intentar en la siguiente pasada.
+async function revisarConfirmaciones(admin: SupabaseClient, s: Sesion, cuenta: string, escribir: boolean) {
+  const out = { revisados: 0, borradores: [] as string[], confirmados: [] as string[] };
+  const desde = new Date(Date.now() - 30 * 86400000).toISOString();
+  const { data } = await admin.from('informes')
+    .select('id, parte_id, asignacion_id, creado_en, parte:partes!inner(id, numero_servicio, sigma_cuenta, estado, sigma_confirmado_en), asig:asignaciones(fecha, hora)')
+    .is('sigma_confir_revisado_en', null).gte('creado_en', desde).eq('parte.sigma_cuenta', cuenta)
+    .order('creado_en').limit(40);
+  // deno-lint-ignore no-explicit-any
+  const cola = ((data || []) as any[]).filter((i) => i.parte && !['cerrado', 'anulado'].includes(i.parte.estado));
+  const marcar = async (ids: string[]) => { if (escribir && ids.length) await admin.from('informes').update({ sigma_confir_revisado_en: new Date().toISOString() }).in('id', ids); };
+  // Informes de servicios ya confirmados o cerrados: nada que hacer
+  await marcar(((data || []) as { id: string }[]).filter((i) => !cola.includes(i)).map((i) => i.id));
+  const yaConfirmados = cola.filter((i) => i.parte.sigma_confirmado_en);
+  await marcar(yaConfirmados.map((i) => i.id));
+  const pendientes = cola.filter((i) => !i.parte.sigma_confirmado_en).slice(0, MAX_CONFIR);
+  if (!pendientes.length) return out;
+  const ut = await paseConfirmacion(s, pendientes[0].parte.numero_servicio);
+  if (!ut) return out;
+  await cargarTextosFnol();
+  const vistos = new Map<string, EstadoConfir>();
+  for (const i of pendientes) {
+    const n = i.parte.numero_servicio as string;
+    let est = vistos.get(n);
+    if (!est) {
+      try { est = await estadoConfirmacion(ut, n); } catch (err) { console.error('confirmación', n, (err as Error).message); continue; }
+      vistos.set(n, est);
+      out.revisados++;
+    }
+    if (!escribir) { if (est.estado === 'rapida' || est.estado === 'completa') out.borradores.push(`${n} (${est.estado})`); continue; }
+    if (est.estado === 'confirmado') {
+      await admin.from('partes').update({ sigma_confirmado_en: new Date().toISOString() }).eq('id', i.parte_id).is('sigma_confirmado_en', null);
+      if (!out.confirmados.includes(n)) out.confirmados.push(n);
+      // Si quedaba un borrador vivo de una variante completa, ya está hecha en el portal
+      await admin.from('sigma_envios').update({ estado: 'enviado', resultado: 'Confirmación hecha en el portal (comprobado por el robot)', enviado_en: new Date().toISOString() })
+        .eq('parte_id', i.parte_id).eq('tipo', 'confirmacion').in('estado', ['borrador', 'error']);
+    } else if (est.estado === 'rapida' || est.estado === 'completa') {
+      const { data: viva } = await admin.from('sigma_envios').select('id').eq('parte_id', i.parte_id).eq('tipo', 'confirmacion')
+        .in('estado', ['borrador', 'aprobado', 'enviando', 'error']).limit(1);
+      if (!viva?.length) {
+        const { error } = await admin.from('sigma_envios').insert({
+          parte_id: i.parte_id, asignacion_id: i.asignacion_id, informe_id: i.id, tipo: 'confirmacion', origen: 'informe',
+          confir_variante: est.estado, confir_datos: est.datos, cita_fecha: i.asig?.fecha ?? null, cita_hora: i.asig?.hora ?? null,
+          comentario: '',
+        });
+        if (error) { console.error('borrador confirmación', n, error.message); continue; }
+        out.borradores.push(`${n} (${est.estado})`);
+      }
+    } else {
+      console.log('confirmación no aplica', n, est.motivo);
+    }
+    await marcar([i.id]);
+  }
+  return out;
+}
+
 // Bloqueo del Repaso por documento de IVA: se comprueba en el portal (solo lectura) y se marca en partes.sigma_iva_pendiente.
 // Primero los ya bloqueados (para desbloquearlos), luego los de Repasos (caducadas, sin primer contacto), luego el resto.
 async function revisarIva(admin: SupabaseClient, s: Sesion, ciaId: number, cuenta: string, vivos: string[], prioridad: Set<string>, escribir: boolean) {
@@ -816,6 +996,7 @@ async function revisarIva(admin: SupabaseClient, s: Sesion, ciaId: number, cuent
   return out;
 }
 
+const ORDEN_ENVIO: Record<string, number> = { informar_cita: 0, confirmacion: 1, repaso: 2, tramitacion: 3 };
 async function procesarEnvios(admin: SupabaseClient, cuenta: string, nombre: string, usuario: string, clave: string, secretoAvisos: string) {
   // Envíos que se quedaron a medias hace más de 10 min: no se reintentan solos (podría duplicarse en el portal)
   await admin.from('sigma_envios').update({ estado: 'error', resultado: 'Envío interrumpido: comprueba en el portal si se guardó antes de reintentar' })
@@ -829,7 +1010,8 @@ async function procesarEnvios(admin: SupabaseClient, cuenta: string, nombre: str
     .in('id', cola.map((x) => x.id)).eq('estado', 'aprobado').select('id');
   const ids = new Set((mios || []).map((x) => x.id));
   const lista = (cola as Envio[]).filter((x) => ids.has(x.id))
-    .sort((a, b) => (a.tipo === b.tipo ? 0 : a.tipo === 'informar_cita' ? -1 : 1)); // primero Informar citas
+    // Orden: Informar citas → Confirmación → Repaso → mensajes a tramitación (SIGMA no deja hacer Repaso con la confirmación pendiente)
+    .sort((a, b) => (ORDEN_ENVIO[a.tipo] ?? 9) - (ORDEN_ENVIO[b.tipo] ?? 9) || String(a.creado_en).localeCompare(String(b.creado_en)));
   if (!lista.length) return { enviados: 0, errores: 0 };
   const s = new Sesion();
   await entrar(s, usuario, clave);
@@ -839,7 +1021,9 @@ async function procesarEnvios(admin: SupabaseClient, cuenta: string, nombre: str
     try {
       if (fallidos.has(e.parte_id) && e.tipo !== 'tramitacion') throw new Error('No se envió porque falló el envío anterior de este servicio');
       if (e.tipo === 'repaso' && e.parte.estado === 'cerrado') throw new Error(CODIGOS_REPASO['3057']);
-      const r = e.tipo === 'repaso' ? await enviarRepaso(s, e) : e.tipo === 'tramitacion' ? await enviarTramitacion(s, e) : await enviarInformarCita(s, e);
+      const r = e.tipo === 'repaso' ? await enviarRepaso(s, e) : e.tipo === 'tramitacion' ? await enviarTramitacion(s, e)
+        : e.tipo === 'confirmacion' ? await enviarConfirmacion(s, e) : await enviarInformarCita(s, e);
+      if (e.tipo === 'confirmacion') await admin.from('partes').update({ sigma_confirmado_en: new Date().toISOString() }).eq('id', e.parte_id);
       if (e.tipo === 'repaso') await admin.from('partes').update({ sigma_iva_pendiente: null, sigma_iva_revisado_en: new Date().toISOString() }).eq('id', e.parte_id);
       await admin.from('sigma_envios').update({ estado: 'enviado', resultado: r, enviado_en: new Date().toISOString(), intentos: 1 }).eq('id', e.id);
       await admin.from('partes').update({ sigma_ficha_en: null }).eq('id', e.parte_id); // releer la ficha en la próxima pasada
@@ -880,6 +1064,7 @@ type Resumen = {
   cambiados: number; fichas: number; desaparecidos: string[]; pendientes: number; error?: string; diagnostico?: unknown;
   aceptados?: Ofrecido[]; sin_contacto?: number; caducadas?: number; cerrados?: string[]; anulados?: string[]; reabiertos?: string[];
   iva?: { revisados: number; bloqueados: string[]; desbloqueados: string[] };
+  confirmacion?: { revisados: number; borradores: string[]; confirmados: string[] };
 };
 
 function partirDireccion(d: string) {
@@ -1031,6 +1216,7 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
   const prioridadIva = new Set<string>([...(caducadasPortal?.keys() ?? []), ...(sinContactoPortal ?? []), ...lis.filas.filter((f) => f.estado === '15').map((f) => f.numero)]);
   if (prueba) {
     try { r.iva = await revisarIva(admin, s, ciaId, cuenta, numeros, prioridadIva, false); } catch (err) { console.error('iva', (err as Error).message); }
+    try { r.confirmacion = await revisarConfirmaciones(admin, s, cuenta, false); } catch (err) { console.error('confirmación', (err as Error).message); }
     r.nuevos = nuevosLista; r.desaparecidos = desaparecidos;
     const una = fichas.values().next().value;
     r.diagnostico = {
@@ -1186,6 +1372,8 @@ async function sincronizar(admin: SupabaseClient, ciaId: number, usuario: string
   }
   // BLOQUEO POR DOCUMENTO DE IVA (solo lectura en el portal; no afecta al resultado de la pasada si falla)
   try { r.iva = await revisarIva(admin, s, ciaId, cuenta, numeros, prioridadIva, true); } catch (err) { console.error('iva', (err as Error).message); }
+  // CONFIRMACIÓN: informes nuevos de servicios sin confirmar → borrador para la oficina (solo lectura en el portal)
+  try { r.confirmacion = await revisarConfirmaciones(admin, s, cuenta, true); } catch (err) { console.error('confirmación', (err as Error).message); }
   if (erroresFicha.length) r.error = `Fichas con error: ${erroresFicha.length}`;
   r.ok = true;
   return r;
@@ -1215,6 +1403,16 @@ Deno.serve(async (req) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
   const { data: cia } = await admin.from('companias').select('id').eq('nombre', 'SIGMA').single();
   const resultados: Resumen[] = [];
+  const verConfir = url.searchParams.get('verconfir');
+  if (verConfir) { // solo lectura: qué dice el portal de la Confirmación de un servicio
+    const c = CUENTAS.find((x) => x.id === (solo || 'VLL'))!;
+    const ses = new Sesion();
+    await entrar(ses, Deno.env.get(`SIGMA_${c.id}_USUARIO`)!, Deno.env.get(`SIGMA_${c.id}_CLAVE`)!);
+    const ut = await paseConfirmacion(ses, verConfir);
+    if (!ut) return new Response(JSON.stringify({ error: 'sin pase de Confirmación' }), { headers: { 'Content-Type': 'application/json' } });
+    await cargarTextosFnol();
+    return new Response(JSON.stringify({ servicio: verConfir, cuenta: c.id, ...(await estadoConfirmacion(ut, verConfir)) }), { headers: { 'Content-Type': 'application/json' } });
+  }
 
   for (const c of CUENTAS) {
     if (solo && solo !== c.id) continue;

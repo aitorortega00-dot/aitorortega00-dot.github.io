@@ -31,6 +31,8 @@
   button.peligro{background:#fff;color:var(--peligro);border-color:var(--peligro)}
   button.mini{padding:3px 9px;font-size:12px}
   button:disabled{opacity:.5;cursor:default}
+  a.boton-enlace{display:inline-block;border-radius:8px;border:1.5px solid var(--marca);background:#fff;color:var(--marca);padding:7px 14px;font-weight:600;text-decoration:none}
+  a.boton-enlace.mini{padding:3px 9px;font-size:12px}
   select:disabled{background:#ECEAE4;color:#9AA0A6;cursor:not-allowed}
   input,select,textarea{border:1px solid var(--borde);border-radius:8px;padding:7px 10px;background:#FAFAF8;color:var(--texto);width:100%}
   textarea{min-height:80px;resize:vertical}
@@ -293,7 +295,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.34 (Sin parpadeos: al marcar revisado, guardar o recibir cambios de otro ordenador/del robot ya no se vacía y repinta la página entera ni se recargan las fotos; solo cambia lo que ha cambiado; v2.33: Ventanas: botón ✕ arriba a la derecha en lugar de Cancelar/Cerrar; v2.32: Las ventanas (Nueva línea, ficha, Asignar visita…) ya no se cierran al pulsar fuera ni al soltar el ratón fuera mientras se selecciona texto: solo con Cancelar/Cerrar o Esc; v2.31: Asignar visita: si el servicio ya tiene una visita pendiente, avisa y deja elegir «Cambiar esa visita» (operario, día, hora) o «Añadir otra visita»; v2.30: Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.35 (Confirmación SIGMA: al llegar el informe del operario de un servicio sin confirmar, el robot prepara en Envíos a SIGMA un borrador «Confirmación»; la rápida la manda el robot al aprobar, la completa se hace en el portal y el robot lo comprueba; v2.34: Sin parpadeos: al marcar revisado, guardar o recibir cambios de otro ordenador/del robot ya no se vacía y repinta la página entera ni se recargan las fotos; solo cambia lo que ha cambiado; v2.33: Ventanas: botón ✕ arriba a la derecha en lugar de Cancelar/Cerrar; v2.32: Las ventanas (Nueva línea, ficha, Asignar visita…) ya no se cierran al pulsar fuera ni al soltar el ratón fuera mientras se selecciona texto: solo con Cancelar/Cerrar o Esc; v2.31: Asignar visita: si el servicio ya tiene una visita pendiente, avisa y deja elegir «Cambiar esa visita» (operario, día, hora) o «Añadir otra visita»; v2.30: Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -664,7 +666,9 @@ function ultimaTramitacion(p) {
   return 'Mensaje a tramitación en camino…';
 }
 const botonTramitacion = (id) => `<button class="mini" onclick="event.stopPropagation();nuevaTramitacion('${id}')">Enviar a tramitación</button>`;
+const URL_CONFIRMACION = (n) => `https://web.multiasistencia.com/w3multi/confirval.php?reparacion=${encodeURIComponent(n)}&modo=0`;
 function tituloEnvio(e) {
+  if (e.tipo === 'confirmacion') return e.confir_variante === 'completa' ? 'Confirmación completa · hacer en el portal' : 'Confirmación del siniestro';
   if (e.tipo === 'tramitacion') return `Mensaje a tramitación · ${MOTIVOS_TRAMITACION.find((m) => m[0] === String(e.motivo_codigo))?.[1] || 'Otros'}`;
   if (e.tipo === 'repaso') return `Repaso · ${e.motivo_texto || 'motivo'}${e.fecha ? ' · ' + fDMA(e.fecha) : ''}${e.hora ? ' ' + hCorta(e.hora) : ''}`;
   return `Informar cita · ${RESOLUCIONES[e.resolucion]?.[0] || ''}${e.cita_fecha ? ' · citada ' + fDMA(e.cita_fecha) : ''}${e.cita_hora ? ' ' + hCorta(e.cita_hora) : ''}`;
@@ -692,7 +696,7 @@ async function vistaEnvios() {
       <span class="esp"></span>
       ${filtroEnvios === 'revisar' ? '<button class="sec" onclick="aprobarTodos()">Aprobar todos los correctos</button>' : ''}
     </div>
-    <p style="color:var(--suave);margin-top:-6px">Se preparan solos al planificar visitas y al recibir informes. Revisa, corrige lo que quieras y pulsa <b>Aprobar y enviar</b>: el robot lo graba en el portal en ese momento. “Informar citas” usa siempre la fecha y hora citadas.</p>
+    <p style="color:var(--suave);margin-top:-6px">Se preparan solos al planificar visitas y al recibir informes (también la <b>Confirmación</b> del siniestro si SIGMA aún no la tiene). Revisa, corrige lo que quieras y pulsa <b>Aprobar y enviar</b>: el robot lo graba en el portal en ese momento. “Informar citas” usa siempre la fecha y hora citadas.</p>
     <div id="lista-envios">Cargando…</div>`);
   let q = sb.from('sigma_envios').select('*, parte:partes(id, numero_servicio, direccion, poblacion, estado, sigma_cuenta, sigma_alerta, sigma_estado, sigma_iva_pendiente)')
     .in('estado', grupos[filtroEnvios]).order('creado_en', { ascending: filtroEnvios === 'revisar' || filtroEnvios === 'cola' });
@@ -711,7 +715,8 @@ async function vistaEnvios() {
         ${problema && ['borrador', 'error'].includes(e.estado) ? `<div class="r mal">⚠️ ${esc(problema)}</div>` : ''}
       </div>
       ${['borrador', 'error'].includes(e.estado) ? `<div class="acc" onclick="event.stopPropagation()">
-        <button class="mini" ${problema ? 'disabled' : ''} onclick="cambiarEnvio('${e.id}','aprobado')">${e.estado === 'error' ? 'Reintentar' : 'Aprobar y enviar'}</button>
+        ${e.tipo === 'confirmacion' && e.confir_variante === 'completa' ? `<a class="mini boton-enlace" href="${URL_CONFIRMACION(e.parte?.numero_servicio)}" target="_blank" rel="noopener">Abrir en el portal ↗</a>` : ''}
+        <button class="mini" ${problema ? 'disabled' : ''} onclick="cambiarEnvio('${e.id}','aprobado')">${e.tipo === 'confirmacion' && e.confir_variante === 'completa' ? 'Ya está hecha: comprobar' : e.estado === 'error' ? 'Reintentar' : 'Aprobar y enviar'}</button>
         <button class="mini peligro" onclick="cambiarEnvio('${e.id}','descartado')">Descartar</button></div>` : ''}
     </div>`;
   }).join('') || '<div class="tarjeta vacio">No hay envíos aquí.</div>');
@@ -719,6 +724,19 @@ async function vistaEnvios() {
 // Fecha a formato de <input type="datetime-local"> (hora local del navegador)
 function aLocal(d) { const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`; }
 function validarEnvio(e) {
+  if (e.tipo === 'confirmacion') {
+    if (e.confir_variante === 'completa') return '';
+    const d = e.confir_datos || {};
+    if (d.pide_contacto) {
+      if (!e.contacto_en) return 'Falta la fecha y hora en que contactasteis con el cliente (SIGMA la pide para confirmar)';
+      if (new Date(e.contacto_en).getTime() > Date.now()) return 'La fecha y hora de contacto con el cliente no puede ser posterior a ahora';
+    }
+    if (d.pide_primera_visita) {
+      if (!e.cita_fecha || !e.cita_hora) return 'Falta la fecha y hora de la primera visita';
+      if (new Date(`${e.cita_fecha}T${hCorta(e.cita_hora)}`).getTime() > Date.now()) return 'La primera visita no puede ser posterior a ahora';
+    }
+    return '';
+  }
   if (e.tipo === 'tramitacion') return e.comentario && e.comentario.trim() ? '' : 'Falta el texto del mensaje';
   if (!e.comentario || !e.comentario.trim()) return 'Falta el comentario';
   if (e.tipo === 'repaso' && e.parte?.estado === 'cerrado') return TXT_CERRADO;
@@ -753,7 +771,7 @@ async function cambiarEnvio(id, estado) {
 }
 async function aprobarTodos() {
   const { data } = await sb.from('sigma_envios').select('*, parte:partes(estado, sigma_estado, sigma_iva_pendiente)').in('estado', ['borrador']);
-  const ok = (data || []).filter((e) => !validarEnvio(e));
+  const ok = (data || []).filter((e) => !validarEnvio(e) && !(e.tipo === 'confirmacion' && e.confir_variante === 'completa')); // la completa la comprueba la oficina una a una
   if (!ok.length) return alert('No hay borradores listos para aprobar (revisa los avisos ⚠️).');
   if (!confirm(`¿Aprobar y enviar ${ok.length} envío(s) a SIGMA?`)) return;
   for (const e of ok) { const { error } = await sb.from('sigma_envios').update({ estado: 'aprobado', resultado: null }).eq('id', e.id); if (error) return fallo(error); }
@@ -812,12 +830,32 @@ async function modalEnvio(id) {
   const esNuevo = id === 'nuevo';
   const editable = ['borrador', 'error'].includes(e.estado);
   const dis = editable ? '' : 'disabled';
-  const cab = `<h3>${e.tipo === 'repaso' ? 'Repaso' : e.tipo === 'tramitacion' ? 'Mensaje a tramitación' : 'Informar citas'} · ${esc(e.parte.numero_servicio)} ${esNuevo ? '<span class="et borrador">Nuevo</span>' : `<span class="et ${e.estado}">${TXT_ENVIO[e.estado]}</span>`}</h3>
+  const cab = `<h3>${e.tipo === 'repaso' ? 'Repaso' : e.tipo === 'tramitacion' ? 'Mensaje a tramitación' : e.tipo === 'confirmacion' ? (e.confir_variante === 'completa' ? 'Confirmación completa' : 'Confirmación') : 'Informar citas'} · ${esc(e.parte.numero_servicio)} ${esNuevo ? '<span class="et borrador">Nuevo</span>' : `<span class="et ${e.estado}">${TXT_ENVIO[e.estado]}</span>`}</h3>
     <div style="color:var(--suave)">${esc([e.parte.direccion, e.parte.poblacion].filter(Boolean).join(', '))} ${etiquetaSigma(e.parte)}</div>
     ${e.parte.sigma_estado_texto ? `<div style="font-size:12px;color:var(--suave);margin-top:4px">Estado actual en SIGMA: ${esc(e.parte.sigma_estado_texto)}</div>` : ''}
     ${e.resultado ? `<div class="nota" style="margin-top:10px;${e.estado === 'enviado' ? 'background:#DDF0E3;color:var(--ok)' : ''}">${esc(e.resultado)}</div>` : ''}`;
   let campos;
-  if (e.tipo === 'tramitacion') {
+  if (e.tipo === 'confirmacion') {
+    const d = e.confir_datos || {};
+    let inf = null;
+    if (e.informe_id) inf = (await sb.from('informes').select('texto, trabajo_terminado, creado_en').eq('id', e.informe_id).maybeSingle()).data;
+    const fila = (t, v) => v ? `<div><span style="color:var(--suave)">${t}:</span> ${esc(String(v))}</div>` : '';
+    campos = `
+      <div class="nota" style="margin-top:10px">${e.confir_variante === 'completa'
+        ? 'SIGMA pide la <b>confirmación completa</b> (clasificador de daños: causa, gremio, daños en continente / contenido / a terceros, responsable, perjudicado…). Hazla en la pestaña <b>Confirmación</b> del portal con el informe delante y después pulsa <b>«Ya está hecha: comprobar»</b>: el robot comprueba que el portal la tiene.'
+        : 'Compara lo que dice SIGMA con el informe y las fotos del operario. Si cuadra, <b>Aprobar y enviar</b> confirma el siniestro en el portal (lo mismo que pulsar «Aceptar» en la pestaña Confirmación). Si no cuadra, descarta y hazla en el portal o llama a tramitación.'}</div>
+      <div style="margin-top:10px;font-size:13px;line-height:1.5">
+        <div style="font-weight:600;margin-bottom:2px">Lo que dice SIGMA</div>
+        ${fila('Grupo de causas', d.grupo_causa)}${fila('Causa', d.causa)}${fila('Garantía', d.garantia)}${fila('Nº siniestro', d.siniestro)}${fila('Ocurrencia', d.ocurrencia)}${fila('Límite', d.limite ? d.limite + ' €' : '')}
+        ${d.descripcion ? `<div style="white-space:pre-wrap;margin-top:4px;color:var(--suave)">${esc(d.descripcion)}</div>` : ''}
+      </div>
+      ${inf ? `<div style="margin-top:10px;font-size:13px"><div style="font-weight:600;margin-bottom:2px">Informe del operario <span class="et ${inf.trabajo_terminado ? 'enviado' : 'borrador'}">${inf.trabajo_terminado ? 'Trabajo terminado' : 'Sin terminar'}</span> <small style="color:var(--suave)">${hace(inf.creado_en)}</small></div><div style="white-space:pre-wrap">${esc(inf.texto || '(sin texto)')}</div><a href="#informes" onclick="cerrarModal()" style="font-size:12px">Ver fotos en Informes</a></div>` : ''}
+      ${e.confir_variante === 'completa' ? `<div style="margin-top:12px"><a class="boton-enlace" href="${URL_CONFIRMACION(e.parte.numero_servicio)}" target="_blank" rel="noopener">Abrir Confirmación en el portal ↗</a></div>` : `
+        ${d.pide_primera_visita ? `<div class="dos">
+          <div><label>Fecha de la primera visita (citada)</label><input id="en-pv-fecha" type="date" max="${hoyISO()}" value="${e.cita_fecha || ''}" ${dis}></div>
+          <div><label>Hora</label><input id="en-pv-hora" type="time" step="60" value="${e.cita_hora ? hCorta(e.cita_hora) : ''}" ${dis}></div></div>` : ''}
+        ${d.pide_contacto ? `<label>Fecha y hora del contacto con el cliente</label><input id="en-contacto" type="datetime-local" step="60" max="${aLocal(new Date())}" value="${e.contacto_en ? aLocal(new Date(e.contacto_en)) : ''}" ${dis}>` : ''}`}`;
+  } else if (e.tipo === 'tramitacion') {
     const p = e.previo;
     campos = `
       ${ivaBloq(e.parte) ? `<div class="aviso-bloq">🔒 ${esc(txtBloq(e.parte))}</div>` : ''}
@@ -845,13 +883,14 @@ async function modalEnvio(id) {
       <div class="nota" style="margin-top:10px">Se informará con la <b>fecha y hora citadas</b>${e.cita_fecha ? `: ${fDMA(e.cita_fecha)}${e.cita_hora ? ' a las ' + hCorta(e.cita_hora) : ''}` : ''} (las que figuran en el portal), nunca con la hora del informe.</div>`;
   }
   abrirModal(`${cab}${campos}
-    <label>${e.tipo === 'tramitacion' ? 'Mensaje para tramitación' : 'Comentario (es lo que verá SIGMA)'}</label><textarea id="en-com" ${dis} style="min-height:${e.tipo === 'tramitacion' ? 80 : 120}px">${esc(e.comentario || '')}</textarea>
+    ${e.tipo === 'confirmacion' ? '' : `<label>${e.tipo === 'tramitacion' ? 'Mensaje para tramitación' : 'Comentario (es lo que verá SIGMA)'}</label><textarea id="en-com" ${dis} style="min-height:${e.tipo === 'tramitacion' ? 80 : 120}px">${esc(e.comentario || '')}</textarea>`}
     <div class="acciones">
       ${editable && !esNuevo ? `<button class="peligro" onclick="cambiarEnvio('${e.id}','descartado')">Descartar</button>` : ''}
       <span class="esp"></span>
       <button class="sec" onclick="cerrarModal();modalParte('${e.parte.id}')">Ver servicio</button>
       ${editable && e.tipo === 'repaso' && ivaBloq(e.parte) ? ''
         : editable && e.tipo === 'tramitacion' && esNuevo ? `<button onclick="guardarEnvio('nuevo',true)">Enviar a tramitación</button>`
+        : editable && e.tipo === 'confirmacion' && e.confir_variante === 'completa' ? `<button onclick="cambiarEnvio('${e.id}','aprobado')">Ya está hecha: comprobar</button>`
         : editable ? `<button class="sec" onclick="guardarEnvio('${e.id}',false)">Guardar</button><button onclick="guardarEnvio('${e.id}',true)">${e.estado === 'error' ? 'Guardar y reintentar' : 'Aprobar y enviar'}</button>` : ''}
     </div>`, true);
   if (e.tipo === 'informar_cita') rellenarMotivosCita();
@@ -864,9 +903,12 @@ function rellenarMotivosCita() {
 }
 async function guardarEnvio(id, aprobar) {
   const esNuevo = id === 'nuevo';
-  const e = esNuevo ? envioNuevo : (await sb.from('sigma_envios').select('tipo, parte:partes(estado, sigma_estado, sigma_iva_pendiente)').eq('id', id).single()).data;
-  const fila = { comentario: $('#en-com').value.trim() };
-  if (e.tipo === 'tramitacion') {
+  const e = esNuevo ? envioNuevo : (await sb.from('sigma_envios').select('tipo, confir_variante, confir_datos, cita_fecha, cita_hora, contacto_en, parte:partes(estado, sigma_estado, sigma_iva_pendiente)').eq('id', id).single()).data;
+  const fila = e.tipo === 'confirmacion' ? {} : { comentario: $('#en-com').value.trim() };
+  if (e.tipo === 'confirmacion') {
+    if ($('#en-pv-fecha')) { fila.cita_fecha = $('#en-pv-fecha').value || null; fila.cita_hora = $('#en-pv-hora').value || null; }
+    if ($('#en-contacto')) fila.contacto_en = $('#en-contacto').value ? new Date($('#en-contacto').value).toISOString() : null;
+  } else if (e.tipo === 'tramitacion') {
     const m = MOTIVOS_TRAMITACION.find((x) => x[0] === $('#en-motivo').value) || MOTIVOS_TRAMITACION[0];
     Object.assign(fila, { motivo_codigo: m[0], motivo_texto: m[1] });
   } else if (e.tipo === 'repaso') {
@@ -903,7 +945,7 @@ async function guardarEnvio(id, aprobar) {
     return fallo(error);
   }
   if (esNuevo) envioNuevo = null;
-  if (aprobar) aviso(e.tipo === 'tramitacion' ? 'Enviando el mensaje a tramitación…' : 'Aprobado: enviándolo a SIGMA…'); else if (!problema) aviso('Guardado');
+  if (aprobar) aviso(e.tipo === 'tramitacion' ? 'Enviando el mensaje a tramitación…' : e.tipo === 'confirmacion' ? 'Aprobada: confirmando en SIGMA…' : 'Aprobado: enviándolo a SIGMA…'); else if (!problema) aviso('Guardado');
   cerrarModal(); contarEnvios(); if (vistaActual === 'envios') vistaEnvios(); if (vistaActual === 'repasos') vistaRepasos();
 }
 
@@ -1807,7 +1849,7 @@ async function modalParte(id) {
   let p = { compania_id: cache.companias.find((c) => c.nombre === 'SIGMA')?.id, urgente: false, estado: 'pendiente' };
   let historial = '';
   if (id) {
-    const r = await sb.from('partes').select('*, asignaciones!asignaciones_parte_id_fkey(id, fecha, hora, estado, tipo, operario_id), informes!informes_parte_id_fkey(id, creado_en, texto, revisado, operario_id), sigma_envios(id, tipo, estado, fecha, hora, motivo_codigo, motivo_texto, resolucion, resultado, creado_en, enviado_en)').eq('id', id).single();
+    const r = await sb.from('partes').select('*, asignaciones!asignaciones_parte_id_fkey(id, fecha, hora, estado, tipo, operario_id), informes!informes_parte_id_fkey(id, creado_en, texto, revisado, operario_id), sigma_envios(id, tipo, estado, fecha, hora, motivo_codigo, motivo_texto, resolucion, resultado, creado_en, enviado_en, confir_variante)').eq('id', id).single();
     if (r.error) return fallo(r.error);
     p = r.data;
     const vis = (p.asignaciones || []).sort((a, b) => a.fecha.localeCompare(b.fecha));
