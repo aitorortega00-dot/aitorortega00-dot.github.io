@@ -511,6 +511,9 @@ const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 class Dudoso extends Error {}
 // El portal bloquea el Repaso porque el documento de IVA está pendiente de validar por SIGMA
 class IvaPendiente extends Error {}
+// Informar citas: el portal no tiene ninguna cita pendiente (ya informada o retirada en SIGMA) → no es un error
+class SinCitaPendiente extends Error {}
+const SIN_CITA = 'Descartado solo: el portal no tiene ninguna cita pendiente de informar en este servicio (ya informada o retirada en SIGMA). No hay nada que enviar.';
 const IVA_PENDIENTE = /documento\s+de\s+iva\s+pendiente/i;
 const BLOQUEO_IVA = 'Bloqueado por SIGMA: documento de IVA pendiente de validar. No se ha enviado el Repaso; usa «Enviar a tramitación» y vuelve a intentarlo cuando SIGMA lo valide.';
 
@@ -722,7 +725,7 @@ async function informarCitasPendientes(s: Sesion, n: string, resolucion: string,
   };
   const hechas: string[] = [];
   let actual = await leer();
-  if (!actual.filas.length) throw new Error('El portal no tiene ninguna cita pendiente de informar en este servicio');
+  if (!actual.filas.length) throw new SinCitaPendiente('El portal no tiene ninguna cita pendiente de informar en este servicio');
   for (let i = 0; i < 5 && actual.filas.length; i++) {
     const { doc } = actual;
     // En modo automático (todas) se informan TODAS las pendientes, pasadas o futuras (decisión del usuario 21/10/2026:
@@ -842,6 +845,12 @@ async function procesarEnvios(admin: SupabaseClient, cuenta: string, nombre: str
       await admin.from('partes').update({ sigma_ficha_en: null }).eq('id', e.parte_id); // releer la ficha en la próxima pasada
       enviados++;
     } catch (err) {
+      // Informar cita sin cita pendiente en el portal: se descarta solo, sin error ni aviso (decisión del usuario 23/10/2026)
+      if (err instanceof SinCitaPendiente && e.tipo === 'informar_cita') {
+        await admin.from('sigma_envios').update({ estado: 'descartado', resultado: SIN_CITA }).eq('id', e.id);
+        await admin.from('partes').update({ sigma_ficha_en: null }).eq('id', e.parte_id);
+        continue;
+      }
       if (e.tipo !== 'tramitacion') fallidos.add(e.parte_id);
       const msg = err instanceof IvaPendiente ? BLOQUEO_IVA : (err as Error).message;
       if (err instanceof IvaPendiente) {
