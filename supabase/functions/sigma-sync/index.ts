@@ -14,6 +14,7 @@
 // ?prueba=1  → lee el portal pero NO escribe ni acepta nada y devuelve un resumen.
 // CONFIRMACIÓN (v23, 23/10/2026): cada informe nuevo de un servicio SIGMA sin confirmar crea un borrador 'confirmacion'
 // (variante rápida = la manda el robot al aprobar; completa = la hace la oficina en el portal y el robot lo comprueba).
+// v24 (27/10/2026): un Repaso que SIGMA rechaza con el código 1212 (aplazar un siniestro sin confirmar) se descarta solo.
 // ?verconfir=N&cuenta=VLL → solo lectura: estado de la Confirmación de ese servicio.
 // ?cuenta=VLL → solo esa cuenta.  ?enviar=1 → solo manda a SIGMA los envíos aprobados (sin leer el listado).
 import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4';
@@ -516,6 +517,10 @@ class Dudoso extends Error {}
 class IvaPendiente extends Error {}
 // Informar citas: el portal no tiene ninguna cita pendiente (ya informada o retirada en SIGMA) → no es un error
 class SinCitaPendiente extends Error {}
+// Repaso con un motivo de aplazamiento en un siniestro sin confirmar: SIGMA lo rechaza (código 1212) → no es un error,
+// se descarta solo (decisión del usuario 27/10/2026). El servicio conserva en SIGMA la cita que ya tenía.
+class SinConfirmar extends Error {}
+const SIN_CONFIRMAR = 'Descartado solo: SIGMA no deja aplazar un siniestro sin confirmar (código 1212). En SIGMA sigue la cita que ya tenía el servicio. Si hay que aplazar: primero la Confirmación (sale en esta bandeja tras el informe del operario) y después un Repaso nuevo.';
 const SIN_CITA = 'Descartado solo: el portal no tiene ninguna cita pendiente de informar en este servicio (ya informada o retirada en SIGMA). No hay nada que enviar.';
 const IVA_PENDIENTE = /documento\s+de\s+iva\s+pendiente/i;
 const BLOQUEO_IVA = 'Bloqueado por SIGMA: documento de IVA pendiente de validar. No se ha enviado el Repaso; usa «Enviar a tramitación» y vuelve a intentarlo cuando SIGMA lo valide.';
@@ -598,6 +603,7 @@ async function enviarRepaso(s: Sesion, e: Envio): Promise<string> {
   try {
     return prefijoCitas + await guardarRepaso(s, e, n, ini, api);
   } catch (err) {
+    if (err instanceof SinConfirmar) throw new SinConfirmar(prefijoCitas + (err as Error).message);
     if (prefijoCitas && !(err instanceof IvaPendiente)) throw new Error(prefijoCitas + (err as Error).message);
     throw err;
   }
@@ -703,6 +709,7 @@ async function guardarRepaso(s: Sesion, e: Envio, n: string, ini: any, api: (rut
       continue;
     }
     console.error('review-update', n, JSON.stringify(res?.metadata ?? res).slice(0, 1500));
+    if ((res?.metadata?.errorCodes || []).some((x: { code?: unknown }) => String(x?.code) === '1212')) throw new SinConfirmar(SIN_CONFIRMAR);
     throw new Error('Al guardar Repaso: ' + traducirCodigos(res?.metadata?.errorCodes, res?.metadata?.message ?? res?.message));
   }
   throw new Error('El portal pidió demasiados pasos seguidos: revisa el servicio en el portal');
@@ -1040,6 +1047,12 @@ async function procesarEnvios(admin: SupabaseClient, cuenta: string, nombre: str
       // Informar cita sin cita pendiente en el portal: se descarta solo, sin error ni aviso (decisión del usuario 23/10/2026)
       if (err instanceof SinCitaPendiente && e.tipo === 'informar_cita') {
         await admin.from('sigma_envios').update({ estado: 'descartado', resultado: SIN_CITA }).eq('id', e.id);
+        await admin.from('partes').update({ sigma_ficha_en: null }).eq('id', e.parte_id);
+        continue;
+      }
+      // Aplazamiento en un siniestro sin confirmar (código 1212): se descarta solo, sin error ni aviso (decisión del usuario 27/10/2026)
+      if (err instanceof SinConfirmar && e.tipo === 'repaso') {
+        await admin.from('sigma_envios').update({ estado: 'descartado', resultado: (err as Error).message }).eq('id', e.id);
         await admin.from('partes').update({ sigma_ficha_en: null }).eq('id', e.parte_id);
         continue;
       }
