@@ -49,6 +49,11 @@
   .fila > *{flex:1}
 
   .seccion{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:14px;margin-bottom:12px}
+  .fi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .fi-grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:var(--borde);display:block}
+  .fi-visor{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;display:flex;align-items:center;justify-content:center}
+  .fi-visor img{max-width:100%;max-height:100%;object-fit:contain}
+  .fi-visor .x{position:absolute;top:calc(12px + env(safe-area-inset-top));right:12px;color:#fff;font-size:15px;background:rgba(255,255,255,.18);border-radius:18px;padding:6px 12px}
   .seccion h4{margin:0 0 8px;font-size:12px;color:var(--suave);text-transform:uppercase;letter-spacing:.6px}
   .grande{font-size:17px;font-weight:700}
   .suave{color:var(--suave);font-size:13px}
@@ -416,6 +421,7 @@ async function pintarParte() {
       ${p.aseguradora || p.poliza ? `<div class="seccion"><h4>Seguro</h4>${p.aseguradora ? `<div class="grande">${esc(p.aseguradora)}</div>` : ''}${p.poliza ? `<div class="suave">Póliza: ${esc(p.poliza)}</div>` : ''}</div>` : ''}
       ${p.descripcion ? `<div class="seccion"><h4>Descripción del trabajo</h4><div class="pre">${esc(p.descripcion)}</div></div>` : ''}
       ${a.notas || p.notas_oficina ? `<div class="seccion"><h4>Notas de la oficina</h4>${a.notas ? `<div class="pre">${esc(a.notas)}</div>` : ''}${p.notas_oficina ? `<div class="pre" style="${a.notas ? 'margin-top:8px' : ''}">${esc(p.notas_oficina)}</div>` : ''}</div>` : ''}
+      <div id="fotos-oficina"></div>
       <div class="pila" style="margin-top:4px">
         <button class="boton acento" onclick="ir('informe')">📝&nbsp; <span id="txt-inf">Hacer informe y fotos</span></button>
         ${a.estado === 'pendiente' ? `<button class="boton peligro" onclick="noRealizado()">No se pudo realizar</button>` : ''}
@@ -427,6 +433,7 @@ async function pintarParte() {
     sb.from('asignaciones').select(SELECT_ASIG).eq('id', a.id).single(),
     sb.from('informes').select('id, texto, trabajo_terminado, necesita_repaso, importe_gastos, creado_en, fotos!fotos_informe_id_fkey(count)').eq('parte_id', p.id).order('creado_en', { ascending: false }),
   ]);
+  pintarFotosOficina(p.id);
   if (estado.pantalla !== 'parte') return;
   if (r1.data && (r1.data.estado !== a.estado || r1.data.fecha !== a.fecha || r1.data.notas !== a.notas)) { estado.asig = r1.data; return pintarParte(); }
   const infs = r2.data || [];
@@ -436,6 +443,20 @@ async function pintarParte() {
       <div class="informe-prev"><div class="suave">${fHora(i.creado_en)} · ${i.fotos?.[0]?.count ?? 0} foto(s)${i.trabajo_terminado ? ' · Terminado' : ''}${i.necesita_repaso ? ' · Necesita repaso' : ''}${i.importe_gastos ? ' · Factura ' + Number(i.importe_gastos).toFixed(2).replace('.', ',') + ' €' : ''}</div>
       <div class="pre">${esc(i.texto)}</div></div>`).join('')}</div>`;
   }
+}
+// Fotos internas que la oficina ha añadido al servicio (v2.5)
+async function pintarFotosOficina(parteId) {
+  const { data } = await sb.from('fotos_internas').select('ruta').eq('parte_id', parteId).order('creado_en');
+  if (estado.pantalla !== 'parte' || !data?.length || !$('#fotos-oficina')) return;
+  const { data: f } = await sb.storage.from('fotos').createSignedUrls(data.map((x) => x.ruta), 3600);
+  const urls = (f || []).map((x) => x.signedUrl).filter(Boolean);
+  if (!urls.length || !$('#fotos-oficina')) return;
+  $('#fotos-oficina').innerHTML = `<div class="seccion"><h4>Fotos de la oficina (${urls.length})</h4><div class="fi-grid">${urls.map((u) => `<img src="${esc(u)}" loading="lazy" onclick="verFotoOficina(this.src)">`).join('')}</div></div>`;
+}
+function verFotoOficina(url) {
+  const d = document.createElement('div'); d.className = 'fi-visor';
+  d.innerHTML = `<img src="${esc(url)}"><span class="x">✕ Cerrar</span>`;
+  d.onclick = () => d.remove(); document.body.appendChild(d);
 }
 async function cambiarEstado(nuevo) {
   const { error } = await sb.from('asignaciones').update({ estado: nuevo }).eq('id', estado.asig.id);

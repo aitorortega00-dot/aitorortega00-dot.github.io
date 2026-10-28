@@ -143,6 +143,11 @@
   .fotos{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   .fotos a{position:relative;display:block}
   .fotos img{width:110px;height:110px;object-fit:cover;border-radius:8px;border:1px solid var(--borde);background:var(--borde)}
+  .fi-lista{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+  .fi-lista .fi{position:relative}
+  .fi-lista img{width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--borde);background:var(--borde);display:block;cursor:pointer}
+  .fi-lista .fi button{position:absolute;top:3px;right:3px;padding:0 6px;font-size:12px;line-height:20px;border-radius:10px;background:rgba(0,0,0,.65);color:#fff;border:0}
+  .fi-lista .fi.nueva img{outline:2px dashed var(--acento,#2563eb);outline-offset:-2px}
   .fotos span{position:absolute;left:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:1px 5px;border-radius:4px;text-transform:uppercase}
 
   .velo{position:fixed;inset:0;background:rgba(20,25,30,.45);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:20}
@@ -327,7 +332,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.38 (Repaso: la fecha de contacto con el cliente no puede ser anterior a la apertura del siniestro en SIGMA (código 4107); v2.37: Informes como archivador: una carpeta por servicio a la izquierda, agrupadas en Hoy / Ayer / Últimos 7 días / meses, con pestañas Todas · Sin revisar, buscador y filtro de operario; al abrir una carpeta se ven sus informes con fotos y «Marcar carpeta revisada»; v2.36: Contacto con el cliente: al planificar una visita de un servicio sin primer contacto (estado 15) la web pregunta en ese momento cuándo se contactó con el cliente (propone ahora, editable) y lo guarda en el borrador de Repaso; en Envíos a SIGMA se puede poner en la propia tarjeta; v2.35: Confirmación SIGMA: al llegar el informe del operario de un servicio sin confirmar, el robot prepara en Envíos a SIGMA un borrador «Confirmación»; la rápida la manda el robot al aprobar, la completa se hace en el portal y el robot lo comprueba; v2.34: Sin parpadeos: al marcar revisado, guardar o recibir cambios de otro ordenador/del robot ya no se vacía y repinta la página entera ni se recargan las fotos; solo cambia lo que ha cambiado; v2.33: Ventanas: botón ✕ arriba a la derecha en lugar de Cancelar/Cerrar; v2.32: Las ventanas (Nueva línea, ficha, Asignar visita…) ya no se cierran al pulsar fuera ni al soltar el ratón fuera mientras se selecciona texto: solo con Cancelar/Cerrar o Esc; v2.31: Asignar visita: si el servicio ya tiene una visita pendiente, avisa y deja elegir «Cambiar esa visita» (operario, día, hora) o «Añadir otra visita»; v2.30: Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.39 (Fotos internas para el operario al asignar o editar una visita: van con el servicio, el operario las ve en la app y no se envían a SIGMA; v2.38: Repaso: la fecha de contacto con el cliente no puede ser anterior a la apertura del siniestro en SIGMA (código 4107); v2.37: Informes como archivador: una carpeta por servicio a la izquierda, agrupadas en Hoy / Ayer / Últimos 7 días / meses, con pestañas Todas · Sin revisar, buscador y filtro de operario; al abrir una carpeta se ven sus informes con fotos y «Marcar carpeta revisada»; v2.36: Contacto con el cliente: al planificar una visita de un servicio sin primer contacto (estado 15) la web pregunta en ese momento cuándo se contactó con el cliente (propone ahora, editable) y lo guarda en el borrador de Repaso; en Envíos a SIGMA se puede poner en la propia tarjeta; v2.35: Confirmación SIGMA: al llegar el informe del operario de un servicio sin confirmar, el robot prepara en Envíos a SIGMA un borrador «Confirmación»; la rápida la manda el robot al aprobar, la completa se hace en el portal y el robot lo comprueba; v2.34: Sin parpadeos: al marcar revisado, guardar o recibir cambios de otro ordenador/del robot ya no se vacía y repinta la página entera ni se recargan las fotos; solo cambia lo que ha cambiado; v2.33: Ventanas: botón ✕ arriba a la derecha en lugar de Cancelar/Cerrar; v2.32: Las ventanas (Nueva línea, ficha, Asignar visita…) ya no se cierran al pulsar fuera ni al soltar el ratón fuera mientras se selecciona texto: solo con Cancelar/Cerrar o Esc; v2.31: Asignar visita: si el servicio ya tiene una visita pendiente, avisa y deja elegir «Cambiar esa visita» (operario, día, hora) o «Añadir otra visita»; v2.30: Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -367,7 +372,7 @@ function mensaje(e) {
   return m;
 }
 function fallo(e) { console.error(e); alert('Error: ' + mensaje(e)); }
-function cerrarModal() { $('#modal').innerHTML = ''; if (typeof asigEnEspera !== 'undefined') asigEnEspera = null; }
+function cerrarModal() { $('#modal').innerHTML = ''; if (typeof asigEnEspera !== 'undefined') asigEnEspera = null; if (typeof limpiarFotosInternas === 'function') limpiarFotosInternas(); }
 function abrirModal(html, ancho) {
   $('#modal').innerHTML = `<div class="velo"><div class="modal ${ancho ? 'ancho' : ''}"><button class="cerrar-x" onclick="cerrarModal()" title="Cerrar (Esc)" aria-label="Cerrar">✕</button>${html}</div></div>`;
 }
@@ -1580,6 +1585,80 @@ async function soltarGuardar(td) {
   if (parteId) pedirContacto(parteId);
 }
 
+// ---------- Fotos internas para el operario (v2.39) ----------
+// La oficina las añade al asignar o editar una visita. Van ligadas al servicio (tabla fotos_internas,
+// archivo fotos/internas/<servicio>/<uuid>.jpg): el operario las ve en todas sus visitas de ese servicio.
+// Nunca se envían a SIGMA. Las nuevas se suben al pulsar Asignar / Guardar.
+let fiNuevas = [], fiParte = null, fiExistentes = [], fiCargado = null;
+function limpiarFotosInternas() { fiNuevas.forEach((f) => URL.revokeObjectURL(f.url)); fiNuevas = []; fiParte = null; fiExistentes = []; fiCargado = null; }
+function bloqueFotosInternas() {
+  return `<label>Fotos internas para el operario <small style="color:var(--suave);font-weight:400">(no se envían a SIGMA)</small></label>
+    <div id="fi-lista" class="fi-lista"></div>
+    <input id="fi-input" type="file" accept="image/*" multiple style="display:none" onchange="anadirFotosInternas(this)">
+    <button type="button" class="sec mini" onclick="$('#fi-input').click()">📷 Añadir fotos</button>`;
+}
+async function pintarFotosInternas() {
+  const caja = $('#fi-lista'); if (!caja) return;
+  const parte = fiParte || ($('#as-parte') ? $('#as-parte').value : null);
+  if (!parte) { fiExistentes = []; fiCargado = null; }
+  else if (parte !== fiCargado) {
+    const { data } = await sb.from('fotos_internas').select('id, ruta, nombre, creado_en').eq('parte_id', parte).order('creado_en');
+    fiExistentes = data || []; fiCargado = parte;
+  }
+  const urls = fiExistentes.length ? await firmarFotos(fiExistentes.map((x) => x.ruta)) : {};
+  if (!$('#fi-lista')) return;
+  $('#fi-lista').innerHTML = [
+    ...fiExistentes.map((x) => `<div class="fi"><img src="${urls[x.ruta] || ''}" title="${esc(x.nombre || '')} · ${fCorta(x.creado_en.slice(0, 10))}" onclick="window.open(this.src,'_blank')"><button title="Borrar foto" onclick="borrarFotoInterna('${x.id}')">✕</button></div>`),
+    ...fiNuevas.map((f) => `<div class="fi nueva"><img src="${f.url}" title="${esc(f.nombre)} (se sube al guardar)"><button title="Quitar" onclick="quitarFotoInternaNueva('${f.clave}')">✕</button></div>`),
+  ].join('') || '<small style="color:var(--suave)">Sin fotos internas.</small>';
+}
+async function comprimirFotoInterna(file) {
+  const MAX = 1920; let fuente, w, h;
+  try { fuente = await createImageBitmap(file, { imageOrientation: 'from-image' }); w = fuente.width; h = fuente.height; }
+  catch { fuente = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = mal; i.src = URL.createObjectURL(file); }); w = fuente.naturalWidth; h = fuente.naturalHeight; }
+  const k = Math.min(1, MAX / Math.max(w, h)), c = document.createElement('canvas');
+  c.width = Math.round(w * k); c.height = Math.round(h * k);
+  c.getContext('2d').drawImage(fuente, 0, 0, c.width, c.height); if (fuente.close) fuente.close();
+  for (const q of [0.8, 0.65, 0.5]) { const b = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', q)); if (b && b.size < 5.5 * 1024 * 1024) return b; }
+  throw new Error('La foto es demasiado grande');
+}
+async function anadirFotosInternas(input) {
+  const files = [...(input.files || [])]; input.value = ''; let mal = 0;
+  for (const file of files) {
+    try { const blob = await comprimirFotoInterna(file); fiNuevas.push({ clave: crypto.randomUUID(), nombre: file.name, blob, url: URL.createObjectURL(blob) }); }
+    catch { mal++; }
+  }
+  if (mal) alert(`${mal} archivo(s) no se han podido leer como foto (usa JPG o PNG).`);
+  pintarFotosInternas();
+}
+function quitarFotoInternaNueva(clave) {
+  const f = fiNuevas.find((x) => x.clave === clave); if (f) URL.revokeObjectURL(f.url);
+  fiNuevas = fiNuevas.filter((x) => x.clave !== clave); pintarFotosInternas();
+}
+async function borrarFotoInterna(id) {
+  const x = fiExistentes.find((f) => f.id === id); if (!x || !confirm('¿Borrar esta foto interna? El operario dejará de verla.')) return;
+  await sb.storage.from('fotos').remove([x.ruta]);
+  const { error } = await sb.from('fotos_internas').delete().eq('id', id);
+  if (error) return fallo(error);
+  fiExistentes = fiExistentes.filter((f) => f.id !== id); pintarFotosInternas(); aviso('Foto borrada');
+}
+// Sube las fotos nuevas pendientes; devuelve cuántas se han subido
+async function subirFotosInternas(parteId, asignacionId) {
+  if (!fiNuevas.length) return 0;
+  let ok = 0;
+  for (const [i, f] of fiNuevas.entries()) {
+    aviso(`Subiendo foto ${i + 1} de ${fiNuevas.length}…`);
+    const ruta = `internas/${parteId}/${crypto.randomUUID()}.jpg`;
+    const { error } = await sb.storage.from('fotos').upload(ruta, f.blob, { contentType: 'image/jpeg' });
+    if (error) { console.error(error); continue; }
+    const { error: e2 } = await sb.from('fotos_internas').insert({ parte_id: parteId, asignacion_id: asignacionId, ruta, nombre: f.nombre });
+    if (e2) { console.error(e2); await sb.storage.from('fotos').remove([ruta]); continue; }
+    ok++;
+  }
+  if (ok < fiNuevas.length) alert(`Se han subido ${ok} de ${fiNuevas.length} fotos internas. Vuelve a añadir las que faltan desde la visita.`);
+  return ok;
+}
+
 async function modalAsignar({ parteId = '', operarioId = '', fecha = '' } = {}) {
   const { data: partes } = await sb.from('partes').select('id, numero_servicio, direccion, estado')
     .in('estado', ['pendiente', 'asignado', 'en_curso', 'terminado']).order('numero_servicio');
@@ -1587,7 +1666,7 @@ async function modalAsignar({ parteId = '', operarioId = '', fecha = '' } = {}) 
   abrirModal(`
     <h3>Asignar visita</h3>
     <label>Servicio</label>
-    <select id="as-parte">${(partes || []).map((p) => `<option value="${p.id}" ${p.id === parteId ? 'selected' : ''}>${esc(p.numero_servicio)} — ${esc(p.direccion)} (${TXT_ESTADO[p.estado]})</option>`).join('')}</select>
+    <select id="as-parte" onchange="pintarFotosInternas()">${(partes || []).map((p) => `<option value="${p.id}" ${p.id === parteId ? 'selected' : ''}>${esc(p.numero_servicio)} — ${esc(p.direccion)} (${TXT_ESTADO[p.estado]})</option>`).join('')}</select>
     <div class="dos">
       <div><label>Operario</label><select id="as-op">${cache.operarios.map((o) => `<option value="${o.id}" ${o.id === operarioId ? 'selected' : ''}>${esc(o.nombre)}</option>`).join('')}</select></div>
       <div><label>Día</label><input id="as-fecha" type="date" value="${fecha || hoyISO()}"></div>
@@ -1597,7 +1676,9 @@ async function modalAsignar({ parteId = '', operarioId = '', fecha = '' } = {}) 
       <div><label>Servicio Número</label><input id="as-orden" type="number" min="0" value="1"></div>
     </div>
     <label>Notas para el operario</label><textarea id="as-notas" placeholder="Llevar escalera, llaves en portería…"></textarea>
+    ${bloqueFotosInternas()}
     <div class="acciones"><button onclick="guardarAsignar()">Asignar</button></div>`);
+  limpiarFotosInternas(); pintarFotosInternas();
   if (!partes?.length) $('#as-parte').outerHTML = '<div class="nota">No hay servicios abiertos. Crea uno con «+ Nuevo servicio» en Inicio.</div>';
 }
 function guardarAsignar() { return sinRepetir(guardarAsignarYa); }
@@ -1617,9 +1698,10 @@ async function guardarAsignarYa() {
 }
 let asigEnEspera = null;
 async function insertarAsignacion(fila) {
-  const { error } = await sb.from('asignaciones').insert(fila);
+  const { data: nueva, error } = await sb.from('asignaciones').insert(fila).select('id').single();
   if (error) return fallo(error);
-  cerrarModal(); aviso('Visita asignada'); irA(vistaActual);
+  const nFotos = await subirFotosInternas(fila.parte_id, nueva.id);
+  cerrarModal(); aviso('Visita asignada' + (nFotos ? ` con ${nFotos} foto(s) interna(s)` : '')); irA(vistaActual);
   pedirContacto(fila.parte_id);
 }
 function preguntarVisitaPendiente(fila, pend) {
@@ -1645,7 +1727,8 @@ async function cambiarVisitaExistente(id) {
   if (f.notas) cambios.notas = f.notas; // si no se escribieron notas, se conservan las de la visita
   const { error } = await sb.from('asignaciones').update(cambios).eq('id', id);
   if (error) return fallo(error);
-  asigEnEspera = null; cerrarModal(); aviso('Visita cambiada'); irA(vistaActual);
+  const nFotos = await subirFotosInternas(f.parte_id, id);
+  asigEnEspera = null; cerrarModal(); aviso('Visita cambiada' + (nFotos ? ` con ${nFotos} foto(s) interna(s)` : '')); irA(vistaActual);
   pedirContacto(f.parte_id);
 }
 
@@ -1669,12 +1752,14 @@ async function modalAsignacion(id) {
     <label>Estado de la visita</label>
     <select id="ae-estado">${['pendiente', 'hecho', 'no_realizado'].map((e) => `<option value="${e}" ${e === a.estado ? 'selected' : ''}>${TXT_ESTADO[e]}</option>`).join('')}</select>
     <label>Notas para el operario</label><textarea id="ae-notas">${esc(a.notas || '')}</textarea>
+    ${bloqueFotosInternas()}
     <div class="acciones">
       <button class="peligro" onclick="quitarAsignacion('${a.id}')">Quitar de la planificación</button>
       <span class="esp"></span>
       <button class="sec" onclick="cerrarModal();modalParte('${a.parte.id}')">Ver servicio</button>
       <button onclick="guardarAsignacion('${a.id}')">Guardar</button>
     </div>`);
+  limpiarFotosInternas(); fiParte = a.parte.id; pintarFotosInternas();
 }
 function guardarAsignacion(id) { return sinRepetir(() => guardarAsignacionYa(id)); }
 async function guardarAsignacionYa(id) {
@@ -1683,7 +1768,8 @@ async function guardarAsignacionYa(id) {
     orden: Number(val('ae-orden') || 0), tipo: val('ae-tipo'), estado: val('ae-estado'), notas: val('ae-notas') || null,
   }).eq('id', id).select('parte_id').single();
   if (error) return fallo(error);
-  cerrarModal(); aviso('Guardado'); irA(vistaActual);
+  const nFotos = await subirFotosInternas(data.parte_id, id);
+  cerrarModal(); aviso('Guardado' + (nFotos ? ` con ${nFotos} foto(s) interna(s)` : '')); irA(vistaActual);
   pedirContacto(data.parte_id);
 }
 async function quitarAsignacion(id) {
