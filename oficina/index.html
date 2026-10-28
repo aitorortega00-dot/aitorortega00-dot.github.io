@@ -255,6 +255,38 @@
   .ptto-res{font-size:12px;color:var(--suave);margin-top:3px}
   .ptto-res b{font-variant-numeric:tabular-nums}
 
+  /* Informes como archivador (v2.37) */
+  .pestanas{display:inline-flex;background:#ECEAE4;border-radius:9px;padding:3px;gap:2px}
+  .pestanas button{background:transparent;border:0;color:var(--suave);padding:5px 12px;font-weight:600}
+  .pestanas button.activa{background:#fff;color:var(--texto);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .pestanas small{font-weight:700;margin-left:4px;color:var(--suave)}
+  .archivador{display:grid;grid-template-columns:330px minmax(0,1fr);gap:16px;align-items:start}
+  .carpetas{background:#fff;border:1px solid var(--borde);border-radius:12px;position:sticky;top:72px;max-height:calc(100vh - 92px);overflow:auto}
+  .cajon{position:sticky;top:0;z-index:1;background:#FAFAF8;border-bottom:1px solid var(--borde);padding:7px 14px;font-size:11px;font-weight:700;color:var(--suave);text-transform:uppercase;letter-spacing:.5px}
+  .carpeta{padding:10px 14px 10px 12px;border-bottom:1px solid var(--borde);border-left:4px solid transparent;cursor:pointer;font-size:13px}
+  .carpeta:hover{background:#FAFAF8}
+  .carpeta.sin-revisar{border-left-color:var(--acento)}
+  .carpeta.abierta{background:var(--marca-suave);border-left-color:var(--marca)}
+  .carpeta .l1{display:flex;align-items:center;gap:6px}
+  .carpeta .l1 b{font-size:14px;font-variant-numeric:tabular-nums}
+  .carpeta .l1 .esp{flex:1}.carpeta .l1 small{color:var(--suave);white-space:nowrap}
+  .carpeta .dir{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .carpeta .met{color:var(--suave);font-size:12px;margin-top:2px}
+  .carpeta .ok{color:var(--ok);font-weight:600}.carpeta .pend{color:var(--azul);font-weight:600}
+  .carpetas .mas{padding:10px;text-align:center}
+  .carpeta-cab{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;background:#fff;border:1px solid var(--borde);border-top:4px solid var(--marca);border-radius:12px;padding:12px 16px;margin-bottom:12px}
+  .carpeta-cab .num{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+  .carpeta-cab .num a{color:inherit;text-decoration:none}.carpeta-cab .num a:hover{text-decoration:underline}
+  .carpeta-cab .dir{margin-top:2px}.carpeta-cab .met{color:var(--suave);font-size:13px;margin-top:2px}
+  .carpeta-cab .esp{flex:1}
+  .solo-movil{display:none}
+  @media (max-width:900px){
+    .archivador{grid-template-columns:1fr}
+    .carpetas{position:static;max-height:none}
+    .archivador.con-carpeta .carpetas{display:none}
+    .archivador:not(.con-carpeta) .carpeta-abierta{display:none}
+    .solo-movil{display:inline-block;margin-bottom:10px}
+  }
   @media (max-width:1000px){.hoy-grid{grid-template-columns:1fr}}
   @media (max-width:900px){
     .plan{grid-template-columns:1fr}.sin-plan{position:static;max-height:none}
@@ -295,7 +327,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.36 (Contacto con el cliente: al planificar una visita de un servicio sin primer contacto (estado 15) la web pregunta en ese momento cuándo se contactó con el cliente (propone ahora, editable) y lo guarda en el borrador de Repaso; en Envíos a SIGMA se puede poner en la propia tarjeta; v2.35: Confirmación SIGMA: al llegar el informe del operario de un servicio sin confirmar, el robot prepara en Envíos a SIGMA un borrador «Confirmación»; la rápida la manda el robot al aprobar, la completa se hace en el portal y el robot lo comprueba; v2.34: Sin parpadeos: al marcar revisado, guardar o recibir cambios de otro ordenador/del robot ya no se vacía y repinta la página entera ni se recargan las fotos; solo cambia lo que ha cambiado; v2.33: Ventanas: botón ✕ arriba a la derecha en lugar de Cancelar/Cerrar; v2.32: Las ventanas (Nueva línea, ficha, Asignar visita…) ya no se cierran al pulsar fuera ni al soltar el ratón fuera mientras se selecciona texto: solo con Cancelar/Cerrar o Esc; v2.31: Asignar visita: si el servicio ya tiene una visita pendiente, avisa y deja elegir «Cambiar esa visita» (operario, día, hora) o «Añadir otra visita»; v2.30: Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.37 (Informes como archivador: una carpeta por servicio a la izquierda, agrupadas en Hoy / Ayer / Últimos 7 días / meses, con pestañas Todas · Sin revisar, buscador y filtro de operario; al abrir una carpeta se ven sus informes con fotos y «Marcar carpeta revisada»; v2.36: Contacto con el cliente: al planificar una visita de un servicio sin primer contacto (estado 15) la web pregunta en ese momento cuándo se contactó con el cliente (propone ahora, editable) y lo guarda en el borrador de Repaso; en Envíos a SIGMA se puede poner en la propia tarjeta; v2.35: Confirmación SIGMA: al llegar el informe del operario de un servicio sin confirmar, el robot prepara en Envíos a SIGMA un borrador «Confirmación»; la rápida la manda el robot al aprobar, la completa se hace en el portal y el robot lo comprueba; v2.34: Sin parpadeos: al marcar revisado, guardar o recibir cambios de otro ordenador/del robot ya no se vacía y repinta la página entera ni se recargan las fotos; solo cambia lo que ha cambiado; v2.33: Ventanas: botón ✕ arriba a la derecha en lugar de Cancelar/Cerrar; v2.32: Las ventanas (Nueva línea, ficha, Asignar visita…) ya no se cierran al pulsar fuera ni al soltar el ratón fuera mientras se selecciona texto: solo con Cancelar/Cerrar o Esc; v2.31: Asignar visita: si el servicio ya tiene una visita pendiente, avisa y deja elegir «Cambiar esa visita» (operario, día, hora) o «Añadir otra visita»; v2.30: Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -893,7 +925,7 @@ async function modalEnvio(id) {
         ${fila('Grupo de causas', d.grupo_causa)}${fila('Causa', d.causa)}${fila('Garantía', d.garantia)}${fila('Nº siniestro', d.siniestro)}${fila('Ocurrencia', d.ocurrencia)}${fila('Límite', d.limite ? d.limite + ' €' : '')}
         ${d.descripcion ? `<div style="white-space:pre-wrap;margin-top:4px;color:var(--suave)">${esc(d.descripcion)}</div>` : ''}
       </div>
-      ${inf ? `<div style="margin-top:10px;font-size:13px"><div style="font-weight:600;margin-bottom:2px">Informe del operario <span class="et ${inf.trabajo_terminado ? 'enviado' : 'borrador'}">${inf.trabajo_terminado ? 'Trabajo terminado' : 'Sin terminar'}</span> <small style="color:var(--suave)">${hace(inf.creado_en)}</small></div><div style="white-space:pre-wrap">${esc(inf.texto || '(sin texto)')}</div><a href="#informes" onclick="cerrarModal()" style="font-size:12px">Ver fotos en Informes</a></div>` : ''}
+      ${inf ? `<div style="margin-top:10px;font-size:13px"><div style="font-weight:600;margin-bottom:2px">Informe del operario <span class="et ${inf.trabajo_terminado ? 'enviado' : 'borrador'}">${inf.trabajo_terminado ? 'Trabajo terminado' : 'Sin terminar'}</span> <small style="color:var(--suave)">${hace(inf.creado_en)}</small></div><div style="white-space:pre-wrap">${esc(inf.texto || '(sin texto)')}</div><a href="#informes" onclick="cerrarModal();abrirCarpetaInformes('${e.parte_id}');return false" style="font-size:12px">Ver fotos en Informes</a></div>` : ''}
       ${e.confir_variante === 'completa' ? `<div style="margin-top:12px"><a class="boton-enlace" href="${URL_CONFIRMACION(e.parte.numero_servicio)}" target="_blank" rel="noopener">Abrir Confirmación en el portal ↗</a></div>` : `
         ${d.pide_primera_visita ? `<div class="dos">
           <div><label>Fecha de la primera visita (citada)</label><input id="en-pv-fecha" type="date" max="${hoyISO()}" value="${e.cita_fecha || ''}" ${dis}></div>
@@ -1909,7 +1941,7 @@ async function modalParte(id) {
       ${vis.length ? vis.map((a) => `<div><a href="#" onclick="cerrarModal();modalAsignacion('${a.id}');return false">${fCorta(a.fecha)} ${hCorta(a.hora)}</a> · ${esc(nombreDe(a.operario_id))} · ${a.tipo} <span class="et ${a.estado}">${TXT_ESTADO[a.estado]}</span></div>`).join('') : '<div style="color:var(--suave)">Sin visitas.</div>'}
       <label>Informes</label>
       ${infs.length ? infs.map((i) => `<div style="margin-bottom:4px">${fHora(i.creado_en)} · ${esc(nombreDe(i.operario_id))} ${i.revisado ? '' : '<span class="et nuevo">Nuevo</span>'}<div style="color:var(--suave);white-space:pre-wrap">${esc(i.texto.length > 160 ? i.texto.slice(0, 160) + '…' : i.texto)}</div></div>`).join('') +
-        `<a href="#informes" onclick="filtroInformes={parte:'${p.id}'};cerrarModal()">Ver informes con fotos →</a>` : '<div style="color:var(--suave)">Sin informes.</div>'}
+        `<a href="#informes" onclick="cerrarModal();abrirCarpetaInformes('${p.id}');return false">Ver informes con fotos →</a>` : '<div style="color:var(--suave)">Sin informes.</div>'}
       ${p.sigma_cuenta ? `<label>Envíos a SIGMA</label>
         ${(p.sigma_envios || []).sort((a, b) => b.creado_en.localeCompare(a.creado_en)).map((e) => `<div><a href="#" onclick="cerrarModal();modalEnvio('${e.id}');return false">${esc(tituloEnvio(e))}</a> <span class="et ${e.estado}">${TXT_ENVIO[e.estado]}</span>${e.resultado ? ` <small style="color:var(--suave)">${esc(e.resultado)}</small>` : ''}</div>`).join('') || '<div style="color:var(--suave)">Ninguno.</div>'}
         ${ivaBloq(p) ? `<div class="aviso-bloq">🔒 ${esc(txtBloq(p))}${ultimaTramitacion(p) ? `<div style="font-size:12px;margin-top:4px">${esc(ultimaTramitacion(p))}</div>` : ''}</div>
@@ -1999,51 +2031,155 @@ async function borrarVisitaPrueba(id, parteId, nInf) {
 // =====================================================================
 //  INFORMES
 // =====================================================================
-let filtroInformes = { parte: null, soloNuevos: false };
-let fotosVisor = [], idxVisor = 0, fotosInforme = {};
+let filtroInformes = { parte: null, fijada: false, soloNuevos: false, buscar: '', operario: '', limite: 300 };
+let fotosVisor = [], idxVisor = 0, fotosInforme = {}, _turnoInf = 0;
+const MESES_LARGOS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
+// Abre la carpeta de un servicio en Informes (desde la ficha o desde Envíos a SIGMA)
+function abrirCarpetaInformes(parteId) {
+  Object.assign(filtroInformes, { parte: parteId, fijada: true, soloNuevos: false, buscar: '', operario: '' });
+  if (location.hash === '#informes') vistaInformes(); else location.hash = '#informes';
+}
+function elegirCarpeta(parteId) {
+  filtroInformes.parte = parteId; filtroInformes.fijada = false; vistaInformes();
+  if (window.innerWidth <= 900) window.scrollTo({ top: 0 });
+}
+// Cajón del archivador según la fecha del último informe de la carpeta
+function cajonInforme(ts) {
+  const d = new Date(ts), h = new Date(); h.setHours(0, 0, 0, 0);
+  const dias = Math.floor((h - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+  if (dias <= 0) return 'Hoy';
+  if (dias === 1) return 'Ayer';
+  if (dias < 7) return 'Últimos 7 días';
+  const m = MESES_LARGOS[d.getMonth()]; return m[0].toUpperCase() + m.slice(1) + (d.getFullYear() !== h.getFullYear() ? ' ' + d.getFullYear() : '');
+}
+
+// v2.37: Informes como archivador. A la izquierda, una carpeta por servicio (agrupadas por fecha del último informe);
+// a la derecha, los informes con fotos de la carpeta abierta. Solo se cargan las fotos de esa carpeta.
 async function vistaInformes() {
-  const f = filtroInformes;
-  esqueleto('informes:' + (f.parte || '') + ':' + f.soloNuevos, `
-    <div class="barra"><h2>Informes de operarios</h2>
-      ${f.parte ? `<button class="sec" onclick="filtroInformes={parte:null,soloNuevos:false};vistaInformes()">← Ver todos</button>` : `
-        <label class="check" style="margin:0;text-transform:none;font-size:14px;color:var(--texto)"><input type="checkbox" id="fi-nuevos" ${f.soloNuevos ? 'checked' : ''}> Solo sin revisar</label>`}
+  const f = filtroInformes, turno = ++_turnoInf;
+  if (esqueleto('informes', `
+    <div class="barra"><h2>Informes</h2>
+      <div id="inf-pest" class="pestanas"></div>
+      <input id="inf-buscar" type="search" placeholder="Buscar servicio, dirección, pueblo…" style="max-width:280px">
+      <select id="inf-op" style="max-width:200px"></select>
       <span class="esp"></span><button class="sec" onclick="marcarTodosRevisados()">Marcar todos como revisados</button>
-    </div><div id="lista-inf">Cargando…</div>`);
-  if ($('#fi-nuevos')) $('#fi-nuevos').onchange = (e) => { filtroInformes.soloNuevos = e.target.checked; vistaInformes(); };
-  let q = sb.from('informes')
-    .select('*, parte:partes!informes_parte_id_fkey(id, numero_servicio, direccion, poblacion, compania:companias(nombre)), fotos!fotos_informe_id_fkey(id, tipo, ruta)')
-    .order('creado_en', { ascending: false }).limit(60);
-  if (f.parte) q = q.eq('parte_id', f.parte);
-  else if (f.soloNuevos) q = q.eq('revisado', false);
-  const { data, error } = await q;
-  if (error) return fallo(error);
-  if (!data.length) { morfar($('#lista-inf'), `<div class="tarjeta vacio">${f.soloNuevos ? 'No hay informes sin revisar 👍' : 'Todavía no hay informes.'}</div>`); return; }
+    </div>
+    <div class="archivador" id="inf-arch">
+      <aside class="carpetas" id="inf-carpetas"><div class="vacio">Cargando…</div></aside>
+      <section class="carpeta-abierta" id="inf-detalle"></section>
+    </div>`)) {
+    $('#inf-buscar').value = f.buscar;
+    $('#inf-buscar').oninput = (e) => { filtroInformes.buscar = e.target.value; filtroInformes.fijada = false; vistaInformes(); };
+    $('#inf-op').onchange = (e) => { filtroInformes.operario = e.target.value; filtroInformes.fijada = false; vistaInformes(); };
+  }
 
+  // Lista ligera (sin fotos) para montar las carpetas
+  const { data, error } = await sb.from('informes')
+    .select('id, parte_id, operario_id, creado_en, revisado, trabajo_terminado, necesita_repaso, parte:partes!informes_parte_id_fkey(id, numero_servicio, direccion, poblacion, compania:companias(nombre))')
+    .order('creado_en', { ascending: false }).limit(f.limite);
+  if (error) return fallo(error);
+  if (turno !== _turnoInf) return;
+
+  // Agrupar por servicio
+  const mapa = new Map();
+  for (const i of data) {
+    if (!i.parte) continue;
+    let c = mapa.get(i.parte_id);
+    if (!c) mapa.set(i.parte_id, c = { parte: i.parte, ultimo: i, n: 0, sinRev: 0, ops: new Set() });
+    c.n++; if (!i.revisado) c.sinRev++; c.ops.add(i.operario_id);
+  }
+  const todas = [...mapa.values()];
+  const nSinRev = todas.filter((c) => c.sinRev).length;
+  const ops = [...new Set(data.map((i) => i.operario_id))].map((id) => ({ id, nombre: nombreDe(id) })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  morfar($('#inf-pest'), `
+    <button class="${f.soloNuevos ? '' : 'activa'}" onclick="filtroInformes.soloNuevos=false;filtroInformes.fijada=false;vistaInformes()">Todas <small>${todas.length}</small></button>
+    <button class="${f.soloNuevos ? 'activa' : ''}" onclick="filtroInformes.soloNuevos=true;filtroInformes.fijada=false;vistaInformes()">Sin revisar <small>${nSinRev}</small></button>`);
+  morfar($('#inf-op'), `<option value="" ${f.operario ? '' : 'selected'}>Todos los operarios</option>` +
+    ops.map((o) => `<option value="${o.id}" ${f.operario === o.id ? 'selected' : ''}>${esc(o.nombre)}</option>`).join(''));
+  if (document.activeElement !== $('#inf-op')) $('#inf-op').value = f.operario;
+
+  const q = f.buscar.trim().toLowerCase();
+  const vis = todas.filter((c) => (!f.soloNuevos || c.sinRev) && (!f.operario || c.ops.has(f.operario)) &&
+    (!q || [c.parte.numero_servicio, c.parte.direccion, c.parte.poblacion, c.parte.compania?.nombre].join(' ').toLowerCase().includes(q)));
+
+  // Escritorio: si no hay carpeta elegida (o los filtros la ocultan), se abre la primera de la lista.
+  // Si se llegó desde la ficha (fijada), se respeta aunque no esté entre los cargados.
+  if (window.innerWidth > 900 && !f.fijada && !vis.some((c) => c.parte.id === f.parte)) f.parte = vis[0]?.parte.id || null;
+  $('#inf-arch').classList.toggle('con-carpeta', !!f.parte);
+
+  let html = '', cajon = '';
+  for (const c of vis) {
+    const k = cajonInforme(c.ultimo.creado_en);
+    if (k !== cajon) { cajon = k; html += `<div class="cajon" data-k="cajon-${esc(k)}">${esc(k)}</div>`; }
+    const u = c.ultimo;
+    html += `<div class="carpeta ${c.parte.id === f.parte ? 'abierta' : ''} ${c.sinRev ? 'sin-revisar' : ''}" data-k="${c.parte.id}" onclick="elegirCarpeta('${c.parte.id}')">
+      <div class="l1"><b>${esc(c.parte.numero_servicio)}</b>${c.sinRev ? `<span class="badge">${c.sinRev}</span>` : ''}<span class="esp"></span><small>${hace(u.creado_en)}</small></div>
+      <div class="dir">${esc([c.parte.direccion, c.parte.poblacion].filter(Boolean).join(', '))}</div>
+      <div class="met">${esc(nombreDe(u.operario_id))} · ${c.n} informe${c.n === 1 ? '' : 's'} · ${u.trabajo_terminado ? '<span class="ok">Terminado</span>' : '<span class="pend">Sin terminar</span>'}</div>
+    </div>`;
+  }
+  if (!vis.length) html = `<div class="vacio">${f.soloNuevos ? 'No hay informes sin revisar 👍' : q || f.operario ? 'Ninguna carpeta coincide.' : 'Todavía no hay informes.'}</div>`;
+  if (data.length >= f.limite) html += `<div class="mas" data-k="mas"><button class="sec mini" onclick="filtroInformes.limite+=300;vistaInformes()">Cargar informes más antiguos</button></div>`;
+  morfar($('#inf-carpetas'), html);
+
+  await pintarCarpeta(turno);
+}
+
+// Carpeta abierta: datos del servicio + sus informes con fotos (del más reciente al más antiguo)
+async function pintarCarpeta(turno) {
+  const f = filtroInformes, det = $('#inf-detalle');
+  if (!f.parte) { morfar(det, `<div class="tarjeta vacio">Elige una carpeta de la izquierda.</div>`); fotosVisor = []; return; }
+  const { data, error } = await sb.from('informes')
+    .select('*, parte:partes!informes_parte_id_fkey(id, numero_servicio, direccion, poblacion, compania:companias(nombre)), fotos!fotos_informe_id_fkey(id, tipo, ruta)')
+    .eq('parte_id', f.parte).order('creado_en', { ascending: false });
+  if (error) return fallo(error);
+  if (turno !== _turnoInf) return;
+  const volver = `<button class="sec mini solo-movil" onclick="filtroInformes.parte=null;vistaInformes()">← Archivador</button>`;
+  if (!data.length) { morfar(det, `${volver}<div class="tarjeta vacio">Este servicio no tiene informes.</div>`); fotosVisor = []; return; }
+
+  const p = data[0].parte;
   const urls = await firmarFotos(data.flatMap((i) => i.fotos.map((x) => x.ruta)));
+  if (turno !== _turnoInf) return;
   const orden = { antes: 0, despues: 1, factura: 2 };
   fotosVisor = []; fotosInforme = {};
-  data.forEach((i) => { fotosInforme[i.id] = { servicio: i.parte.numero_servicio, fecha: i.creado_en, fotos: [...i.fotos].sort((a, b) => orden[a.tipo] - orden[b.tipo]).map((x) => ({ ruta: x.ruta, tipo: x.tipo })) }; });
-  morfar($('#lista-inf'), data.map((i) => `
+  data.forEach((i) => { i.fotos.sort((a, b) => orden[a.tipo] - orden[b.tipo]); fotosInforme[i.id] = { servicio: p.numero_servicio, fecha: i.creado_en, fotos: i.fotos.map((x) => ({ ruta: x.ruta, tipo: x.tipo })) }; });
+  const sinRev = data.filter((i) => !i.revisado).length;
+  const repaso = data[0].necesita_repaso;
+
+  morfar(det, `${volver}
+    <div class="carpeta-cab" data-k="cab-${p.id}">
+      <div><div class="num"><a href="#" onclick="modalParte('${p.id}');return false">${esc(p.numero_servicio)}</a></div>
+        <div class="dir">${esc([p.direccion, p.poblacion].filter(Boolean).join(', '))}${p.compania?.nombre ? ' · ' + esc(p.compania.nombre) : ''}</div>
+        <div class="met">${data.length} informe${data.length === 1 ? '' : 's'}${sinRev ? ` · <b style="color:var(--acento)">${sinRev} sin revisar</b>` : ''}</div></div>
+      <span class="esp"></span>
+      ${repaso ? `<button class="mini acento" onclick="modalAsignar({parteId:'${p.id}'})">Programar repaso</button>` : ''}
+      ${sinRev ? `<button class="mini" onclick="marcarCarpetaRevisada('${p.id}')">Marcar carpeta revisada</button>` : ''}
+      <button class="mini sec" onclick="modalParte('${p.id}')">Ficha del servicio</button>
+    </div>
+    ${data.map((i) => `
     <div class="tarjeta informe ${i.revisado ? '' : 'sin-revisar'}" data-k="${i.id}">
       <div class="cab">
-        <b><a href="#" onclick="modalParte('${i.parte.id}');return false">${esc(i.parte.numero_servicio)}</a></b>
-        <span>${esc(i.parte.direccion)}${i.parte.poblacion ? ', ' + esc(i.parte.poblacion) : ''}</span>
-        <span style="color:var(--suave)">· ${esc(i.parte.compania?.nombre || '')} · ${esc(nombreDe(i.operario_id))} · ${fHora(i.creado_en)}</span>
+        <b>${fHora(i.creado_en)}</b>
+        <span style="color:var(--suave)">${esc(nombreDe(i.operario_id))}</span>
         ${i.trabajo_terminado ? '<span class="et terminado">Terminado</span>' : '<span class="et en_curso">Sin terminar</span>'}
         ${i.necesita_repaso ? '<span class="et pendiente">Necesita repaso</span>' : ''}
         ${i.importe_gastos ? `<span class="et">Factura ${euros(i.importe_gastos)}</span>` : ''}
         <span class="esp"></span>
-        ${i.necesita_repaso ? `<button class="mini acento" onclick="modalAsignar({parteId:'${i.parte.id}'})">Programar repaso</button>` : ''}
         ${['antes', 'despues'].map((t) => { const n = i.fotos.filter((x) => x.tipo === t).length; return n ? `<button class="mini" onclick="descargarFotos('${i.id}', '${t}', this)" title="Descargar las ${n} fotos de ${t === 'antes' ? 'antes' : 'después'}">⬇ ${t === 'antes' ? 'Antes' : 'Después'} (${n})</button>` : ''; }).join('')}
         ${i.revisado ? `<span class="et revisado">✓ Revisado</span>` : `<button class="mini" onclick="marcarRevisado('${i.id}')">Marcar revisado</button>`}
       </div>
       <div class="txt">${esc(i.texto)}</div>
-      ${i.fotos.length ? `<div class="fotos">${i.fotos.sort((a, b) => orden[a.tipo] - orden[b.tipo]).map((x) => {
-        const n = fotosVisor.push({ url: urls[x.ruta], tipo: x.tipo, parte: i.parte.numero_servicio }) - 1;
+      ${i.fotos.length ? `<div class="fotos">${i.fotos.map((x) => {
+        const n = fotosVisor.push({ url: urls[x.ruta], tipo: x.tipo, parte: p.numero_servicio }) - 1;
         return `<a href="#" onclick="abrirVisor(${n});return false"><img loading="lazy" src="${urls[x.ruta] || ''}" alt=""><span>${x.tipo === 'despues' ? 'después' : x.tipo}</span></a>`;
       }).join('')}</div>` : ''}
-    </div>`).join(''));
+    </div>`).join('')}`);
+}
+async function marcarCarpetaRevisada(parteId) {
+  const { error } = await sb.from('informes').update({ revisado: true }).eq('parte_id', parteId).eq('revisado', false);
+  if (error) return fallo(error);
+  contarSinRevisar(); vistaInformes();
 }
 // Descarga de golpe las fotos de un tipo (antes / despues) de un informe, como archivos sueltos:
 // <servicio>_<tipo>_<n>.jpg. Chrome pide una vez «Permitir descargas múltiples» para kubelapp.github.io.
