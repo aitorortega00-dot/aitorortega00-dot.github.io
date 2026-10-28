@@ -142,6 +142,42 @@
     .tjf input.imp{width:90px}
   }
   @media (min-width:761px){ .tarjetas-fac{display:none} }
+  /* ---------- Estadísticas ---------- */
+  .bloque{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:16px 18px;margin-bottom:18px}
+  .bloque>h3{margin:0 0 12px;font-size:17px;display:flex;align-items:center;gap:8px}
+  .bloque .kpis{margin-bottom:10px}
+  .bloque .kpi{background:#FAFAF8}
+  .kpi small{display:block;font-size:11px;color:var(--suave);margin-top:2px}
+  .kpi span.var{display:block;font-size:11px;font-weight:700;margin-top:3px;text-transform:none;letter-spacing:0}
+  .var.sube{color:var(--ok)} .var.baja{color:var(--peligro)} .var.igual{color:var(--suave)}
+  .leyenda{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--suave);margin:2px 0 4px}
+  .leyenda i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .leyenda i.l{width:16px;height:2px;border-radius:1px;vertical-align:3px}
+  .graf svg{display:block;overflow:visible}
+  .graf .g{stroke:#ECE9E3;stroke-width:1}
+  .graf .base{stroke:#C9C4BA;stroke-width:1}
+  .graf .ax{fill:var(--suave);font-size:11px;font-variant-numeric:tabular-nums}
+  .graf .hit{fill:transparent;cursor:default}
+  .graf .hit.hov{fill:rgba(43,47,54,.06)}
+  #est-tip{position:fixed;pointer-events:none;background:#2B2F36;color:#fff;border-radius:8px;padding:8px 11px;font-size:12px;z-index:40;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+  #est-tip b{display:block;margin-bottom:2px}
+  #est-tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+  .dgs{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-top:16px}
+  .dg h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;color:var(--suave);letter-spacing:.4px}
+  .dg-f{display:grid;grid-template-columns:minmax(0,1fr) 80px 92px;gap:8px;align-items:center;font-size:13px;padding:3px 0}
+  .dg-k{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dg-b{height:8px;background:#F1EEE8;border-radius:4px;overflow:hidden}
+  .dg-b i{display:block;height:100%;border-radius:4px}
+  .dg-v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .dg-v small{color:var(--suave)}
+  details.datos{margin-top:8px}
+  details.datos summary{cursor:pointer;color:var(--suave);font-size:12px}
+  details.datos table{font-size:12.5px;margin-top:6px}
+  details.datos th,details.datos td{padding:4px 8px}
+  details.datos td.num,details.datos th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .nota-est{font-size:12px;color:var(--suave);margin:8px 0 0}
+  #es-fechas{display:flex;gap:6px;align-items:center}
+  @media (max-width:760px){ .bloque{padding:12px} .dg-f{grid-template-columns:minmax(0,1fr) 60px 84px} #es-fechas{flex:1 1 100%} }
 </style>
 </head>
 <body>
@@ -156,6 +192,7 @@
     <nav class="menu">
       <a href="#usuarios" data-p="usuarios">Usuarios</a>
       <a href="#facturacion" data-p="facturacion">Facturación</a>
+      <a href="#estadisticas" data-p="estadisticas">Estadísticas</a>
     </nav>
     <span class="esp"></span>
   </header>
@@ -205,6 +242,35 @@
     <div id="fac-lista"><p class="suave">Cargando…</p></div>
     <div class="barra" style="margin-top:28px"><h2 style="font-size:17px">Facturas de compañía subidas</h2></div>
     <div id="fac-facturas" class="suave">—</div>
+  </main>
+
+  <main id="p-estadisticas" class="pagina ancha oculto">
+    <div class="barra">
+      <h2>Estadísticas</h2>
+      <span class="esp"></span>
+      <button class="sec mini" onclick="cargarEst(true)" title="Volver a leer los datos">↻ Actualizar</button>
+    </div>
+    <div class="filtros">
+      <select id="es-per" onchange="pintarEst()" title="Periodo">
+        <option value="7">Últimos 7 días</option>
+        <option value="30" selected>Últimos 30 días</option>
+        <option value="90">Últimos 90 días</option>
+        <option value="mes">Este mes</option>
+        <option value="mesant">Mes anterior</option>
+        <option value="anio">Este año</option>
+        <option value="todo">Todo</option>
+        <option value="rango">Entre fechas…</option>
+      </select>
+      <span id="es-fechas" class="oculto"><input type="date" id="es-desde" onchange="pintarEst()" title="Desde"><span class="suave">a</span><input type="date" id="es-hasta" onchange="pintarEst()" title="Hasta"></span>
+      <select id="es-agr" onchange="pintarEst()" title="Agrupar">
+        <option value="auto">Agrupar: automático</option><option value="dia">Por día</option><option value="semana">Por semana</option><option value="mes">Por mes</option>
+      </select>
+      <select id="es-prov" onchange="pintarEst()" title="Provincia">
+        <option value="">Todas las provincias</option><option value="VALLADOLID">Valladolid</option><option value="PALENCIA">Palencia</option>
+      </select>
+    </div>
+    <section class="bloque"><h3>Servicios nuevos</h3><div id="est-serv"><p class="suave">Cargando…</p></div></section>
+    <section class="bloque"><h3>Facturación</h3><div id="est-fac"><p class="suave">Cargando…</p></div></section>
   </main>
 </div>
 
@@ -265,12 +331,13 @@ async function alCambiarSesion(s) {
   irA();
 }
 // ---------- Páginas (Usuarios · Facturación) ----------
-const PAGINAS = ['usuarios', 'facturacion'];
+const PAGINAS = ['usuarios', 'facturacion', 'estadisticas'];
 function irA() {
   const p = PAGINAS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'usuarios';
   PAGINAS.forEach((x) => $('#p-' + x).classList.toggle('oculto', x !== p));
   document.querySelectorAll('header .menu a').forEach((a) => a.classList.toggle('activo', a.dataset.p === p));
   if (p === 'facturacion') cargarFac();
+  if (p === 'estadisticas') cargarEst(true);
 }
 window.addEventListener('hashchange', () => { if (yoId) irA(); });
 async function llamar(cuerpo) {
@@ -440,6 +507,7 @@ async function cargarFac(forzar) {
       if (ev.eventType === 'DELETE') filas = filas.filter((x) => x.id !== ev.old.id);
       else { const i = filas.findIndex((x) => x.id === ev.new.id); if (i >= 0) filas[i] = ev.new; else filas.unshift(ev.new); }
       if (!document.activeElement?.closest?.('#fac-lista')) pintarFac();
+      if (paginaEst()) pintarEst();
     }).subscribe();
   }
 }
@@ -822,6 +890,259 @@ function pintarFacturas() {
     ${facturas.map((x) => `<tr><td><b>${esc(x.numero)}</b></td><td>${fechaCorta(x.fecha)}</td><td class="num">${(x.lineas || []).length}</td><td class="num">${eur(x.base)}</td><td class="num">${eur(x.total)}</td><td class="num">${eur(x.a_transferir)}</td>
       <td>${x.resumen ? `<span class="chip ok">${x.resumen.cuadran} cuadran</span> ${x.resumen.distintos ? `<span class="chip mal">${x.resumen.distintos} distintos</span>` : ''} ${x.resumen.nuevos ? `<span class="chip av">${x.resumen.nuevos} no apuntados</span>` : ''}` : ''}
       <button class="mini sec" onclick="$('#ff-q').value='${esc(x.numero)}';pintarFac();scrollTo(0,0)">Ver</button></td></tr>`).join('')}</tbody></table></div>`;
+}
+// =====================================================================
+//  ESTADÍSTICAS · 28/10/2026
+//  · Servicios nuevos: los que SIGMA nos asigna cada día («Fecha/Hora Asignación», misma regla que «Nuevos hoy»);
+//    manuales: día de alta. Cerrados: «Fecha/Hora Cierre» de SIGMA. Datos de la función estadisticas_servicios() (solo admin).
+//    El hub empezó el 18/10/2026: antes de esa fecha solo cuentan los servicios que seguían abiertos ese día.
+//  · Facturación: la misma tabla de la página Facturación (fecha, importe sin IVA, liquidado).
+// =====================================================================
+let estServ = null;
+const COL = { entra: '#2F6DB5', cierra: '#D2691E', liq: '#2E7D4F', noliq: '#E8A24A', barra: '#5F6770' };
+const INICIO_HUB = '2026-10-18';
+const DIAS_SEM = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const MES_C = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const aD = (s) => new Date(s + 'T00:00:00Z');
+const isoD = (d) => `${d.getUTCFullYear()}-${dosD(d.getUTCMonth() + 1)}-${dosD(d.getUTCDate())}`;
+const sumaDias = (s, n) => { const d = aD(s); d.setUTCDate(d.getUTCDate() + n); return isoD(d); };
+const difDias = (a, b) => Math.round((aD(b) - aD(a)) / 864e5);
+const diaSem = (s) => (aD(s).getUTCDay() + 6) % 7; // 0 = lunes
+const lunesDe = (s) => sumaDias(s, -diaSem(s));
+const dm = (s) => s.slice(8, 10) + '/' + s.slice(5, 7);
+const nfmt = (v) => Number(v).toLocaleString('es-ES', { useGrouping: 'always' });
+const eur0 = (v) => Number(v).toLocaleString('es-ES', { maximumFractionDigits: 0, useGrouping: 'always' }) + ' €';
+const eurEje = (v) => v >= 1000 ? (v / 1000).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' k€' : eur0(v);
+const paginaEst = () => !$('#p-estadisticas').classList.contains('oculto');
+
+async function cargarEst(forzar) {
+  if (!facCargada) await cargarFac();
+  if (!estServ || forzar) {
+    const { data, error } = await sb.rpc('estadisticas_servicios');
+    if (error) { $('#est-serv').innerHTML = `<p class="error">No se pudieron leer los servicios: ${esc(mensaje(error))}</p>`; estServ = null; }
+    else estServ = data || [];
+  }
+  pintarEst();
+}
+
+// ---------- Periodo y agrupación ----------
+function rangoEst() {
+  const p = $('#es-per').value, h = hoyISO();
+  let d = sumaDias(h, -29), a = h;
+  if (p === '7') d = sumaDias(h, -6);
+  else if (p === '90') d = sumaDias(h, -89);
+  else if (p === 'mes') d = h.slice(0, 8) + '01';
+  else if (p === 'mesant') { a = sumaDias(h.slice(0, 8) + '01', -1); d = a.slice(0, 8) + '01'; }
+  else if (p === 'anio') d = h.slice(0, 4) + '-01-01';
+  else if (p === 'todo') {
+    const fs = [...(estServ || []).map((s) => s.entrada), ...filas.map((x) => x.fecha)].filter(Boolean).sort();
+    d = fs[0] || d; if (fs.length && fs[fs.length - 1] > a) a = fs[fs.length - 1];
+  } else if (p === 'rango') {
+    d = $('#es-desde').value || d; a = $('#es-hasta').value || a; if (d > a) [d, a] = [a, d];
+  }
+  return { d, a };
+}
+function agrupacion(n) {
+  const g = $('#es-agr').value;
+  if (g !== 'auto') return g;
+  return n <= 62 ? 'dia' : n <= 210 ? 'semana' : 'mes';
+}
+const clave = (f, g) => g === 'dia' ? f : g === 'semana' ? lunesDe(f) : f.slice(0, 7);
+function cubos(d, a, g) {
+  const B = [];
+  let k = clave(d, g);
+  while (k <= a) {
+    const fin = g === 'dia' ? k : g === 'semana' ? sumaDias(k, 6) : isoD(new Date(Date.UTC(+k.slice(0, 4), +k.slice(5, 7), 0)));
+    const ini = k.length === 7 ? k + '-01' : k;
+    B.push({ k, ini: ini < d ? d : ini, fin: fin > a ? a : fin,
+      corto: g === 'dia' ? dm(k) : g === 'semana' ? dm(k) : MES_C[+k.slice(5, 7) - 1] + (k.slice(0, 4) !== a.slice(0, 4) || B.length === 0 ? ' ' + k.slice(2, 4) : ''),
+      largo: g === 'dia' ? DIAS_SEM[diaSem(k)] + ' ' + dm(k) + '/' + k.slice(2, 4) : g === 'semana' ? `Semana del ${dm(ini < d ? d : ini)} al ${dm(fin > a ? a : fin)}` : MESES[+k.slice(5, 7) - 1] + ' ' + k.slice(0, 4) });
+    k = g === 'dia' ? sumaDias(k, 1) : g === 'semana' ? sumaDias(k, 7) : sumaDias(fin, 1).slice(0, 7);
+  }
+  return B;
+}
+function porCubo(B, lista, fFecha, fValor) {
+  const idx = new Map(B.map((b, i) => [b.k, i])), v = B.map(() => 0);
+  return { de: (g) => { lista.forEach((x) => { const f = fFecha(x); if (!f) return; const i = idx.get(clave(f, g)); if (i != null) v[i] += fValor ? fValor(x) : 1; }); return v; } };
+}
+function variacion(act, ant, invertir) {
+  if (!ant) return '';
+  const p = Math.round((act - ant) / ant * 100);
+  if (p === 0) return '<span class="var igual">= que el anterior</span>';
+  const bien = invertir ? p < 0 : p > 0;
+  return `<span class="var ${bien ? 'sube' : 'baja'}" title="Frente al periodo anterior de la misma duración">${p > 0 ? '▲' : '▼'} ${Math.abs(p)} % vs. anterior</span>`;
+}
+
+// ---------- Gráfico de barras (apiladas) + línea, en SVG ----------
+function escala(max, entero) {
+  const raw = max / 4, mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+  let paso = [1, 2, 2.5, 5, 10].find((k) => k * mag >= raw) * mag;
+  if (entero) paso = Math.max(1, Math.round(paso));
+  return { paso, top: Math.max(paso, Math.ceil(max / paso) * paso) };
+}
+let estTips = {};
+function grafico(id, B, series, fmtY, tip, entero) {
+  const el = $('#' + id); if (!el) return;
+  const W = Math.max(300, el.clientWidth || 700), H = W < 500 ? 200 : 250, m = { t: 10, r: 8, b: 26, l: 54 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b, n = B.length;
+  const barras = series.filter((s) => s.tipo !== 'linea'), lineas = series.filter((s) => s.tipo === 'linea');
+  const tot = B.map((_, i) => barras.reduce((t, s) => t + s.valores[i], 0));
+  const { paso, top } = escala(Math.max(1, ...tot, ...lineas.flatMap((s) => s.valores.map((v) => v || 0))), entero);
+  const y = (v) => m.t + ih - (v / top) * ih;
+  const bw = iw / n, ancho = Math.max(2, Math.min(34, bw * 0.68)), gap = n > 60 ? 1 : 2;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(series.map((x) => x.nombre).join(', '))}">`;
+  for (let v = 0; v <= top + 1e-9; v += paso) {
+    s += `<line class="${v ? 'g' : 'base'}" x1="${m.l}" x2="${W - m.r}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/>`;
+    s += `<text class="ax" x="${m.l - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${fmtY(v)}</text>`;
+  }
+  B.forEach((b, i) => {
+    const cx = m.l + bw * i + bw / 2;
+    const segs = barras.map((se) => ({ v: se.valores[i], c: se.color })).filter((x) => x.v > 0);
+    let base = 0;
+    segs.forEach((sg, j) => {
+      const yb = y(base), yt = y(base + sg.v), arriba = j === segs.length - 1;
+      const yb2 = j > 0 ? yb - gap : yb, h = Math.max(1, yb2 - yt), x0 = cx - ancho / 2, r = arriba ? Math.min(4, ancho / 2, h) : 0;
+      s += r ? `<path fill="${sg.c}" d="M${x0},${yb2}V${yt + r}Q${x0},${yt} ${x0 + r},${yt}H${x0 + ancho - r}Q${x0 + ancho},${yt} ${x0 + ancho},${yt + r}V${yb2}Z"/>`
+        : `<rect fill="${sg.c}" x="${x0}" y="${yt}" width="${ancho}" height="${h}"/>`;
+      base += sg.v;
+    });
+  });
+  lineas.forEach((se) => {
+    const pts = se.valores.map((v, i) => v == null ? null : `${(m.l + bw * i + bw / 2).toFixed(1)},${y(v).toFixed(1)}`).filter(Boolean);
+    s += `<polyline fill="none" stroke="${se.color}" stroke-width="2" stroke-linejoin="round" points="${pts.join(' ')}"/>`;
+    if (n <= 45) se.valores.forEach((v, i) => { if (v != null) s += `<circle cx="${(m.l + bw * i + bw / 2).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="${se.color}" stroke="#fff" stroke-width="2"/>`; });
+  });
+  const salto = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(iw / 50))));
+  B.forEach((b, i) => { if (i % salto === 0) s += `<text class="ax" x="${(m.l + bw * i + bw / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle">${esc(b.corto)}</text>`; });
+  B.forEach((b, i) => { s += `<rect class="hit" data-g="${id}" data-i="${i}" x="${(m.l + bw * i).toFixed(1)}" y="${m.t}" width="${bw.toFixed(1)}" height="${ih}"/>`; });
+  s += '</svg>';
+  el.innerHTML = s;
+  estTips[id] = (i) => `<b>${esc(B[i].largo)}</b>${tip(i)}`;
+}
+function tipFila(color, texto, linea) { return `<div><i style="background:${color}${linea ? ';height:2px;vertical-align:3px' : ''}"></i>${texto}</div>`; }
+document.addEventListener('mousemove', (e) => {
+  const t = e.target.closest?.('.graf .hit');
+  let tipEl = $('#est-tip');
+  document.querySelectorAll('.graf .hit.hov').forEach((h) => h !== t && h.classList.remove('hov'));
+  if (!t) { tipEl?.remove(); return; }
+  t.classList.add('hov');
+  if (!tipEl) { tipEl = document.createElement('div'); tipEl.id = 'est-tip'; document.body.appendChild(tipEl); }
+  const f = estTips[t.dataset.g]; if (!f) return;
+  tipEl.innerHTML = f(+t.dataset.i);
+  const r = tipEl.getBoundingClientRect();
+  let x = e.clientX + 14, yy = e.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14;
+  if (yy + r.height > innerHeight - 8) yy = e.clientY - r.height - 14;
+  tipEl.style.left = x + 'px'; tipEl.style.top = yy + 'px';
+});
+// En el móvil: tocar una barra muestra su dato
+document.addEventListener('click', (e) => {
+  const t = e.target.closest?.('.graf .hit');
+  if (!t || !matchMedia('(hover: none)').matches) return;
+  const f = estTips[t.dataset.g]; if (f) aviso(f(+t.dataset.i).replace(/<\/div>/g, ' · ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').replace(/ · $/, ''));
+});
+let estResize;
+window.addEventListener('resize', () => { clearTimeout(estResize); estResize = setTimeout(() => { if (yoId && paginaEst()) pintarEst(); }, 200); });
+
+// ---------- Desglose (barras horizontales) ----------
+function desglose(titulo, items, color, fmt, max = 8) {
+  items = items.filter((i) => i.v > 0).sort((a, b) => b.v - a.v);
+  if (items.length > max) {
+    const resto = items.slice(max - 1);
+    items = [...items.slice(0, max - 1), { k: `Otros (${resto.length})`, v: resto.reduce((t, i) => t + i.v, 0), n: resto.reduce((t, i) => t + (i.n || 0), 0) }];
+  }
+  const tope = Math.max(1, ...items.map((i) => i.v));
+  return `<div class="dg"><h4>${esc(titulo)}</h4>${items.length ? items.map((i) => `<div class="dg-f"><span class="dg-k" title="${esc(i.k)}">${esc(i.k)}</span>
+    <span class="dg-b"><i style="width:${(i.v / tope * 100).toFixed(1)}%;background:${color}"></i></span><span class="dg-v">${fmt(i)}</span></div>`).join('') : '<p class="suave" style="margin:0">Sin datos.</p>'}</div>`;
+}
+function agrupar(lista, fk, fv) {
+  const m = new Map();
+  lista.forEach((x) => { const k = fk(x) || '—'; const o = m.get(k) || { k, v: 0, n: 0 }; o.v += fv ? fv(x) : 1; o.n++; m.set(k, o); });
+  return [...m.values()];
+}
+function tablaDatos(B, cols) {
+  return `<details class="datos"><summary>Ver los datos en tabla</summary><div class="tabla-fac" style="display:block"><table><thead><tr><th>Periodo</th>${cols.map((c) => `<th class="num">${esc(c.t)}</th>`).join('')}</tr></thead><tbody>
+    ${B.map((b, i) => `<tr><td>${esc(b.largo)}</td>${cols.map((c) => `<td class="num">${c.f(c.v[i])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
+}
+
+// ---------- Pintar ----------
+function pintarEst() {
+  if (!facCargada) return;
+  $('#es-fechas').classList.toggle('oculto', $('#es-per').value !== 'rango');
+  const { d, a } = rangoEst(), n = difDias(d, a) + 1, g = agrupacion(n), B = cubos(d, a, g);
+  const pd = sumaDias(d, -n), pa = sumaDias(d, -1);
+  const prov = $('#es-prov').value, hoy = hoyISO();
+  const en = (f, x, y) => !!f && f >= x && f <= y;
+  const nomG = { dia: 'día', semana: 'semana', mes: 'mes' }[g];
+
+  // ----- Servicios -----
+  if (estServ) {
+    const sv = estServ.filter((s) => !prov || s.provincia === prov);
+    const entr = sv.filter((s) => en(s.entrada, d, a)), cerr = sv.filter((s) => en(s.cierre, d, a));
+    const comparable = pd >= INICIO_HUB;
+    const antE = comparable ? sv.filter((s) => en(s.entrada, pd, pa)).length : 0;
+    const antC = comparable ? sv.filter((s) => en(s.cierre, pd, pa)).length : 0;
+    const abiertos = sv.filter((s) => !['cerrado', 'anulado'].includes(s.estado)).length;
+    const hoyN = sv.filter((s) => s.entrada === hoy).length;
+    const urg = entr.filter((s) => s.urgente).length;
+    const vE = porCubo(B, entr, (s) => s.entrada).de(g), vC = porCubo(B, cerr, (s) => s.cierre).de(g).map((v, i) => B[i].fin < INICIO_HUB ? null : v);
+    const pico = Math.max(0, ...vE), iPico = vE.indexOf(pico);
+    const porDia = agrupar(entr, (s) => DIAS_SEM[diaSem(s.entrada)]);
+    const semanas = Math.max(1, n / 7);
+    $('#est-serv').innerHTML = `
+      <div class="kpis">
+        <div class="kpi"><b>${nfmt(entr.length)}</b><span>Entrados en el periodo</span>${variacion(entr.length, antE)}</div>
+        <div class="kpi"><b>${(entr.length / n).toLocaleString('es-ES', { maximumFractionDigits: 1 })}</b><span>Media por día</span></div>
+        <div class="kpi"><b>${nfmt(hoyN)}</b><span>Entrados hoy</span></div>
+        <div class="kpi"><b>${pico ? nfmt(pico) : '—'}</b><span>Máximo en un ${nomG}</span>${pico ? `<small>${esc(B[iPico].largo)}</small>` : ''}</div>
+        <div class="kpi"><b>${nfmt(cerr.length)}</b><span>Cerrados en SIGMA</span>${variacion(cerr.length, antC)}</div>
+        <div class="kpi"><b>${nfmt(abiertos)}</b><span>Abiertos ahora</span></div>
+        <div class="kpi ${urg ? 'aviso' : ''}"><b>${nfmt(urg)}</b><span>Urgentes entrados</span></div>
+      </div>
+      <div class="leyenda"><span><i style="background:${COL.entra}"></i>Entrados</span><span><i class="l" style="background:${COL.cierra}"></i>Cerrados en SIGMA</span><span>· por ${nomG}</span></div>
+      <div class="graf" id="g-serv"></div>
+      ${tablaDatos(B, [{ t: 'Entrados', v: vE, f: nfmt }, { t: 'Cerrados', v: vC, f: (v) => v == null ? '—' : nfmt(v) }])}
+      ${d < INICIO_HUB ? `<p class="nota-est">KUBEL recibe los servicios desde el 18/10/2026: antes de esa fecha solo se cuentan los que seguían abiertos ese día${pd < INICIO_HUB ? ', y no se compara con el periodo anterior' : ''}.</p>` : ''}
+      <div class="dgs">
+        ${desglose('Por gremio', agrupar(entr, (s) => s.gremio ? s.gremio + (s.gremio_codigo ? ' · ' + s.gremio_codigo : '') : '—'), COL.entra, (i) => `${nfmt(i.v)} <small>${Math.round(i.v / entr.length * 100)} %</small>`)}
+        ${desglose('Por provincia', agrupar(entr, (s) => s.provincia ? s.provincia[0] + s.provincia.slice(1).toLowerCase() : 'Sin provincia'), COL.entra, (i) => `${nfmt(i.v)} <small>${Math.round(i.v / entr.length * 100)} %</small>`)}
+        ${desglose('Media por día de la semana', DIAS_SEM.map((k) => ({ k, v: (porDia.find((x) => x.k === k)?.v || 0) / semanas })).filter((x) => x.v), COL.entra, (i) => i.v.toLocaleString('es-ES', { maximumFractionDigits: 1 }), 7)}
+      </div>`;
+    grafico('g-serv', B, [{ nombre: 'Entrados', color: COL.entra, valores: vE }, { nombre: 'Cerrados', color: COL.cierra, valores: vC, tipo: 'linea' }], nfmt,
+      (i) => tipFila(COL.entra, `Entrados: <b style="display:inline">${vE[i]}</b>`) + tipFila(COL.cierra, `Cerrados: ${vC[i] == null ? 'sin datos' : vC[i]}`, true), true);
+  }
+
+  // ----- Facturación -----
+  const fv = filas.filter((x) => (!prov || x.provincia === prov) && en(x.fecha, d, a));
+  const antF = filas.filter((x) => (!prov || x.provincia === prov) && en(x.fecha, pd, pa));
+  const imp = (x) => Number(x.importe) || 0;
+  const suma = (l) => r2(l.reduce((t, x) => t + imp(x), 0));
+  const tot = suma(fv), conImp = fv.filter((x) => x.importe != null), noLiq = fv.filter((x) => !x.liquidado), sinImp = fv.length - conImp.length;
+  const vL = porCubo(B, fv.filter((x) => x.liquidado), (x) => x.fecha, imp).de(g).map(r2);
+  const vN = porCubo(B, noLiq, (x) => x.fecha, imp).de(g).map(r2);
+  const vNum = porCubo(B, fv, (x) => x.fecha).de(g);
+  const gremioDe = new Map((estServ || []).map((s) => [s.id, s.gremio]));
+  const fmtE = (i) => `${eur0(i.v)} <small>· ${i.n}</small>`;
+  $('#est-fac').innerHTML = `
+    <div class="kpis">
+      <div class="kpi"><b>${eur(tot)}</b><span>Facturado sin IVA</span>${variacion(tot, suma(antF))}</div>
+      <div class="kpi"><b>${eur(r2(tot * IVA))}</b><span>Con IVA</span></div>
+      <div class="kpi"><b>${nfmt(fv.length)}</b><span>Servicios facturados</span>${variacion(fv.length, antF.length)}</div>
+      <div class="kpi"><b>${conImp.length ? eur(r2(tot / conImp.length)) : '—'}</b><span>Importe medio</span></div>
+      <div class="kpi"><b>${eur(r2(tot / n))}</b><span>Media por día</span></div>
+      <div class="kpi aviso"><b>${eur(suma(noLiq))}</b><span>No liquidado (${noLiq.length})</span></div>
+      ${sinImp ? `<div class="kpi aviso"><b>${sinImp}</b><span>Sin importe</span></div>` : ''}
+    </div>
+    <div class="leyenda"><span><i style="background:${COL.liq}"></i>Liquidado</span><span><i style="background:${COL.noliq}"></i>No liquidado</span><span>· importe sin IVA por ${nomG}, según la fecha de la línea</span></div>
+    <div class="graf" id="g-fac"></div>
+    ${tablaDatos(B, [{ t: 'Servicios', v: vNum, f: nfmt }, { t: 'Liquidado', v: vL, f: eur }, { t: 'No liquidado', v: vN, f: eur }, { t: 'Total sin IVA', v: vL.map((v, i) => r2(v + vN[i])), f: eur }])}
+    <div class="dgs">
+      ${desglose('Por operario', agrupar(fv, (x) => x.operario || 'Sin operario', imp), COL.barra, fmtE)}
+      ${desglose('Por compañía', agrupar(fv, (x) => x.compania || 'Sin compañía', imp), COL.barra, fmtE)}
+      ${desglose('Por gremio', agrupar(fv, (x) => gremioDe.get(x.parte_id) || 'Sin dato (a mano o del Excel)', imp), COL.barra, fmtE)}
+    </div>`;
+  grafico('g-fac', B, [{ nombre: 'Liquidado', color: COL.liq, valores: vL }, { nombre: 'No liquidado', color: COL.noliq, valores: vN }], eurEje,
+    (i) => tipFila(COL.liq, `Liquidado: ${eur(vL[i])}`) + tipFila(COL.noliq, `No liquidado: ${eur(vN[i])}`) + `<div style="margin-top:3px">Total: <b style="display:inline">${eur(r2(vL[i] + vN[i]))}</b> · ${vNum[i]} servicio${vNum[i] === 1 ? '' : 's'}</div>`);
 }
 </script>
 </body>
