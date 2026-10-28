@@ -87,3 +87,21 @@ update public.sigma_envios e
                 where x.parte_id = e.parte_id and x.id <> e.id and x.tipo = 'repaso'
                   and x.estado in ('aprobado','enviando','enviado')
                   and x.fecha = e.fecha and x.hora is not distinct from e.hora);
+
+-- 19c: Repasos sin enviar (borrador o error) cuya cita ya ha pasado → descartados solos (cada 5 min)
+create or replace function public.sigma_descartar_repasos_caducados()
+returns integer language plpgsql security definer set search_path to 'public' as $$
+declare n integer; ahora timestamp := now() at time zone 'Europe/Madrid';
+begin
+  update public.sigma_envios
+     set estado = 'descartado',
+         resultado = 'Descartado solo: la cita (' || to_char(fecha, 'DD/MM/YYYY') || coalesce(' ' || to_char(hora, 'HH24:MI'), '')
+                     || ') ya ha pasado sin enviarse a SIGMA'
+                     || case when estado = 'error' and resultado is not null then ' · Error anterior: ' || resultado else '' end
+   where tipo = 'repaso' and estado in ('borrador','error') and fecha is not null
+     and (case when hora is null then fecha < ahora::date else (fecha + hora) <= ahora end);
+  get diagnostics n = row_count;
+  return n;
+end; $$;
+revoke all on function public.sigma_descartar_repasos_caducados() from public, anon, authenticated;
+select cron.schedule('kubel-repasos-caducados', '*/5 * * * *', 'select public.sigma_descartar_repasos_caducados()');
