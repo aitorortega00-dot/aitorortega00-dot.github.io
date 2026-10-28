@@ -105,6 +105,7 @@
   .tabla-fac input.imp{width:90px;text-align:right}
   .tabla-fac input.fac{width:110px}
   .tabla-fac input.com{width:150px}
+  .cierre{font-size:11px;color:var(--suave)}
   .tabla-fac tr.sin-imp td{background:#FFF8EC}
   .tabla-fac tr.liq td{color:#5F6770}
   .nota-imp{display:block;font-size:11px;color:#8A4B00;white-space:normal;max-width:160px}
@@ -196,6 +197,7 @@
       <select id="ff-op" onchange="pintarFac()"></select>
       <select id="ff-cia" onchange="pintarFac()"></select>
       <select id="ff-est" onchange="pintarFac()"></select>
+      <select id="ff-cie" onchange="pintarFac()" title="Cuenta de oficina que cerró el servicio (la que marcó revisado su informe)"></select>
       <select id="ff-mes" onchange="$('#ff-dia').value='';pintarFac()"></select>
       <input id="ff-dia" type="date" title="Día" onchange="$('#ff-mes').value='';pintarFac()">
       <button class="sec mini" onclick="limpiarFiltros()">Quitar filtros</button>
@@ -409,6 +411,8 @@ async function abrirCopia(inp) {
 //  · Cada servicio SIGMA que el robot pasa a Cerrado entra solo como NO LIQUIDADO (fecha y operario de la visita).
 //  · El importe (sin IVA) lo anota la función sigma-importes con el total del presupuesto aceptado; se puede corregir.
 //  · LIQUIDADO: a mano o al subir la factura PDF de SIGMA (cotejo).
+//  · Cerrado por (28/10/2026): cuenta de oficina que marcó revisado el último informe del servicio
+//    (lo rellena la BD: informes.revisado_por → facturacion.cerrado_por). «Sin registrar» = antes del 28/10 o sin informe.
 // =====================================================================
 const IVA = 1.21;
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -447,21 +451,24 @@ const FILTROS = {
   est: (x, v) => v === 'liq' ? x.liquidado : v === 'no' ? !x.liquidado : v === 'sinimp' ? x.importe == null : true,
   mes: (x, v) => claveMes(x) === v,
   dia: (x, v) => x.fecha === v,
+  cie: (x, v) => (x.cerrado_por || '—') === v,
 };
+const SIN_CIERRE = 'Sin registrar';
+const txtCierre = (x) => x.cerrado_por ? `${esc(x.cerrado_por)}${x.cerrado_en ? ` <span class="cierre">${new Date(x.cerrado_en).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>` : ''}` : '<span class="cierre">—</span>';
 function valoresFiltro() {
-  return { op: $('#ff-op').value, cia: $('#ff-cia').value, est: $('#ff-est').value, mes: $('#ff-mes').value, dia: $('#ff-dia').value };
+  return { op: $('#ff-op').value, cia: $('#ff-cia').value, est: $('#ff-est').value, cie: $('#ff-cie').value, mes: $('#ff-mes').value, dia: $('#ff-dia').value };
 }
 function pasa(x, f, salvo) {
   for (const k of Object.keys(FILTROS)) if (k !== salvo && f[k] && !FILTROS[k](x, f[k])) return false;
   const q = $('#ff-q').value.trim().toLowerCase();
-  if (q && ![x.servicio, x.direccion, x.factura, x.comentario, x.operario].some((t) => String(t || '').toLowerCase().includes(q))) return false;
+  if (q && ![x.servicio, x.direccion, x.factura, x.comentario, x.operario, x.cerrado_por].some((t) => String(t || '').toLowerCase().includes(q))) return false;
   return true;
 }
 function rellenarSelect(id, todos, opciones, valor) {
   $(id).innerHTML = `<option value="">${todos}</option>` + opciones.map(([v, t, n]) => `<option value="${esc(v)}" ${v === valor ? 'selected' : ''}>${esc(t)} (${n})</option>`).join('');
 }
 function contar(lista, fn) { const m = new Map(); lista.forEach((x) => { const k = fn(x); m.set(k, (m.get(k) || 0) + 1); }); return m; }
-function limpiarFiltros() { ['#ff-q', '#ff-op', '#ff-cia', '#ff-est', '#ff-mes', '#ff-dia'].forEach((i) => ($(i).value = '')); pintarFac(); }
+function limpiarFiltros() { ['#ff-q', '#ff-op', '#ff-cia', '#ff-est', '#ff-cie', '#ff-mes', '#ff-dia'].forEach((i) => ($(i).value = '')); pintarFac(); }
 
 function pintarFac() {
   if (!facCargada) return;
@@ -473,6 +480,8 @@ function pintarFac() {
   rellenarSelect('#ff-cia', 'Todas las compañías', [...cias].sort((a, b) => b[1] - a[1]).map(([k, n]) => [k, k, n]), f.cia);
   const be = filas.filter((x) => pasa(x, f, 'est'));
   rellenarSelect('#ff-est', 'Liquidado y no liquidado', [['no', 'NO LIQUIDADO', be.filter((x) => !x.liquidado).length], ['liq', 'LIQUIDADO', be.filter((x) => x.liquidado).length], ['sinimp', 'Sin importe', be.filter((x) => x.importe == null).length]], f.est);
+  const cies = contar(filas.filter((x) => pasa(x, f, 'cie')), (x) => x.cerrado_por || '—');
+  rellenarSelect('#ff-cie', 'Cerrado por: todas las cuentas', [...cies].sort((a, b) => a[0] === '—' ? 1 : b[0] === '—' ? -1 : a[0].localeCompare(b[0])).map(([k, n]) => [k, k === '—' ? SIN_CIERRE : 'Cerrado por ' + k, n]), f.cie);
   const meses = contar(filas.filter((x) => pasa(x, f, 'mes')), claveMes);
   rellenarSelect('#ff-mes', 'Todos los meses', [...meses].filter(([k]) => k).sort((a, b) => b[0].localeCompare(a[0])).map(([k, n]) => [k, nombreMes(k), n]), f.mes);
 
@@ -496,11 +505,11 @@ function pintarFac() {
   const inp = (x, campo, cls, ph) => `<input class="${cls}" value="${esc(campo === 'importe' ? (x.importe == null ? '' : String(x.importe).replace('.', ',')) : x[campo] ?? '')}" placeholder="${ph}" onchange="guardarCampo('${x.id}','${campo}',this)" onkeydown="if(event.key==='Enter')this.blur()">`;
   $('#fac-lista').innerHTML = `
     <div class="tabla-fac"><table><thead><tr>
-      <th>Fecha</th><th>Mes</th><th>Servicio</th><th>Dirección</th><th>Provincia</th><th>Operario</th><th>Compañía</th>
+      <th>Fecha</th><th>Mes</th><th>Servicio</th><th>Dirección</th><th>Provincia</th><th>Operario</th><th>Compañía</th><th>Cerrado por</th>
       <th class="num">Importe</th><th class="num">Con IVA</th><th>Factura</th><th>Comentario</th><th>Estado</th><th></th></tr></thead><tbody>
     ${lista.map((x) => `<tr class="${x.importe == null ? 'sin-imp' : ''} ${x.liquidado ? 'liq' : ''}">
       <td>${fechaCorta(x.fecha)}</td><td>${esc(mesDe(x))}</td><td><b>${esc(x.servicio)}</b></td>
-      <td class="dir">${esc(x.direccion)}</td><td>${esc(x.provincia)}</td><td>${esc(x.operario)}</td><td>${esc(x.compania)}</td>
+      <td class="dir">${esc(x.direccion)}</td><td>${esc(x.provincia)}</td><td>${esc(x.operario)}</td><td>${esc(x.compania)}</td><td>${txtCierre(x)}</td>
       <td class="num">${inp(x, 'importe', 'imp', '0,00')}${dif(x)}${nota(x)}</td>
       <td class="num">${x.importe != null ? eur(r2(x.importe * IVA)) : ''}</td>
       <td>${inp(x, 'factura', 'fac', '')}</td><td>${inp(x, 'comentario', 'com', '')}</td>
@@ -508,7 +517,7 @@ function pintarFac() {
     </tbody></table></div>
     <div class="tarjetas-fac">${lista.map((x) => `<div class="tjf ${x.importe == null ? 'sin-imp' : ''}">
       <div class="f1"><b>${esc(x.servicio)}</b>${est(x)}</div>
-      <div class="c">${fechaCorta(x.fecha)} · ${esc(x.operario || '—')} · ${esc(x.compania || '')}<br>${esc(x.direccion || '')}${x.provincia ? ' · ' + esc(x.provincia) : ''}</div>
+      <div class="c">${fechaCorta(x.fecha)} · ${esc(x.operario || '—')} · ${esc(x.compania || '')}<br>${esc(x.direccion || '')}${x.provincia ? ' · ' + esc(x.provincia) : ''}${x.cerrado_por ? '<br>Cerrado por ' + txtCierre(x) : ''}</div>
       <div class="f2">${inp(x, 'importe', 'imp', 'Importe')}<span class="suave">${x.importe != null ? 'con IVA ' + eur(r2(x.importe * IVA)) : ''}</span>${dif(x)}
         <button class="mini sec" onclick="modalLinea('${x.id}')">Editar</button></div>${nota(x)}</div>`).join('')}</div>
     <div class="pie-tabla">${ver.length > MAX ? `Se muestran ${MAX} de ${ver.length}: usa los filtros para acotar. ` : ''}Importe sin IVA. Lo anota el robot con el total del presupuesto aceptado en SIGMA; puedes corregirlo escribiendo encima.</div>`;
@@ -546,7 +555,7 @@ function modalLinea(id) {
   const cias = [...new Set(['SIGMA', 'TASHO', 'YAVOI', ...filas.map((f) => f.compania).filter(Boolean)])];
   abrirModal(`
     <h3>${id ? 'Servicio ' + esc(x.servicio) : 'Nueva línea'}</h3>
-    ${id ? `<div class="sub">${x.origen === 'auto' ? 'Entró sola al cerrarse en SIGMA' : x.origen === 'excel' ? 'Del Excel antiguo' : x.origen === 'factura' ? 'Añadida desde una factura' : 'Añadida a mano'}${x.liquidado_en ? ' · liquidado el ' + fecha(x.liquidado_en) : ''}</div>` : ''}
+    ${id ? `<div class="sub">${x.origen === 'auto' ? 'Entró sola al cerrarse en SIGMA' : x.origen === 'excel' ? 'Del Excel antiguo' : x.origen === 'factura' ? 'Añadida desde una factura' : 'Añadida a mano'}${x.liquidado_en ? ' · liquidado el ' + fecha(x.liquidado_en) : ''}${x.cerrado_por ? ` · cerrado por <b>${esc(x.cerrado_por)}</b>${x.cerrado_en ? ' el ' + fecha(x.cerrado_en) : ''}` : ''}</div>` : ''}
     <div class="dos"><div><label>Fecha</label><input type="date" id="l-fecha" value="${esc(x.fecha || '')}"></div>
       <div><label>Servicio</label><input id="l-serv" value="${esc(x.servicio || '')}"></div></div>
     <label>Dirección</label><input id="l-dir" value="${esc(x.direccion || '')}">
@@ -596,14 +605,14 @@ async function descargarExcel() {
   try {
     if (!window.XLSX) await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
     const f = valoresFiltro(), ver = filas.filter((x) => pasa(x, f));
-    const cab = ['FECHA', 'MES', 'SERVICIO', 'DIRECCION', 'PROVINCIA', 'OPERARIO', 'COMPAÑÍA', 'GASTO REAL', 'FACTURACION', 'CON IVA', 'FACTURA', 'COMENTARIO', 'ESTADO'];
+    const cab = ['FECHA', 'MES', 'SERVICIO', 'DIRECCION', 'PROVINCIA', 'OPERARIO', 'COMPAÑÍA', 'GASTO REAL', 'FACTURACION', 'CON IVA', 'FACTURA', 'COMENTARIO', 'ESTADO', 'CERRADO POR'];
     const datos = ver.map((x) => [x.fecha ? new Date(x.fecha + 'T00:00:00') : '', mesDe(x), /^\d+$/.test(x.servicio) ? Number(x.servicio) : x.servicio, x.direccion || '', x.provincia || '', x.operario || '', x.compania || '',
       x.gasto_real == null ? '' : Number(x.gasto_real), x.importe == null ? '' : Number(x.importe), x.importe == null ? '' : r2(x.importe * IVA),
-      x.factura || '', x.comentario || '', x.liquidado ? 'LIQUIDADO' : 'NO LIQUIDADO']);
+      x.factura || '', x.comentario || '', x.liquidado ? 'LIQUIDADO' : 'NO LIQUIDADO', x.cerrado_por || '']);
     const tot = (i) => r2(datos.reduce((t, r) => t + (Number(r[i]) || 0), 0));
-    datos.push(['', '', 'Total', '', '', '', '', tot(7), tot(8), tot(9), '', '', '']);
+    datos.push(['', '', 'Total', '', '', '', '', tot(7), tot(8), tot(9), '', '', '', '']);
     const ws = XLSX.utils.aoa_to_sheet([cab, ...datos], { cellDates: true, dateNF: 'dd/mm/yyyy' });
-    ws['!cols'] = [10, 10, 12, 34, 12, 13, 10, 10, 12, 12, 14, 18, 14].map((w) => ({ wch: w }));
+    ws['!cols'] = [10, 10, 12, 34, 12, 13, 10, 10, 12, 12, 14, 18, 14, 13].map((w) => ({ wch: w }));
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Servicios');
     XLSX.writeFile(wb, `KUBEL-facturacion-${hoyISO()}.xlsx`);
   } catch (e) { aviso('Error: ' + mensaje(e)); }
