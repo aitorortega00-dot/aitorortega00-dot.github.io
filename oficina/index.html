@@ -166,6 +166,21 @@
   .check input{width:auto}
   .aviso{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--texto);color:#fff;padding:10px 18px;border-radius:10px;z-index:30;font-weight:600;max-width:calc(100vw - 32px)}
   .vacio{color:var(--suave);padding:20px;text-align:center}
+  /* v2.41 Destacados ⭐ */
+  .estrella{background:none;border:1px solid var(--borde);color:#B98A0E;font-size:18px;line-height:1;padding:3px 8px;border-radius:8px;vertical-align:middle;margin-left:6px;cursor:pointer}
+  .estrella.on{background:#FFF4CC;border-color:#E9C75A}
+  .estrella:hover{background:#FFF4CC}
+  .caja-dest{background:#FFFBEA;border:1px solid #E9C75A;border-radius:10px;padding:10px 12px;margin:8px 0 4px}
+  .caja-dest textarea{min-height:80px;background:#fff}
+  .caja-dest .meta{font-size:12px;color:var(--suave);margin-top:4px}
+  .dest-lista{display:grid;gap:10px}
+  .dest{background:var(--tarjeta);border:1px solid var(--borde);border-left:4px solid #E9C75A;border-radius:12px;padding:12px 14px;cursor:pointer}
+  .dest:hover{border-color:#E9C75A}
+  .dest .cab{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .dest .num{font-weight:700;font-size:15px}
+  .dest .dir{color:var(--suave);font-size:13px;margin-top:2px}
+  .dest .nota{white-space:pre-wrap;margin-top:8px}
+  .dest .meta{font-size:12px;color:var(--suave);margin-top:6px}
 
   .visor{position:fixed;inset:0;background:rgba(10,12,14,.92);z-index:40;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:16px}
   .visor img{max-width:100%;max-height:calc(100vh - 110px);border-radius:6px}
@@ -320,6 +335,7 @@
       <a href="#plan" data-v="plan">Planificación</a>
       <a href="#informes" data-v="informes">Informes<span id="b-inf" class="badge oculto"></span></a>
       <a href="#envios" data-v="envios">Envíos a SIGMA<span id="b-env" class="badge oculto"></span></a>
+      <a href="#destacados" data-v="destacados" title="Destacados: servicios con anotación para toda la oficina">⭐<span id="b-dest" class="badge oculto"></span></a>
     </nav>
     <div class="usuario"><span id="sigma-ind" class="sigma-ind oculto" onclick="modalSigma()" title="Robot SIGMA: última lectura del portal"></span><span id="vivo" class="vivo off" title="Actualización en directo"></span><button class="mini" id="btn-avisos" onclick="alternarAvisos()" title="Avisos en este dispositivo">🔕</button><span id="yo"></span></div>
   </header>
@@ -332,7 +348,7 @@
 
 <script>
 /* =====================================================================
-   KUBEL Oficina — v2.40 (Asignar visita en servicios cerrados o anulados: el servicio de la ficha queda elegido y la visita es solo interna, sin Repaso ni Informar cita para SIGMA y sin tocar estado, Facturación ni «Cerrado por» (SQL 22); v2.39: Fotos internas para el operario al asignar o editar una visita: van con el servicio, el operario las ve en la app y no se envían a SIGMA; v2.38: Repaso: la fecha de contacto con el cliente no puede ser anterior a la apertura del siniestro en SIGMA (código 4107); v2.37: Informes como archivador: una carpeta por servicio a la izquierda, agrupadas en Hoy / Ayer / Últimos 7 días / meses, con pestañas Todas · Sin revisar, buscador y filtro de operario; al abrir una carpeta se ven sus informes con fotos y «Marcar carpeta revisada»; v2.36: Contacto con el cliente: al planificar una visita de un servicio sin primer contacto (estado 15) la web pregunta en ese momento cuándo se contactó con el cliente (propone ahora, editable) y lo guarda en el borrador de Repaso; en Envíos a SIGMA se puede poner en la propia tarjeta; v2.35: Confirmación SIGMA: al llegar el informe del operario de un servicio sin confirmar, el robot prepara en Envíos a SIGMA un borrador «Confirmación»; la rápida la manda el robot al aprobar, la completa se hace en el portal y el robot lo comprueba; v2.34: Sin parpadeos: al marcar revisado, guardar o recibir cambios de otro ordenador/del robot ya no se vacía y repinta la página entera ni se recargan las fotos; solo cambia lo que ha cambiado; v2.33: Ventanas: botón ✕ arriba a la derecha en lugar de Cancelar/Cerrar; v2.32: Las ventanas (Nueva línea, ficha, Asignar visita…) ya no se cierran al pulsar fuera ni al soltar el ratón fuera mientras se selecciona texto: solo con Cancelar/Cerrar o Esc; v2.31: Asignar visita: si el servicio ya tiene una visita pendiente, avisa y deja elegir «Cambiar esa visita» (operario, día, hora) o «Añadir otra visita»; v2.30: Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
+   KUBEL Oficina — v2.41 (Destacados ⭐: estrella junto al nº en la ficha del servicio con una anotación compartida por toda la oficina; página ⭐ con la lista (SQL 23); v2.40: Asignar visita en servicios cerrados o anulados: el servicio de la ficha queda elegido y la visita es solo interna, sin Repaso ni Informar cita para SIGMA y sin tocar estado, Facturación ni «Cerrado por» (SQL 22); v2.39: Fotos internas para el operario al asignar o editar una visita: van con el servicio, el operario las ve en la app y no se envían a SIGMA; v2.38: Repaso: la fecha de contacto con el cliente no puede ser anterior a la apertura del siniestro en SIGMA (código 4107); v2.37: Informes como archivador: una carpeta por servicio a la izquierda, agrupadas en Hoy / Ayer / Últimos 7 días / meses, con pestañas Todas · Sin revisar, buscador y filtro de operario; al abrir una carpeta se ven sus informes con fotos y «Marcar carpeta revisada»; v2.36: Contacto con el cliente: al planificar una visita de un servicio sin primer contacto (estado 15) la web pregunta en ese momento cuándo se contactó con el cliente (propone ahora, editable) y lo guarda en el borrador de Repaso; en Envíos a SIGMA se puede poner en la propia tarjeta; v2.35: Confirmación SIGMA: al llegar el informe del operario de un servicio sin confirmar, el robot prepara en Envíos a SIGMA un borrador «Confirmación»; la rápida la manda el robot al aprobar, la completa se hace en el portal y el robot lo comprueba; v2.34: Sin parpadeos: al marcar revisado, guardar o recibir cambios de otro ordenador/del robot ya no se vacía y repinta la página entera ni se recargan las fotos; solo cambia lo que ha cambiado; v2.33: Ventanas: botón ✕ arriba a la derecha en lugar de Cancelar/Cerrar; v2.32: Las ventanas (Nueva línea, ficha, Asignar visita…) ya no se cierran al pulsar fuera ni al soltar el ratón fuera mientras se selecciona texto: solo con Cancelar/Cerrar o Esc; v2.31: Asignar visita: si el servicio ya tiene una visita pendiente, avisa y deja elegir «Cambiar esa visita» (operario, día, hora) o «Añadir otra visita»; v2.30: Asignar visita: el botón se bloquea mientras guarda (evita visitas dobles por doble clic); también al arrastrar en Planificación y al guardar una visita; v2.29: Informes: botones «⬇ Antes» y «⬇ Después» descargan de golpe todas las fotos de ese tipo; v2.28: Sin estado «En camino» en las visitas (quitado también de la app operario v2.4); v2.27: Ficha del servicio: botones «Repaso» y «Mensaje a tramitación» junto a «Asignar visita»; Asignar visita sin campo Tipo y «Orden en la ruta» pasa a «Servicio Número»; v2.26: Presupuestos: importe total del presupuesto en SIGMA en la lista y en la ficha; al quedar aceptado el servicio entra en Facturación del panel admin; v2.25.1: Asignar visita: la hora se elige en un desplegable con las horas que admite SIGMA, en punto o y media 08:00–21:30; v2.25: Próxima visita: incluye la cita presencial marcada en SIGMA con un Repaso «Visita al Cliente»; v2.24: Presupuestos: el robot solo guarda los servicios cuyo presupuesto cambia; v2.23: Presupuestos: vista con filtros Aceptados · Pendientes de valoración · Enviados · Rechazados (gremios 11A, 77A, 30A, 10A, 76A) y partidas en la ficha; v2.22: Repaso bloqueado también en estado SIGMA 6 «Aplazamiento Pte. Cia./Perito» y 16 «presupuesto pendiente»: en gris con «Enviar a tramitación»; v2.21: contacto con el cliente: nunca posterior a ahora ni antes de las 08:00; v2.20: Inicio: nº de servicios abiertos en compañía y provincias; los contadores de provincia, pueblo, gremio y compañía se recalculan con los demás filtros; v2.19: Envíos a SIGMA: no se aprueban Repasos de servicios cerrados ni con fecha/hora pasada; v2.18: Repasos: el servicio sale de «Caducada» al instante al guardar/aprobar el Repaso; v2.17: Repasos: filtro y orden nuevos/antiguos; v2.16: [PRUEBAS] borrar visita con informes; v2.15: Repasos: Sin primer contacto no suma al contador; «Todas las provincias»; ficha con Teléfono asegurado 1/2 y perjudicado 1/2; v2.14: Inicio sin rutas, últimos informes ni «Planificar semana»; Gremio junto al buscador; Urgentes al final; v2.13: Repaso bloqueado por documento de IVA → botón «Enviar a tramitación»; v2.12: Nuevos hoy = asignados hoy por SIGMA; v2.11: servicios nuevos de hoy: etiqueta, filtro y KPI; v2.10: Repaso nuevo solo se guarda al pulsar Guardar/Aprobar; v2.9: Repaso con fecha de contacto en estado 15; v2.8: sin Operarios; «Servicio» en vez de «Parte»; filtro Gremio; Total servicios)
    Web accesible desde cualquier sitio. Datos en Supabase.
    ===================================================================== */
 
@@ -480,6 +496,7 @@ async function alCambiarSesion(sesion) {
   await cargarCatalogos();
   arrancarTiempoReal();
   contarSinRevisar();
+  contarDestacados();
   contarEnvios();
   KubelAvisos.sincronizar(sb).then(pintarBotonAvisos);
   contarRepasos();
@@ -530,6 +547,7 @@ function arrancarTiempoReal() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'partes' }, (p) => alCambio('partes', p))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sigma_sincronizaciones' }, () => cargarSigma())
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sigma_envios' }, (p) => alCambioEnvio(p))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'destacados' }, (p) => alCambio('destacados', p))
     .subscribe((estado) => $('#vivo').classList.toggle('off', estado !== 'SUBSCRIBED'));
 }
 function pararTiempoReal() { if (canal) { sb.removeChannel(canal); canal = null; } }
@@ -540,6 +558,7 @@ function alCambio(tabla, p) {
     if (p.new.estado === 'no_realizado') aviso(`⚠️ ${nombreDe(p.new.operario_id)}: visita no realizada`);
   }
   if (tabla === 'informes') contarSinRevisar();
+  if (tabla === 'destacados') contarDestacados();
   if (tabla === 'partes') { clearTimeout(alCambio.sc); alCambio.sc = setTimeout(() => { contarRepasos(); contarPresupuestos(); }, 800); }
   // No recargar si hay una ventana abierta (para no perder lo que se está escribiendo)
   clearTimeout(recargaT);
@@ -1044,7 +1063,7 @@ async function guardarEnvio(id, aprobar) {
 // ---------- Navegación ----------
 window.addEventListener('hashchange', () => yo && irA(location.hash.slice(1)));
 function irA(v, silencioso) {
-  const vistas = { inicio: vistaHoy, repasos: vistaRepasos, presupuestos: vistaPresupuestos, plan: vistaPlan, informes: vistaInformes, envios: vistaEnvios };
+  const vistas = { inicio: vistaHoy, repasos: vistaRepasos, presupuestos: vistaPresupuestos, plan: vistaPlan, informes: vistaInformes, envios: vistaEnvios, destacados: vistaDestacados };
   // Direcciones antiguas: #hoy y #partes → Inicio (que ya incluye los partes); #sincontacto → Repasos
   let irAPartes = false;
   if (v === 'hoy') v = 'inicio';
@@ -2037,13 +2056,14 @@ function exportarPartes() {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
-async function modalParte(id) {
+async function modalParte(id, abrirNota) {
   let p = { compania_id: cache.companias.find((c) => c.nombre === 'SIGMA')?.id, urgente: false, estado: 'pendiente' };
-  let historial = '';
+  let historial = '', dest = null;
   if (id) {
     const r = await sb.from('partes').select('*, asignaciones!asignaciones_parte_id_fkey(id, fecha, hora, estado, tipo, operario_id), informes!informes_parte_id_fkey(id, creado_en, texto, revisado, operario_id), sigma_envios(id, tipo, estado, fecha, hora, motivo_codigo, motivo_texto, resolucion, resultado, creado_en, enviado_en, confir_variante)').eq('id', id).single();
     if (r.error) return fallo(r.error);
     p = r.data;
+    dest = (await sb.from('destacados').select('*').eq('parte_id', id).maybeSingle()).data || null;
     const vis = (p.asignaciones || []).sort((a, b) => a.fecha.localeCompare(b.fecha));
     const infs = (p.informes || []).sort((a, b) => b.creado_en.localeCompare(a.creado_en));
     historial = `
@@ -2060,7 +2080,8 @@ async function modalParte(id) {
         : ''}` : ''}`;
   }
   abrirModal(`
-    <h3>${id ? 'Servicio ' + esc(p.numero_servicio) : 'Nuevo servicio'}</h3>
+    <h3>${id ? 'Servicio ' + esc(p.numero_servicio) + ` <button id="btn-estrella" class="estrella ${dest ? 'on' : ''}" onclick="alternarCajaDest()" title="${dest ? 'Destacado: ver o editar la anotación' : 'Destacar con una anotación para toda la oficina'}">${dest ? '★' : '☆'}</button>` : 'Nuevo servicio'}</h3>
+    ${id ? cajaDestacado(id, dest, abrirNota) : ''}
     ${id ? `<div style="color:var(--suave);font-size:12px">Creado ${fHora(p.creado_en)} · modificado ${fHora(p.actualizado_en)}${p.origen === 'sigma' ? ' · importado de SIGMA' : ''}</div>` : ''}
     ${id ? bloqueSigma(p) : ''}
     <div class="dos">
@@ -2104,6 +2125,85 @@ async function modalParte(id) {
       
       <button onclick="guardarParte(${id ? `'${id}'` : ''})">${id ? 'Guardar' : 'Crear servicio'}</button>
     </div>`);
+}
+
+// =====================================================================
+//  DESTACADOS ⭐ (v2.41) — anotación compartida por servicio entre los
+//  usuarios de oficina. Se marca con la estrella de la ficha y se ve en
+//  la página ⭐. Una anotación por servicio (tabla destacados, SQL 23).
+//  No la ve el operario ni va a SIGMA.
+// =====================================================================
+function metaDest(d) {
+  if (!d) return '';
+  const mismo = d.creado_en && Math.abs(new Date(d.actualizado_en) - new Date(d.creado_en)) < 2000;
+  return mismo ? `Destacado por ${esc(nombreDe(d.creado_por))} · ${fHora(d.creado_en)}`
+    : `Editado por ${esc(nombreDe(d.actualizado_por))} · ${fHora(d.actualizado_en)} <small>(destacado por ${esc(nombreDe(d.creado_por))})</small>`;
+}
+function cajaDestacado(parteId, d, abierta) {
+  return `<div id="caja-dest" class="caja-dest ${abierta ? '' : 'oculto'}" data-parte="${parteId}">
+    <label style="margin-top:0">⭐ Anotación para la oficina <small style="color:var(--suave);font-weight:400">(la ven todos los usuarios de oficina; no la ve el operario ni va a SIGMA)</small></label>
+    <textarea id="dest-nota" placeholder="Ej.: llamar al cliente el lunes, pendiente de material, avisar a tramitación…">${esc(d?.nota || '')}</textarea>
+    <div class="meta" id="dest-meta">${metaDest(d)}</div>
+    <div class="acciones" style="margin-top:8px">
+      <button class="mini" onclick="guardarDestacado('${parteId}')">${d ? 'Guardar anotación' : '⭐ Destacar'}</button>
+      ${d ? `<button class="mini sec" onclick="quitarDestacado('${parteId}')">Quitar de ⭐</button>` : ''}
+    </div></div>`;
+}
+function alternarCajaDest() {
+  const c = $('#caja-dest'); if (!c) return;
+  c.classList.toggle('oculto');
+  if (!c.classList.contains('oculto')) $('#dest-nota')?.focus();
+}
+let guardandoDest = false;
+async function guardarDestacado(parteId) {
+  if (guardandoDest) return;
+  const nota = $('#dest-nota')?.value.trim() || '';
+  guardandoDest = true;
+  const { data, error } = await sb.from('destacados').upsert({ parte_id: parteId, nota }, { onConflict: 'parte_id' }).select('*').single();
+  guardandoDest = false;
+  if (error) return fallo(error);
+  const c = $('#caja-dest');
+  if (c && c.dataset.parte === parteId) c.outerHTML = cajaDestacado(parteId, data, true);
+  const b = $('#btn-estrella'); if (b) { b.classList.add('on'); b.textContent = '★'; b.title = 'Destacado: ver o editar la anotación'; }
+  aviso('⭐ Anotación guardada'); contarDestacados();
+}
+async function quitarDestacado(parteId) {
+  if (!confirm('¿Quitar este servicio de ⭐ Destacados? Se borra la anotación para toda la oficina.')) return;
+  const { error } = await sb.from('destacados').delete().eq('parte_id', parteId);
+  if (error) return fallo(error);
+  const c = $('#caja-dest'); if (c && c.dataset.parte === parteId) c.outerHTML = cajaDestacado(parteId, null, false);
+  const b = $('#btn-estrella'); if (b) { b.classList.remove('on'); b.textContent = '☆'; b.title = 'Destacar con una anotación para toda la oficina'; }
+  aviso('Quitado de ⭐'); contarDestacados();
+  if (vistaActual === 'destacados') vistaDestacados();
+}
+async function contarDestacados() {
+  const { count } = await sb.from('destacados').select('id', { count: 'exact', head: true });
+  const b = $('#b-dest'); if (b) { b.textContent = count || ''; b.classList.toggle('oculto', !count); }
+}
+let buscaDest = '';
+async function vistaDestacados() {
+  esqueleto('destacados', `
+    <div class="barra"><h2>⭐ Destacados</h2><span class="esp"></span>
+      <input id="dest-busca" type="search" placeholder="Buscar nº, dirección, cliente o texto…" style="max-width:320px" value="${esc(buscaDest)}" oninput="buscaDest=this.value;vistaDestacados()"></div>
+    <p style="color:var(--suave);margin:-8px 0 14px;font-size:13px">Servicios marcados con la estrella ☆ en su ficha, con su anotación. Los ve toda la oficina. Pulsa uno para abrir la ficha.</p>
+    <div id="dest-lista" class="dest-lista"><div class="vacio">Cargando…</div></div>`);
+  const { data, error } = await sb.from('destacados')
+    .select('*, parte:partes(id, numero_servicio, asegurado, direccion, poblacion, codigo_postal, estado, urgente, sigma_cuenta)')
+    .order('actualizado_en', { ascending: false });
+  if (error) return fallo(error);
+  const q = buscaDest.trim().toLowerCase();
+  const lista = (data || []).filter((d) => d.parte && (!q || [d.nota, d.parte.numero_servicio, d.parte.asegurado, dirCompleta(d.parte)].join(' ').toLowerCase().includes(q)));
+  morfar($('#dest-lista'), lista.length ? lista.map((d) => `
+    <div class="dest" data-k="${d.id}" onclick="modalParte('${d.parte.id}', true)">
+      <div class="cab"><span>★</span><span class="num">${esc(d.parte.numero_servicio)}</span>
+        <span class="et ${d.parte.estado}">${TXT_ESTADO[d.parte.estado] || esc(d.parte.estado)}</span>
+        ${d.parte.urgente ? '<span class="et urg">Urgente</span>' : ''}
+        ${d.parte.sigma_cuenta ? `<span class="et sigma">SIGMA ${esc((CUENTAS_SIGMA[d.parte.sigma_cuenta] || d.parte.sigma_cuenta).toUpperCase())}</span>` : ''}
+        ${d.parte.asegurado ? `<span style="color:var(--suave)">${esc(d.parte.asegurado)}</span>` : ''}</div>
+      <div class="dir">${esc(dirCompleta(d.parte))}</div>
+      <div class="nota">${d.nota ? esc(d.nota) : '<span style="color:var(--suave)">(sin anotación)</span>'}</div>
+      <div class="meta">${metaDest(d)}</div>
+    </div>`).join('') : `<div class="vacio">${q ? 'Ningún destacado coincide con la búsqueda.' : 'Aún no hay servicios destacados. Abre un servicio y pulsa ☆ junto a su número.'}</div>`);
 }
 
 async function guardarParte(id) {
