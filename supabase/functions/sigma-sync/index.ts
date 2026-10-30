@@ -15,6 +15,8 @@
 // CONFIRMACIÓN (v23, 23/10/2026): cada informe nuevo de un servicio SIGMA sin confirmar crea un borrador 'confirmacion'
 // (variante rápida = la manda el robot al aprobar; completa = la hace la oficina en el portal y el robot lo comprueba).
 // v24 (27/10/2026): un Repaso que SIGMA rechaza con el código 1212 (aplazar un siniestro sin confirmar) se descarta solo.
+// v25 (30/10/2026): un «Documento de Iva pendiente de Validar» en la bitácora posterior a la última comprobación de IVA hace
+//   que ese servicio se compruebe en la pasada siguiente, antes que los demás (antes los libres se miraban cada 6 h).
 // ?verconfir=N&cuenta=VLL → solo lectura: estado de la Confirmación de ese servicio.
 // ?cuenta=VLL → solo esa cuenta.  ?enviar=1 → solo manda a SIGMA los envíos aprobados (sin leer el listado).
 import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4';
@@ -983,15 +985,29 @@ async function revisarConfirmaciones(admin: SupabaseClient, s: Sesion, cuenta: s
 }
 
 // Bloqueo del Repaso por documento de IVA: se comprueba en el portal (solo lectura) y se marca en partes.sigma_iva_pendiente.
-// Primero los ya bloqueados (para desbloquearlos), luego los de Repasos (caducadas, sin primer contacto), luego el resto.
+// Primero los que tienen en la bitácora un «Documento de Iva pendiente de Validar» posterior a su última comprobación
+// (v25, 30/10/2026: antes un servicio libre solo se volvía a mirar a las 6 h y seguía contando, p. ej. 29480757), luego los
+// ya bloqueados (para desbloquearlos), luego los de Repasos (caducadas, sin primer contacto), luego el resto.
+// Hora de Madrid «aaaa-mm-dd hh:mm», igual que las fechas de la bitácora
+const horaMadrid = (iso: string) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso)).replace('T', ' ').slice(0, 16);
+// deno-lint-ignore no-explicit-any
+function avisoIvaNuevo(p: any) {
+  const aviso = (Array.isArray(p.sigma_bitacora) ? p.sigma_bitacora : [])
+    .filter((x: { fecha?: string; texto?: string }) => x?.fecha && IVA_PENDIENTE.test(x.texto ?? ''))
+    .map((x: { fecha: string }) => String(x.fecha).slice(0, 16)).sort().pop();
+  if (!aviso) return false;
+  return !p.sigma_iva_revisado_en || aviso >= horaMadrid(p.sigma_iva_revisado_en);
+}
 async function revisarIva(admin: SupabaseClient, s: Sesion, ciaId: number, cuenta: string, vivos: string[], prioridad: Set<string>, escribir: boolean) {
-  const { data } = await admin.from('partes').select('id, numero_servicio, sigma_iva_pendiente, sigma_iva_revisado_en')
+  const { data } = await admin.from('partes').select('id, numero_servicio, sigma_iva_pendiente, sigma_iva_revisado_en, sigma_bitacora')
     .eq('compania_id', ciaId).eq('sigma_cuenta', cuenta).in('numero_servicio', vivos.length ? vivos : ['-']);
   const ahoraMs = Date.now();
-  const cola = (data || []).filter((p) => {
+  const cola = (data || []).map((p) => ({ ...p, nuevo: !p.sigma_iva_pendiente && avisoIvaNuevo(p) })).filter((p) => {
+    if (p.nuevo) return true;
     const edad = p.sigma_iva_revisado_en ? (ahoraMs - new Date(p.sigma_iva_revisado_en).getTime()) / 60000 : 1e9;
     return p.sigma_iva_pendiente ? edad > IVA_MARCADO_MIN : edad > IVA_LIBRE_H * 60;
-  }).sort((a, b) => (Number(!!b.sigma_iva_pendiente) - Number(!!a.sigma_iva_pendiente))
+  }).sort((a, b) => (Number(b.nuevo) - Number(a.nuevo))
+    || (Number(!!b.sigma_iva_pendiente) - Number(!!a.sigma_iva_pendiente))
     || (Number(prioridad.has(b.numero_servicio)) - Number(prioridad.has(a.numero_servicio)))
     || String(a.sigma_iva_revisado_en ?? '').localeCompare(String(b.sigma_iva_revisado_en ?? ''))).slice(0, MAX_IVA);
   const out = { revisados: 0, bloqueados: [] as string[], desbloqueados: [] as string[] };
