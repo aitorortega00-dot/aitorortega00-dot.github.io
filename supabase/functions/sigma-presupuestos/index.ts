@@ -1,5 +1,5 @@
 // KUBEL — Robot de PRESUPUESTOS del portal SIGMA (Multiasistencia, proveedores) · 21/10/2026
-// Solo gremios 11A, 77A, 30A, 10A y 76A. Entra con cada cuenta (Valladolid, Palencia), lee la pestaña «Presupuesto»
+// Gremios 11A, 77A, 30A, 10A y 76A + fontanería 01A, 75A y 22A (30/10/2026, filtro «Fontanería» de la oficina). Entra con cada cuenta (Valladolid, Palencia), lee la pestaña «Presupuesto»
 // (valprincipal.php → servicio JSON valuations-initial-data, SOLO LECTURA) de cada servicio abierto y lo clasifica en
 // partes.sigma_ptto_* para la vista «Presupuestos» de la oficina:
 //   · 'enviado'     → hay partidas en «Pendiente»: valorado y esperando respuesta de compañía/MA
@@ -14,6 +14,9 @@
 // partes.actualizado_en («modificado» en la ficha) ni se avisa en directo a la oficina sin motivo (21/10/2026).
 // También guarda el «importe total» (partes.sigma_ptto_total): al quedar ACEPTADO, el servicio entra en Facturación con
 // ese importe (disparador partes_facturacion_ptto) aunque aún no esté cerrado (21/10/2026).
+// v5 (30/10/2026): + gremios de fontanería 01A (privativos), 75A (comunidades) y 22A (pocero). Con más servicios, tope de
+// tiempo (deja de empezar servicios a los 115 s; la función se corta a los 150 s) y los ya leídos en orden aleatorio, para
+// que una pasada cortada no deje siempre fuera a los mismos (sigma_ptto_revisado_en solo cambia cuando cambia el presupuesto).
 // ?prueba=1 → lee el portal pero NO escribe y devuelve el resumen.  ?cuenta=VLL → solo esa cuenta.
 import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.45.4';
 import postgres from 'npm:postgres@3.4.4';
@@ -24,7 +27,9 @@ const CUENTAS = [
   { id: 'VLL', nombre: 'Valladolid' },
   { id: 'PAL', nombre: 'Palencia' },
 ];
-const GREMIOS_PTTO = ['11A', '77A', '30A', '10A', '76A'];
+const GREMIOS_PTTO = ['11A', '77A', '30A', '10A', '76A', '01A', '75A', '22A'];
+const TOPE_MS = 115_000; // a partir de aquí no se empiezan servicios nuevos
+let INICIO = Date.now(); // se reinicia en cada llamada
 const PARALELO = 3; // servicios a la vez (sin agobiar al portal)
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36';
 const dec = new TextDecoder('windows-1252');
@@ -206,7 +211,7 @@ async function leer(ut: string, n: string): Promise<Ptto | null> {
   return null;
 }
 
-type Resumen = { cuenta: string; ok: boolean; servicios: number; leidos: number; guardados: number; fallidos: string[]; estados: Record<string, number>; cambios: string[]; error?: string };
+type Resumen = { cuenta: string; ok: boolean; servicios: number; leidos: number; guardados: number; fallidos: string[]; estados: Record<string, number>; cambios: string[]; cortado?: boolean; error?: string };
 
 // Huella del presupuesto para saber si ha cambiado (independiente del orden de claves que devuelve jsonb)
 // deno-lint-ignore no-explicit-any
@@ -217,7 +222,9 @@ async function revisarCuenta(admin: SupabaseClient, ciaId: number, cuenta: strin
     .eq('compania_id', ciaId).eq('sigma_cuenta', cuenta).eq('sigma_en_curso', true).in('sigma_gremio', GREMIOS_PTTO)
     .not('estado', 'in', '(cerrado,anulado)').order('sigma_ptto_revisado_en', { ascending: true, nullsFirst: true });
   if (error) throw error;
-  const lista = data || [];
+  // Primero los nunca leídos; el resto, al azar
+  const todos = data || [];
+  const lista = [...todos.filter((p) => !p.sigma_ptto_estado), ...todos.filter((p) => p.sigma_ptto_estado).sort(() => Math.random() - 0.5)];
   r.servicios = lista.length;
   if (!lista.length) { r.ok = true; return; }
   const s = new Sesion();
@@ -228,6 +235,7 @@ async function revisarCuenta(admin: SupabaseClient, ciaId: number, cuenta: strin
   let idx = 0;
   await Promise.all(Array.from({ length: PARALELO }, async () => {
     while (idx < lista.length) {
+      if (Date.now() - INICIO > TOPE_MS) { r.cortado = true; return; }
       const p = lista[idx++];
       const res = await leer(ut, p.numero_servicio);
       if (!res) { r.fallidos.push(p.numero_servicio); continue; }
@@ -271,6 +279,7 @@ async function leerSecreto() {
 Deno.serve(async (req) => {
   const sec = await leerSecreto();
   if (!sec || req.headers.get('x-kubel-secreto') !== sec) return new Response('no', { status: 401 });
+  INICIO = Date.now();
   const url = new URL(req.url);
   const prueba = url.searchParams.get('prueba') === '1';
   const solo = url.searchParams.get('cuenta');
@@ -291,6 +300,6 @@ Deno.serve(async (req) => {
     }
     resultados.push(r);
   }
-  console.log('presupuestos', JSON.stringify(resultados.map((x) => ({ cuenta: x.cuenta, ok: x.ok, servicios: x.servicios, leidos: x.leidos, guardados: x.guardados, fallidos: x.fallidos.length, estados: x.estados, cambios: x.cambios.length, error: x.error }))));
+  console.log('presupuestos', JSON.stringify(resultados.map((x) => ({ cuenta: x.cuenta, ok: x.ok, servicios: x.servicios, leidos: x.leidos, guardados: x.guardados, fallidos: x.fallidos.length, estados: x.estados, cambios: x.cambios.length, cortado: x.cortado, error: x.error }))));
   return new Response(JSON.stringify({ prueba, resultados }), { headers: { 'Content-Type': 'application/json' } });
 });
